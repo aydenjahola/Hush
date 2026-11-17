@@ -111,6 +111,40 @@ import Testing
         #expect(h.store.strips.first?.engineError != nil)
     }
 
+    @Test func failedRebuildClearsMeterLevel() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.popoverDidAppear()
+        let engine = try #require(h.factory.live("a"))
+        engine.peak = 0.5
+        h.store.tickMeters(elapsed: 1.0 / 30.0)
+        #expect(h.store.meterLevels["a"] != nil)
+
+        engine.rebuildError = FakeError()
+        h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
+        #expect(engine.isStopped)
+        #expect(h.store.meterLevels["a"] == nil)
+    }
+
+    @Test func controlFailureSaysHushCouldNotControlTheApp() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.factory.error = FakeError()
+        h.store.setPercent(80, for: "a")
+        let message = try #require(h.store.strips.first?.engineError)
+        #expect(message.contains("couldn't control this app's audio"))
+    }
+
+    @Test func meterOnlyFailureSaysHushCouldNotReadTheLevel() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.factory.error = FakeError()
+        h.store.popoverDidAppear()
+        let message = try #require(h.store.strips.first?.engineError)
+        #expect(message.contains("couldn't read this app's level"))
+        #expect(!message.contains("control"))
+    }
+
     @Test func engineFailureShowsWarningAndRetriesOnNextChange() {
         let h = Harness()
         h.processes.emit([makeApp("a")])

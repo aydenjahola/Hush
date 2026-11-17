@@ -145,6 +145,7 @@ public final class MixerStore {
         rebuildStrips()          // fresh order while still "closed"
         isPopoverVisible = true
         reconcile()
+        rebuildStrips()          // pick up meter-engine failures; order is already frozen
         startMeterPolling()
     }
 
@@ -234,9 +235,8 @@ public final class MixerStore {
                 do {
                     try engine.rebuild(outputDeviceID: device.id)
                 } catch {
-                    engine.stop()
-                    engines[id] = nil
-                    recordFailure(error, for: id)
+                    tearDownEngine(id)
+                    recordFailure(error, for: id, mode: engine.mode)
                 }
             }
         }
@@ -299,7 +299,7 @@ public final class MixerStore {
                     initialGain: mode == .control ? setting.effectiveGain : 1,
                     outputDeviceID: device.id)
             } catch {
-                recordFailure(error, for: id)
+                recordFailure(error, for: id, mode: mode)
             }
         }
     }
@@ -313,8 +313,12 @@ public final class MixerStore {
         for id in engines.keys { tearDownEngine(id) }
     }
 
-    private func recordFailure(_ error: any Error, for id: String) {
-        engineErrors[id] = "Hush couldn't control this app's audio, so it's playing normally. (\(error))"
+    private func recordFailure(_ error: any Error, for id: String, mode: EngineMode) {
+        let summary = switch mode {
+        case .control: "Hush couldn't control this app's audio, so it's playing normally."
+        case .meterOnly: "Hush couldn't read this app's level."
+        }
+        engineErrors[id] = "\(summary) (\(error))"
         logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
     }
 
