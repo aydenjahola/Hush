@@ -12,6 +12,9 @@ struct ChannelStrip: View {
     let onReset: () -> Void
     let onToggleMute: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
+
     private var isMuted: Bool { strip.setting.isMuted }
 
     var body: some View {
@@ -52,7 +55,7 @@ struct ChannelStrip: View {
             Text("\(strip.setting.percent)%")
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(strip.setting.percent > 100 ? Palette.amber : Color.primary)
+                .foregroundStyle(strip.setting.percent > 100 ? Palette.amber(colorScheme, contrast) : Color.primary)
         }
     }
 

@@ -18,6 +18,6 @@ struct PermissionBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Palette.amber.opacity(0.15)))
+                .fill(Palette.amberTint.opacity(0.15)))
     }
 }

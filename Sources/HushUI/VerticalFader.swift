@@ -84,7 +84,7 @@ struct VerticalFader: View {
                 .fill(Color.primary.opacity(contrast == .increased ? 0.3 : 0.12))
                 .frame(width: 4, height: height)
             if value > 100 {
-                Capsule().fill(Palette.amber).frame(width: 4, height: totalFill)
+                Capsule().fill(Palette.amber(colorScheme, contrast)).frame(width: 4, height: totalFill)
             }
             Capsule().fill(neutralFill).frame(width: 4, height: unityFill)
         }
