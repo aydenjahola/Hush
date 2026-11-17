@@ -10,7 +10,15 @@ public final class AudioProcessMonitor: AudioProcessSource {
 
     private var onChange: (@MainActor ([AudioApp]) -> Void)?
     private var listListener: AudioObjectPropertyListenerBlock?
-    private var runningListeners: [AudioObjectID: AudioObjectPropertyListenerBlock] = [:]
+    /// Per process object: one listener block per selector in `runningSelectors`.
+    private var runningListeners: [AudioObjectID: [AudioObjectPropertySelector: AudioObjectPropertyListenerBlock]] = [:]
+    /// Fast paths only: the HAL often skips these notifications, so `poller` backs them up.
+    private static let runningSelectors = [kAudioProcessPropertyIsRunning, kAudioProcessPropertyIsRunningOutput]
+    private lazy var poller = RunningStatePoller(
+        fastInterval: .seconds(1),
+        slowInterval: .seconds(3),
+        read: { Self.readIsRunningOutput($0) },
+        onChange: { [weak self] in self?.refresh() })
     private let resolver = AppIdentityResolver()
     private let ownPID = ProcessInfo.processInfo.processIdentifier
     private let ownBundleID = Bundle.main.bundleIdentifier
@@ -23,15 +31,21 @@ public final class AudioProcessMonitor: AudioProcessSource {
         listListener = addListener(to: CoreAudioProperty.systemObject, selector: kAudioHardwarePropertyProcessObjectList)
         refresh()
         onChange(apps)
+        poller.start()
+    }
+
+    public func setFastPolling(_ fast: Bool) {
+        poller.setFast(fast)
     }
 
     public func stop() {
+        poller.stop()
         if let listListener {
             removeListener(listListener, from: CoreAudioProperty.systemObject, selector: kAudioHardwarePropertyProcessObjectList)
         }
         listListener = nil
-        for (objectID, block) in runningListeners {
-            removeListener(block, from: objectID, selector: kAudioProcessPropertyIsRunningOutput)
+        for (objectID, blocks) in runningListeners {
+            for (selector, block) in blocks { removeListener(block, from: objectID, selector: selector) }
         }
         runningListeners = [:]
         onChange = nil
@@ -44,6 +58,9 @@ public final class AudioProcessMonitor: AudioProcessSource {
             kAudioHardwarePropertyProcessObjectList,
             filler: AudioObjectID(kAudioObjectUnknown))) ?? []
         syncRunningListeners(with: objectIDs)
+        var running: [AudioObjectID: Bool] = [:]
+        for objectID in objectIDs { running[objectID] = Self.readIsRunningOutput(objectID) }
+        poller.record(running)
 
         var groups: [String: (identity: AppIdentity, objects: [AudioObjectID], playing: Bool)] = [:]
         var livePIDs: Set<pid_t> = []
@@ -54,17 +71,16 @@ public final class AudioProcessMonitor: AudioProcessSource {
             livePIDs.insert(pid)
             let rawBundleID = try? CoreAudioProperty.string(objectID, kAudioProcessPropertyBundleID)
             let bundleID = (rawBundleID?.isEmpty ?? true) ? nil : rawBundleID
-            let isRunning = (try? CoreAudioProperty.scalar(
-                objectID, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0
+            let isRunning = running[objectID] ?? false
             let identity = resolver.identity(pid: pid, bundleID: bundleID)
             if let ownBundleID, identity.id == ownBundleID { continue }
 
             if var group = groups[identity.id] {
                 group.objects.append(objectID)
-                group.playing = group.playing || isRunning != 0
+                group.playing = group.playing || isRunning
                 groups[identity.id] = group
             } else {
-                groups[identity.id] = (identity, [objectID], isRunning != 0)
+                groups[identity.id] = (identity, [objectID], isRunning)
             }
         }
         resolver.retainOnly(pids: livePIDs)
@@ -88,13 +104,22 @@ public final class AudioProcessMonitor: AudioProcessSource {
 
     private func syncRunningListeners(with objectIDs: [AudioObjectID]) {
         let current = Set(objectIDs)
-        for (objectID, block) in runningListeners where !current.contains(objectID) {
-            removeListener(block, from: objectID, selector: kAudioProcessPropertyIsRunningOutput)
+        for (objectID, blocks) in runningListeners where !current.contains(objectID) {
+            for (selector, block) in blocks { removeListener(block, from: objectID, selector: selector) }
             runningListeners[objectID] = nil
         }
         for objectID in objectIDs where runningListeners[objectID] == nil {
-            runningListeners[objectID] = addListener(to: objectID, selector: kAudioProcessPropertyIsRunningOutput)
+            var blocks: [AudioObjectPropertySelector: AudioObjectPropertyListenerBlock] = [:]
+            for selector in Self.runningSelectors {
+                blocks[selector] = addListener(to: objectID, selector: selector)
+            }
+            runningListeners[objectID] = blocks
         }
+    }
+
+    private static func readIsRunningOutput(_ objectID: AudioObjectID) -> Bool {
+        let value = (try? CoreAudioProperty.scalar(objectID, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0
+        return value != 0
     }
 
     private func addListener(to objectID: AudioObjectID, selector: AudioObjectPropertySelector) -> AudioObjectPropertyListenerBlock? {

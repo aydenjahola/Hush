@@ -660,6 +660,17 @@ import Testing
         #expect(h.store.playingCount == 2)
     }
 
+    @Test func popoverVisibilityTogglesFastProcessPolling() {
+        let h = Harness()
+        #expect(h.processes.fastPollingCalls.isEmpty)
+
+        h.store.popoverDidAppear()
+        #expect(h.processes.fastPollingCalls == [true])
+
+        h.store.popoverDidDisappear()
+        #expect(h.processes.fastPollingCalls == [true, false])
+    }
+
     @Test func shutdownStopsEnginesAndFlushes() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])

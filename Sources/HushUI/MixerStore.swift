@@ -146,6 +146,7 @@ public final class MixerStore {
         refreshPermission()
         rebuildStrips()          // fresh order while still "closed"
         isPopoverVisible = true
+        processSource.setFastPolling(true)
         reconcile()
         rebuildStrips()          // pick up meter-engine failures; order is already frozen
         startMeterPolling()
@@ -154,6 +155,7 @@ public final class MixerStore {
     public func popoverDidDisappear() {
         guard isPopoverVisible else { return }
         isPopoverVisible = false
+        processSource.setFastPolling(false)
         stopMeterPolling()
         meterLevels = [:]
         reconcile()
