@@ -41,11 +41,13 @@ struct VerticalFader: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0).onChanged { drag in
+                    guard isEnabled else { return }
                     let newValue = percent(atY: drag.location.y, travel: travel)
                     if newValue != value { onChange(newValue) }
                 })
             .simultaneousGesture(
                 SpatialTapGesture(count: 2).onEnded { tap in
+                    guard isEnabled else { return }
                     if abs(tap.location.y - (knobTop + knobSize.height / 2)) <= 12 { onReset() }
                 })
         }
@@ -61,6 +63,7 @@ struct VerticalFader: View {
         .accessibilityLabel("\(appName) volume")
         .accessibilityValue("\(value) percent")
         .accessibilityAdjustableAction { direction in
+            guard isEnabled else { return }
             switch direction {
             case .increment: nudge(Self.step)
             case .decrement: nudge(-Self.step)
