@@ -10,7 +10,8 @@ Run before every release. `make run` builds `Hush.app` and launches it. Test the
 - [ ] **Multichannel output.** If you have a 5.1/7.1 device or a multichannel interface, set an app to 50%. It plays only on the front left/right pair, not on every speaker.
 - [ ] **Permission denied, then granted.** Run `tccutil reset AudioCapture io.github.aydenjahola.Hush`, relaunch and deny: the banner shows and the controls are disabled. Click "Open System Settings", grant access, reopen the popover: controls work.
 - [ ] **Permission banner opens the right pane.** With access denied, click "Open System Settings" in the banner. System Settings opens at Privacy & Security → Screen & System Audio Recording, with the System Audio Recording Only list visible.
-- [ ] **Levels restored after relaunch.** Set one app to 60% and mute another. Quit Hush from the gear menu and relaunch. Both settings apply as soon as the apps play.
+- [ ] **Levels restored after relaunch.** Set one app to 60% and mute another. Quit Hush from the gear menu and relaunch. Both settings apply as soon as the apps are running.
+- [ ] **Muted app's sounds start silent.** Mute a chat or mail app while it's idle, then trigger a notification sound in it (e.g. send yourself a message). The sound is silent from its very first moment, with no blip at full volume. Lower the app to 30% instead: the sound starts at 30%.
 - [ ] **Settings from the gear.** Click the gear in the popover. The Settings window opens and comes to the front, even when another app is active. Right-click the gear: "Quit Hush" is offered.
 - [ ] **Launch at login.** Turn on "Launch at login" in Settings, log out and back in. Hush is in the menu bar. Turn it off; it no longer appears in System Settings → General → Login Items.
 - [ ] **Reset all levels.** Set two apps to non-100% levels, then Settings → "Reset All Levels…" → confirm. Both strips go back to 100% and unmuted, and the apps play at normal volume.

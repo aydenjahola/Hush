@@ -36,11 +36,10 @@ With only the Command Line Tools installed, use `make test` rather than plain `s
 
 ## How it works
 
-For each app you adjust, Hush creates a private process tap that mutes the app at the source, then plays the tapped audio back through a private aggregate device with your gain applied. Apps left at 100% are untouched. If Hush quits or crashes, macOS removes its taps and every app plays normally again.
+For each app you adjust, Hush creates a private process tap that mutes the app at the source, then plays the tapped audio back through a private aggregate device with your gain applied. Hush keeps that tap open for as long as the app is running, even while it's silent, so a muted or lowered app's next sound starts at the right level instead of briefly at full volume. The trade-off is one idle tap per adjusted app that's running. Apps left at 100% are untouched. If Hush quits or crashes, macOS removes its taps and every app plays normally again.
 
 ## Known limitations
 
-- A muted or lowered app is only tapped once it starts playing, so the first fraction of a second of each sound plays at normal volume.
 - Audio from command-line tools is attributed to the terminal app that launched them.
 - When you switch output devices, apps briefly play at their normal level while Hush rebuilds its engines.
 
