@@ -40,7 +40,7 @@ For each app you adjust, Hush creates a private process tap that mutes the app a
 
 ## Known limitations
 
-- For apps that are lowered or boosted (not muted), the first fraction of a second of each new sound can play at normal volume while Hush starts processing it.
+- For apps that are lowered or boosted (not muted), up to about a second (usually much less) of each new sound can play at normal volume before Hush notices it and starts processing it.
 - Even a muted app can leak its very first sound after it launches, or when it starts a new audio helper process (common in browsers), because Hush can only tap a process once Core Audio reports it.
 - Audio from command-line tools is attributed to the terminal app that launched them.
 - When you switch output devices, lowered or boosted apps briefly play at their normal level while Hush rebuilds their engines. Muted apps stay muted.
