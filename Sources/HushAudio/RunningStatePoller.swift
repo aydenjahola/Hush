@@ -7,16 +7,25 @@ import CoreAudio
 @MainActor
 final class RunningStatePoller {
     typealias Reader = @MainActor (AudioObjectID) -> Bool
+    typealias Sleeper = @Sendable (Duration) async throws -> Void
 
     private let fastInterval: Duration
     private let slowInterval: Duration
     private let read: Reader
     private let onChange: @MainActor () -> Void
+    private let sleep: Sleeper
     private var snapshot: [AudioObjectID: Bool] = [:]
     private var task: Task<Void, Never>?
     private var isFast = false
 
-    init(fastInterval: Duration, slowInterval: Duration, read: @escaping Reader, onChange: @escaping @MainActor () -> Void) {
+    init(
+        fastInterval: Duration,
+        slowInterval: Duration,
+        read: @escaping Reader,
+        onChange: @escaping @MainActor () -> Void,
+        sleep: @escaping Sleeper = { try await Task.sleep(for: $0) }
+    ) {
+        self.sleep = sleep
         self.fastInterval = fastInterval
         self.slowInterval = slowInterval
         self.read = read
@@ -50,10 +59,11 @@ final class RunningStatePoller {
 
     func start() {
         task?.cancel()
+        let sleep = self.sleep
         task = Task { [weak self] in
             while !Task.isCancelled {
                 guard let interval = self?.interval else { return }
-                try? await Task.sleep(for: interval)
+                try? await sleep(interval)
                 guard !Task.isCancelled, let self else { return }
                 self.poll()
             }
