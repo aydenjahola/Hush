@@ -15,10 +15,12 @@ final class EngineSharedState: Sendable {
     }
 }
 
-/// One app's tap + private aggregate device + IOProc.
+/// One app's tap, plus (except in `.muteOnly`) a private aggregate device and IOProc.
 ///
 /// `.control`: the app is muted at the source (`.mutedWhenTapped`) and replayed with gain.
 /// `.meterOnly`: the app plays normally (`.unmuted`); output buffers are zero-filled and only the level is measured.
+/// `.muteOnly`: a `.muted` tap and nothing else. The tap's existence silences the app even though
+/// nobody reads it, so there's no aggregate, no IOProc and no running device.
 @MainActor
 public final class AppAudioEngine: AudioEngineHandle {
     public let mode: EngineMode
@@ -40,7 +42,7 @@ public final class AppAudioEngine: AudioEngineHandle {
     }
 
     public func start() throws {
-        guard ioProcID == nil else { return }
+        guard tapID == kAudioObjectUnknown else { return }
         do {
             try build()
         } catch {
@@ -67,16 +69,20 @@ public final class AppAudioEngine: AudioEngineHandle {
     }
 
     public func setGain(_ gain: Float) {
+        guard mode != .muteOnly else { return }
         state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
     }
 
     public func currentPeak() -> Float {
-        Float(bitPattern: state.peakBits.exchange(0, ordering: .relaxed))
+        guard mode != .muteOnly else { return 0 }
+        return Float(bitPattern: state.peakBits.exchange(0, ordering: .relaxed))
     }
 
     public func rebuild(outputDeviceID: AudioObjectID) throws {
-        stop()
         self.outputDeviceID = outputDeviceID
+        // A mute-only tap isn't attached to any device, so it survives an output change untouched.
+        guard mode != .muteOnly else { return }
+        stop()
         try start()
     }
 
@@ -85,11 +91,16 @@ public final class AppAudioEngine: AudioEngineHandle {
         description.uuid = UUID()
         description.name = "Hush – \(appID)"
         description.isPrivate = true
-        description.muteBehavior = mode == .control ? .mutedWhenTapped : .unmuted
+        description.muteBehavior = switch mode {
+        case .control: .mutedWhenTapped
+        case .meterOnly: .unmuted
+        case .muteOnly: .muted
+        }
 
         var newTap = AudioObjectID(kAudioObjectUnknown)
         try CoreAudioProperty.check(AudioHardwareCreateProcessTap(description, &newTap), "AudioHardwareCreateProcessTap")
         tapID = newTap
+        if mode == .muteOnly { return }
 
         let outputUID = try CoreAudioProperty.string(outputDeviceID, kAudioDevicePropertyDeviceUID)
         let configuration: [String: Any] = [
@@ -156,6 +167,9 @@ public final class AppAudioEngine: AudioEngineHandle {
                 state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
             case .meterOnly:
                 peak = BufferRouting.peak(of: input, firstInputBuffer: tapBufferOffset)
+                BufferRouting.silence(output)
+            case .muteOnly:  // never has an IOProc; kept for exhaustiveness
+                peak = 0
                 BufferRouting.silence(output)
             }
             // Non-negative Float bit patterns order like the values, so an atomic max is a valid peak hold.

@@ -163,3 +163,9 @@ final class Harness {
 func makeApp(_ id: String, playing: Bool = true, objects: [AudioObjectID] = [42], regular: Bool = true) -> AudioApp {
     AudioApp(id: id, displayName: id, processObjectIDs: objects, isPlaying: playing, isRegularApp: regular)
 }
+
+@MainActor func mutedSetting(percent: Int = 100) -> AppVolumeSetting {
+    var setting = AppVolumeSetting(percent: percent, lastAdjusted: Harness.fixedNow)
+    setting.isMuted = true
+    return setting
+}

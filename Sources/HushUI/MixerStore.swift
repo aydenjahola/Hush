@@ -189,10 +189,10 @@ public final class MixerStore {
     // MARK: Meters
 
     func tickMeters(elapsed: Double) {
-        // A silent app's control engine would only ever report 0, so meter just the playing apps.
+        // Mute-only taps have no level to read, and muted strips hide their meter anyway.
         let playingIDs = Set(apps.lazy.filter(\.isPlaying).map(\.id))
         var levels: [String: Float] = [:]
-        for (id, engine) in engines where playingIDs.contains(id) {
+        for (id, engine) in engines where engine.mode != .muteOnly && playingIDs.contains(id) {
             levels[id] = MeterBallistics.next(
                 displayed: meterLevels[id] ?? 0,
                 peak: engine.currentPeak(),
@@ -270,8 +270,8 @@ public final class MixerStore {
     }
 
     /// Makes the set of running engines match the reconcile rule in spec section 4.3:
-    /// adjusted running apps get a `.control` engine, other playing apps get a `.meterOnly`
-    /// engine while the popover is open, everything else gets none.
+    /// muted running apps get a `.muteOnly` tap, lowered or boosted playing apps a `.control`
+    /// engine, other playing apps a `.meterOnly` engine while the popover is open, the rest none.
     private func reconcile() {
         guard controlsEnabled, let device = outputDevice else {
             tearDownAllEngines()
@@ -287,9 +287,12 @@ public final class MixerStore {
 
         for (id, app) in present {
             let setting = settings[id] ?? AppVolumeSetting()
-            // Adjusted apps keep their control tap while running, even when silent, so the first
-            // moment of each new sound is already muted or lowered.
-            let desired: EngineMode? = if setting.needsEngine {
+            // Muted apps keep a cheap mute tap (no IO) while running, even when silent, so the first
+            // moment of each new sound is already silenced. Lowered or boosted apps need real
+            // processing, so they get a control engine only while they play.
+            let desired: EngineMode? = if setting.isMuted {
+                .muteOnly
+            } else if setting.needsEngine && app.isPlaying {
                 .control
             } else if app.isPlaying && isPopoverVisible {
                 .meterOnly
@@ -332,6 +335,7 @@ public final class MixerStore {
         let summary = switch mode {
         case .control: "Hush couldn't control this app's audio, so it's playing normally."
         case .meterOnly: "Hush couldn't read this app's level."
+        case .muteOnly: "Hush couldn't mute this app, so it's playing normally."
         }
         engineErrors[id] = "\(summary) (\(error))"
         logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")

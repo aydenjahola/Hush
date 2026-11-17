@@ -56,6 +56,9 @@ public enum EngineMode: Sendable, Equatable {
     case control
     /// The app plays normally; the tap only measures its level.
     case meterOnly
+    /// The app is silenced by the tap's existence alone (`CATapMuted`): no aggregate device,
+    /// no IOProc, nothing running. Cheap enough to keep open while a muted app is idle.
+    case muteOnly
 }
 
 public enum AudioCapturePermissionStatus: Sendable, Equatable {
