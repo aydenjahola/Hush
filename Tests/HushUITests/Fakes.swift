@@ -98,8 +98,15 @@ final class FakeEngineFactory: AudioEngineFactory {
 @MainActor
 final class FakePermission: AudioCapturePermissionSource {
     var status: AudioCapturePermissionStatus = .authorized
+    /// What the user answers when asked; nil leaves `status` unchanged.
+    var answer: AudioCapturePermissionStatus?
+    private(set) var requestCount = 0
     func currentStatus() -> AudioCapturePermissionStatus { status }
-    func requestAccess() async -> AudioCapturePermissionStatus { status }
+    func requestAccess() async -> AudioCapturePermissionStatus {
+        requestCount += 1
+        if let answer { status = answer }
+        return status
+    }
 }
 
 final class FakePersister: SettingsPersisting {
@@ -125,6 +132,7 @@ final class Harness {
     init(
         document: SettingsDocument = SettingsDocument(),
         permission status: AudioCapturePermissionStatus = .authorized,
+        answer: AudioCapturePermissionStatus? = nil,
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = { _ in nil }
     ) {
         let processes = FakeProcessSource()
@@ -132,6 +140,7 @@ final class Harness {
         let factory = FakeEngineFactory()
         let permission = FakePermission()
         permission.status = status
+        permission.answer = answer
         let persister = FakePersister(document: document)
         self.processes = processes
         self.output = output

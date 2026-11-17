@@ -216,6 +216,65 @@ import Testing
         #expect(h.factory.live("a")?.mode == .control)
     }
 
+    @Test func undeterminedPermissionIsRequestedAndGrantAppliesSavedSettings() async throws {
+        let h = Harness(
+            document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]),
+            permission: .undetermined,
+            answer: .authorized)
+        h.processes.emit([makeApp("a")])
+        #expect(!h.store.controlsEnabled)
+        #expect(h.factory.made.isEmpty)
+
+        let request = try #require(h.store.permissionRequest)
+        await request.value
+        #expect(h.permission.requestCount == 1)
+        #expect(h.store.permission == .authorized)
+        let engine = try #require(h.factory.live("a"))
+        #expect(engine.mode == .control)
+        #expect(isApproximatelyEqual(engine.initialGain, 0.25))
+    }
+
+    @Test func undeterminedPermissionDeniedKeepsControlsOff() async throws {
+        let h = Harness(permission: .undetermined, answer: .denied)
+        h.processes.emit([makeApp("a")])
+        await h.store.permissionRequest?.value
+        #expect(h.store.permission == .denied)
+        #expect(!h.store.controlsEnabled)
+        #expect(h.factory.made.isEmpty)
+    }
+
+    @Test func authorizedPermissionIsNotRequested() {
+        let h = Harness()
+        #expect(h.store.permissionRequest == nil)
+        #expect(h.permission.requestCount == 0)
+    }
+
+    @Test func losingOutputDeviceTearsDownEnginesAndReturningRecreatesThem() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.setPercent(80, for: "a")
+        h.store.popoverDidAppear()
+        h.processes.emit([makeApp("a"), makeApp("b", objects: [43])])
+        let control = try #require(h.factory.live("a"))
+        let meter = try #require(h.factory.live("b"))
+        #expect(meter.mode == .meterOnly)
+
+        h.output.emit(nil)
+        #expect(control.isStopped)
+        #expect(meter.isStopped)
+        #expect(h.store.engineCount == 0)
+        #expect(h.store.outputDevice == nil)
+        #expect(h.store.meterLevels.isEmpty)
+
+        h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
+        let newControl = try #require(h.factory.live("a"))
+        #expect(newControl !== control)
+        #expect(newControl.mode == .control)
+        #expect(isApproximatelyEqual(newControl.initialGain, 0.64))
+        #expect(h.factory.live("b")?.mode == .meterOnly)
+        #expect(h.store.engineCount == 2)
+    }
+
     @Test func stoppingPlaybackTearsDownEngineAndKeepsSetting() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])

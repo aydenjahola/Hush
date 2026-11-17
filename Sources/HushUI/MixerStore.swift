@@ -60,6 +60,8 @@ public final class MixerStore {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var hasPendingSave = false
     @ObservationIgnored private var meterTask: Task<Void, Never>?
+    /// The first-launch permission request, if one was made (exposed for tests).
+    @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "io.github.hush-mixer.Hush", category: "engine")
 
     public init(
@@ -90,7 +92,7 @@ public final class MixerStore {
         outputSource.start { [weak self] device in self?.outputDidChange(device) }
         processSource.start { [weak self] apps in self?.appsDidChange(apps) }
         if permission == .undetermined {
-            Task { [weak self] in
+            permissionRequest = Task { [weak self] in
                 guard let self else { return }
                 let status = await self.permissionSource.requestAccess()
                 self.permissionDidChange(status)
