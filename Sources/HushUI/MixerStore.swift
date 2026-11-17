@@ -303,23 +303,30 @@ public final class MixerStore {
                 nil
             }
 
-            if let engine = engines[id] {
-                if engine.mode == desired && engine.processObjectIDs == app.processObjectIDs {
-                    if desired == .control { engine.setGain(setting.effectiveGain) }
-                    continue
-                }
-                tearDownEngine(id)
+            let existing = engines[id]
+            if let existing, existing.mode == desired, existing.processObjectIDs == app.processObjectIDs {
+                if desired == .control { existing.setGain(setting.effectiveGain) }
+                continue
             }
 
-            guard let mode = desired, engineErrors[id] == nil else { continue }
+            guard let mode = desired, engineErrors[id] == nil else {
+                tearDownEngine(id)
+                continue
+            }
+            // Make before break: the old tap keeps the app muted or processed until the new one
+            // exists, so a mode or process-list change doesn't let audio through in between.
             do {
-                engines[id] = try engineFactory.makeEngine(
+                let replacement = try engineFactory.makeEngine(
                     appID: id,
                     processObjectIDs: app.processObjectIDs,
                     mode: mode,
                     initialGain: mode == .control ? setting.effectiveGain : 1,
                     outputDeviceID: device.id)
+                engines[id] = replacement
+                existing?.stop()
+                if existing != nil { meterLevels[id] = nil }
             } catch {
+                tearDownEngine(id)  // never keep an engine in the wrong mode
                 recordFailure(error, for: id, mode: mode)
             }
         }

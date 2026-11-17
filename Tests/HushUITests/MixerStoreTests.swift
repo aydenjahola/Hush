@@ -710,6 +710,69 @@ import Testing
         #expect(h.processes.fastPollingCalls == [true])
     }
 
+    @Test func unmutingPlayingAppMakesControlEngineBeforeStoppingMuteTap() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(percent: 50)]))
+        h.processes.emit([makeApp("a")])
+        let mute = try #require(h.factory.live("a"))
+        let before = h.factory.events.count
+
+        h.store.toggleMute(for: "a")
+        #expect(Array(h.factory.events.dropFirst(before)) == ["make a control", "stop a muteOnly"])
+        #expect(mute.isStopped)
+        #expect(h.factory.live("a")?.mode == .control)
+        #expect(h.store.engineCount == 1)
+    }
+
+    @Test func mutingPlayingAppMakesMuteTapBeforeStoppingControlEngine() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.setPercent(50, for: "a")
+        let before = h.factory.events.count
+
+        h.store.toggleMute(for: "a")
+        #expect(Array(h.factory.events.dropFirst(before)) == ["make a muteOnly", "stop a control"])
+        #expect(h.factory.live("a")?.mode == .muteOnly)
+    }
+
+    @Test func processListChangeMakesNewMuteTapBeforeStoppingOldOne() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
+        h.processes.emit([makeApp("a", objects: [42])])
+        let old = try #require(h.factory.live("a"))
+        let before = h.factory.events.count
+
+        h.processes.emit([makeApp("a", objects: [42, 43])])
+        #expect(Array(h.factory.events.dropFirst(before)) == ["make a muteOnly", "stop a muteOnly"])
+        #expect(old.isStopped)
+        #expect(h.factory.live("a")?.processObjectIDs == [42, 43])
+    }
+
+    @Test func meterToControlSwapIsMakeBeforeBreakAndClearsMeterLevel() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.popoverDidAppear()
+        let meter = try #require(h.factory.live("a"))
+        meter.peak = 0.5
+        h.store.tickMeters(elapsed: 1.0 / 30.0)
+        let before = h.factory.events.count
+
+        h.store.setPercent(50, for: "a")
+        #expect(Array(h.factory.events.dropFirst(before)) == ["make a control", "stop a meterOnly"])
+        #expect(h.store.meterLevels["a"] == nil, "the new engine starts with a fresh meter")
+    }
+
+    @Test func failedReplacementStopsOldEngineAndRecordsError() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(percent: 50)]))
+        h.processes.emit([makeApp("a")])
+        let mute = try #require(h.factory.live("a"))
+
+        h.factory.error = FakeError()
+        h.store.toggleMute(for: "a")
+        #expect(mute.isStopped, "never keep an engine in the wrong mode")
+        #expect(h.store.engineCount == 0)
+        let message = try #require(h.store.strips.first?.engineError)
+        #expect(message.contains("couldn't control this app's audio"))
+    }
+
     @Test func shutdownStopsEnginesAndFlushes() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])

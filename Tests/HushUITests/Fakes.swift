@@ -54,6 +54,8 @@ final class FakeEngine: AudioEngineHandle {
     private(set) var rebuiltDeviceIDs: [AudioObjectID] = []
     var rebuildError: (any Error)?
     var peak: Float = 0
+    /// Shared ordered event log, set by the factory.
+    var log: ((String) -> Void)?
 
     init(appID: String, mode: EngineMode, processObjectIDs: [AudioObjectID], initialGain: Float) {
         self.appID = appID
@@ -64,7 +66,10 @@ final class FakeEngine: AudioEngineHandle {
     }
 
     func start() throws {}
-    func stop() { isStopped = true }
+    func stop() {
+        isStopped = true
+        log?("stop \(appID) \(mode)")
+    }
     func setGain(_ gain: Float) { currentGain = gain }
     func currentPeak() -> Float { peak }
 
@@ -78,6 +83,8 @@ final class FakeEngine: AudioEngineHandle {
 final class FakeEngineFactory: AudioEngineFactory {
     private(set) var made: [FakeEngine] = []
     var error: (any Error)?
+    /// Ordered "make <id> <mode>" / "stop <id> <mode>" events across all engines.
+    private(set) var events: [String] = []
 
     func makeEngine(
         appID: String,
@@ -86,8 +93,10 @@ final class FakeEngineFactory: AudioEngineFactory {
         initialGain: Float,
         outputDeviceID: AudioObjectID
     ) throws -> any AudioEngineHandle {
+        events.append("make \(appID) \(mode)")
         if let error { throw error }
         let engine = FakeEngine(appID: appID, mode: mode, processObjectIDs: processObjectIDs, initialGain: initialGain)
+        engine.log = { [weak self] in self?.events.append($0) }
         made.append(engine)
         return engine
     }
