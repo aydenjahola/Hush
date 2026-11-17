@@ -4,7 +4,7 @@ import CoreAudio
 public protocol AudioProcessSource: AnyObject {
     /// Begins monitoring. Calls `onChange` immediately with the current list, then on every change.
     func start(onChange: @escaping @MainActor ([AudioApp]) -> Void)
-    /// Polls running state more often (while the popover is visible) or less often.
+    /// Polls running state more often or less often. The caller decides when fast polling is worth it.
     func setFastPolling(_ fast: Bool)
 }
 

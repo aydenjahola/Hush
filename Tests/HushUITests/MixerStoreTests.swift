@@ -671,6 +671,45 @@ import Testing
         #expect(h.processes.fastPollingCalls == [true, false])
     }
 
+    @Test func presentLoweredAppTurnsFastPollingOnAndResetTurnsItOff() {
+        let h = Harness()
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(h.processes.fastPollingCalls.isEmpty)
+
+        h.store.setPercent(60, for: "a")
+        #expect(h.processes.fastPollingCalls == [true], "a missed start would otherwise play unprocessed for up to the slow interval")
+
+        h.store.setPercent(70, for: "a")
+        #expect(h.processes.fastPollingCalls == [true], "pushed only when it changes")
+
+        h.store.resetVolume(for: "a")
+        #expect(h.processes.fastPollingCalls == [true, false])
+    }
+
+    @Test func savedLoweredSettingTurnsFastPollingOnWhenAppAppearsAndOffWhenItLeaves() {
+        let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 150, lastAdjusted: Harness.fixedNow)]))
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(h.processes.fastPollingCalls == [true])
+
+        h.processes.emit([])
+        #expect(h.processes.fastPollingCalls == [true, false])
+    }
+
+    @Test func mutedOnlyAppDoesNotNeedFastPolling() {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(percent: 50)]))
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(h.processes.fastPollingCalls.isEmpty, "the mute tap is always on, so a missed start is already silent")
+    }
+
+    @Test func loweredAppKeepsFastPollingAfterPopoverCloses() {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.setPercent(60, for: "a")
+        h.store.popoverDidAppear()
+        h.store.popoverDidDisappear()
+        #expect(h.processes.fastPollingCalls == [true])
+    }
+
     @Test func shutdownStopsEnginesAndFlushes() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])

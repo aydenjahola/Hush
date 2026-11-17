@@ -60,6 +60,8 @@ public final class MixerStore {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var hasPendingSave = false
     @ObservationIgnored private var meterTask: Task<Void, Never>?
+    /// Last value pushed to `processSource.setFastPolling`.
+    @ObservationIgnored private var isFastPolling = false
     /// The first-launch permission request, if one was made (exposed for tests).
     @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
@@ -146,7 +148,6 @@ public final class MixerStore {
         refreshPermission()
         rebuildStrips()          // fresh order while still "closed"
         isPopoverVisible = true
-        processSource.setFastPolling(true)
         reconcile()
         rebuildStrips()          // pick up meter-engine failures; order is already frozen
         startMeterPolling()
@@ -155,7 +156,6 @@ public final class MixerStore {
     public func popoverDidDisappear() {
         guard isPopoverVisible else { return }
         isPopoverVisible = false
-        processSource.setFastPolling(false)
         stopMeterPolling()
         meterLevels = [:]
         reconcile()
@@ -275,6 +275,7 @@ public final class MixerStore {
     /// muted running apps get a `.muteOnly` tap, lowered or boosted playing apps a `.control`
     /// engine, other playing apps a `.meterOnly` engine while the popover is open, the rest none.
     private func reconcile() {
+        defer { updatePolling() }
         guard controlsEnabled, let device = outputDevice else {
             tearDownAllEngines()
             return
@@ -322,6 +323,20 @@ public final class MixerStore {
                 recordFailure(error, for: id, mode: mode)
             }
         }
+    }
+
+    /// Fast process polling while the popover is open (live strips) or while any present app
+    /// needs a playing-time `.control` engine: if the HAL misses that app's start, the next poll
+    /// is what starts processing it. Muted apps don't count; their mute tap is always on.
+    private func updatePolling() {
+        let needsPlayingTimeEngine = controlsEnabled && apps.contains { app in
+            guard let setting = settings[app.id] else { return false }
+            return !setting.isMuted && setting.needsEngine
+        }
+        let fast = isPopoverVisible || needsPlayingTimeEngine
+        guard fast != isFastPolling else { return }
+        isFastPolling = fast
+        processSource.setFastPolling(fast)
     }
 
     private func tearDownEngine(_ id: String) {
