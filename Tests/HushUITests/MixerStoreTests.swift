@@ -275,20 +275,151 @@ import Testing
         #expect(h.store.engineCount == 2)
     }
 
-    @Test func stoppingPlaybackTearsDownEngineAndKeepsSetting() throws {
+    @Test func stoppingPlaybackKeepsControlEngine() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.setPercent(80, for: "a")
+        let engine = try #require(h.factory.live("a"))
+
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(!engine.isStopped)
+        #expect(h.factory.live("a") === engine)
+        #expect(h.store.strips.isEmpty)
+
+        h.processes.emit([makeApp("a")])
+        #expect(h.factory.made.count == 1, "the tap was already in place when playback resumed")
+        #expect(h.factory.live("a") === engine)
+        #expect(isApproximatelyEqual(engine.currentGain, 0.64))
+    }
+
+    @Test func mutedAppThatIsNotPlayingGetsControlEngineAtZeroGain() throws {
+        var muted = AppVolumeSetting(lastAdjusted: Harness.fixedNow)
+        muted.isMuted = true
+        let h = Harness(document: SettingsDocument(apps: ["chat": muted]))
+        h.processes.emit([makeApp("chat", playing: false)])
+
+        let engine = try #require(h.factory.live("chat"))
+        #expect(engine.mode == .control)
+        #expect(engine.initialGain == 0)
+    }
+
+    @Test func adjustingAppThatIsNotPlayingCreatesControlEngine() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a", playing: false)])
+        h.store.setShowInactiveApps(true)
+        h.store.popoverDidAppear()
+        #expect(h.factory.made.isEmpty)
+
+        h.store.setPercent(50, for: "a")
+        let engine = try #require(h.factory.live("a"))
+        #expect(engine.mode == .control)
+        #expect(isApproximatelyEqual(engine.initialGain, 0.25))
+
+        h.store.setPercent(100, for: "a")
+        #expect(engine.isStopped)
+        #expect(h.store.engineCount == 0, "idle and untouched: no meter engine either")
+    }
+
+    @Test func appWithoutSettingThatIsNotPlayingGetsNoEngineWithPopoverOpen() {
+        let h = Harness()
+        h.processes.emit([makeApp("a", playing: false)])
+        h.store.setShowInactiveApps(true)
+        h.store.popoverDidAppear()
+        #expect(h.factory.made.isEmpty)
+        #expect(h.store.strips.map(\.id) == ["a"])
+    }
+
+    @Test func stoppingPlaybackTearsDownMeterOnlyEngine() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.popoverDidAppear()
+        let meter = try #require(h.factory.live("a"))
+        #expect(meter.mode == .meterOnly)
+
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(meter.isStopped)
+        #expect(h.store.engineCount == 0)
+    }
+
+    @Test func idleControlEngineStaysControlWhenPopoverOpensAndCloses() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
+        h.processes.emit([makeApp("a", playing: false)])
+        let engine = try #require(h.factory.live("a"))
+
+        h.store.popoverDidAppear()
+        h.store.popoverDidDisappear()
+        #expect(!engine.isStopped)
+        #expect(h.factory.made.count == 1)
+    }
+
+    @Test func appDisappearingTearsDownEngineAndKeepsSetting() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
         h.store.setPercent(80, for: "a")
         let first = try #require(h.factory.live("a"))
 
-        h.processes.emit([makeApp("a", playing: false)])
+        h.processes.emit([])
         #expect(first.isStopped)
-        #expect(h.store.strips.isEmpty)
+        #expect(h.store.engineCount == 0)
 
-        h.processes.emit([makeApp("a")])
+        h.processes.emit([makeApp("a", playing: false)])
         let second = try #require(h.factory.live("a"))
         #expect(second !== first)
+        #expect(second.mode == .control)
         #expect(isApproximatelyEqual(second.initialGain, 0.64))
+    }
+
+    @Test func engineErrorSurvivesStoppingPlaybackAndClearsWhenAppDisappears() throws {
+        let h = Harness()
+        h.store.setShowInactiveApps(true)
+        h.processes.emit([makeApp("a")])
+        h.factory.error = FakeError()
+        h.store.setPercent(80, for: "a")
+        #expect(h.store.strips.first?.engineError != nil)
+
+        h.factory.error = nil
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(h.store.strips.first?.engineError != nil, "stopping playback is not a retry")
+        #expect(h.factory.made.isEmpty)
+
+        h.processes.emit([])
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(h.store.strips.first?.engineError == nil)
+        #expect(h.factory.live("a")?.mode == .control, "a relaunched app gets a fresh attempt")
+    }
+
+    @Test func idleAppProcessListChangeReplacesControlEngine() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
+        h.processes.emit([makeApp("a", playing: false, objects: [42])])
+        let first = try #require(h.factory.live("a"))
+
+        h.processes.emit([makeApp("a", playing: false, objects: [42, 43])])
+        #expect(first.isStopped)
+        #expect(h.factory.live("a")?.processObjectIDs == [42, 43])
+    }
+
+    @Test func outputChangeRebuildsIdleControlEngine() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
+        h.processes.emit([makeApp("a", playing: false)])
+        let engine = try #require(h.factory.live("a"))
+
+        h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
+        #expect(engine.rebuiltDeviceIDs == [2])
+        #expect(h.factory.made.count == 1)
+    }
+
+    @Test func meterTickSkipsEnginesOfAppsThatAreNotPlaying() throws {
+        let h = Harness(document: SettingsDocument(apps: ["idle": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
+        h.processes.emit([makeApp("idle", playing: false), makeApp("b", objects: [43])])
+        h.store.popoverDidAppear()
+        #expect(h.store.engineCount == 2)
+
+        h.store.tickMeters(elapsed: 1.0 / 30.0)
+        #expect(Set(h.store.meterLevels.keys) == ["b"])
+
+        h.processes.emit([makeApp("idle", playing: false), makeApp("b", playing: false, objects: [43])])
+        h.store.tickMeters(elapsed: 1.0 / 30.0)
+        #expect(h.store.meterLevels.isEmpty)
     }
 
     @Test func processListChangeReplacesEngine() throws {

@@ -189,8 +189,10 @@ public final class MixerStore {
     // MARK: Meters
 
     func tickMeters(elapsed: Double) {
+        // A silent app's control engine would only ever report 0, so meter just the playing apps.
+        let playingIDs = Set(apps.lazy.filter(\.isPlaying).map(\.id))
         var levels: [String: Float] = [:]
-        for (id, engine) in engines {
+        for (id, engine) in engines where playingIDs.contains(id) {
             levels[id] = MeterBallistics.next(
                 displayed: meterLevels[id] ?? 0,
                 peak: engine.currentPeak(),
@@ -267,22 +269,33 @@ public final class MixerStore {
         rebuildStrips()
     }
 
-    /// Makes the set of running engines match the reconcile rule in spec section 4.3.
+    /// Makes the set of running engines match the reconcile rule in spec section 4.3:
+    /// adjusted running apps get a `.control` engine, other playing apps get a `.meterOnly`
+    /// engine while the popover is open, everything else gets none.
     private func reconcile() {
         guard controlsEnabled, let device = outputDevice else {
             tearDownAllEngines()
             return
         }
 
-        var playing: [String: AudioApp] = [:]
-        for app in apps where app.isPlaying { playing[app.id] = app }
+        var present: [String: AudioApp] = [:]
+        for app in apps { present[app.id] = app }
 
-        for id in engines.keys where playing[id] == nil { tearDownEngine(id) }
-        for id in engineErrors.keys where playing[id] == nil { engineErrors[id] = nil }
+        // An app that's gone takes its engine and its error with it; the setting stays for its return.
+        for id in engines.keys where present[id] == nil { tearDownEngine(id) }
+        for id in engineErrors.keys where present[id] == nil { engineErrors[id] = nil }
 
-        for (id, app) in playing {
+        for (id, app) in present {
             let setting = settings[id] ?? AppVolumeSetting()
-            let desired: EngineMode? = setting.needsEngine ? .control : (isPopoverVisible ? .meterOnly : nil)
+            // Adjusted apps keep their control tap while running, even when silent, so the first
+            // moment of each new sound is already muted or lowered.
+            let desired: EngineMode? = if setting.needsEngine {
+                .control
+            } else if app.isPlaying && isPopoverVisible {
+                .meterOnly
+            } else {
+                nil
+            }
 
             if let engine = engines[id] {
                 if engine.mode == desired && engine.processObjectIDs == app.processObjectIDs {
