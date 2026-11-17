@@ -45,8 +45,11 @@ struct WindowVisibilityObserver: NSViewRepresentable {
         private func report(_ visible: Bool) {
             guard visible != lastReported else { return }
             lastReported = visible
-            DispatchQueue.main.async { [weak self] in
-                self?.onChange?(visible)
+            // Capture the callback, not the view: when the view is freed as the window closes,
+            // the "hidden" report must still arrive or meters keep polling.
+            let callback = onChange
+            DispatchQueue.main.async {
+                callback?(visible)
             }
         }
     }
