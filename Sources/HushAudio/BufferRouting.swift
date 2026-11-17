@@ -31,8 +31,11 @@ enum BufferRouting {
             for channel in 0..<outChannels {
                 let destination = outData.advanced(by: channel)
                 var written = 0
-                if totalInputChannels > 0,
-                   let source = locate(channel: outputChannel % totalInputChannels, in: input, from: firstInputBuffer) {
+                // Mono fans out to every output channel. Two or more channels map one-to-one,
+                // and output channels beyond the tap's (e.g. surround on a 5.1 device) stay silent.
+                let sourceChannel = totalInputChannels == 1 ? 0 : outputChannel
+                if sourceChannel < totalInputChannels,
+                   let source = locate(channel: sourceChannel, in: input, from: firstInputBuffer) {
                     written = min(outFrames, source.frames)
                     let channelPeak = SampleProcessor.apply(
                         startGain: startGain,
