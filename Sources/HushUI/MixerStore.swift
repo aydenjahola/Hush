@@ -199,10 +199,11 @@ public final class MixerStore {
             var last = clock.now
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(33))
+                guard !Task.isCancelled, let self else { break }
                 let current = clock.now
                 let elapsed = (current - last) / .seconds(1)
                 last = current
-                self?.tickMeters(elapsed: elapsed)
+                self.tickMeters(elapsed: elapsed)
             }
         }
     }

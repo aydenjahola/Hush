@@ -262,6 +262,21 @@ import Testing
         #expect(h.store.meterLevels.isEmpty)
     }
 
+    @Test func meterPollingDoesNotWriteAfterPopoverCloses() async throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.setPercent(80, for: "a")
+        h.store.popoverDidAppear()
+        let engine = try #require(h.factory.live("a"))
+        engine.peak = 0.5
+
+        // Let the poll loop reach its sleep, then close while it is suspended.
+        try await Task.sleep(for: .milliseconds(20))
+        h.store.popoverDidDisappear()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(h.store.meterLevels.isEmpty)
+    }
+
     @Test func resetAllLevelsClearsEverySetting() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
