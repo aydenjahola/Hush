@@ -1,5 +1,6 @@
 import AppKit
 import CoreAudio
+import HushCore
 import os
 
 /// Publishes the apps that own Core Audio process objects, with helpers grouped under their app.
@@ -13,7 +14,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
     private let resolver = AppIdentityResolver()
     private let ownPID = ProcessInfo.processInfo.processIdentifier
     private let ownBundleID = Bundle.main.bundleIdentifier
-    private let logger = Logger(subsystem: "io.github.hush-mixer.Hush", category: "processes")
+    private let logger = Logger(subsystem: HushIdentity.bundleID, category: "processes")
 
     public init() {}
 

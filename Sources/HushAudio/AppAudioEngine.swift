@@ -94,7 +94,7 @@ public final class AppAudioEngine: AudioEngineHandle {
         let outputUID = try CoreAudioProperty.string(outputDeviceID, kAudioDevicePropertyDeviceUID)
         let configuration: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Hush – \(appID)",
-            kAudioAggregateDeviceUIDKey: "io.github.hush-mixer.aggregate.\(UUID().uuidString)",
+            kAudioAggregateDeviceUIDKey: "\(HushIdentity.bundleID).aggregate.\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: outputUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,

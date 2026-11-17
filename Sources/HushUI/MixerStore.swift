@@ -62,7 +62,7 @@ public final class MixerStore {
     @ObservationIgnored private var meterTask: Task<Void, Never>?
     /// The first-launch permission request, if one was made (exposed for tests).
     @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
-    @ObservationIgnored private let logger = Logger(subsystem: "io.github.hush-mixer.Hush", category: "engine")
+    @ObservationIgnored private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
 
     public init(
         processSource: any AudioProcessSource,

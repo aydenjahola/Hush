@@ -15,7 +15,7 @@ public final class SettingsStore: SettingsPersisting {
 
     private let fileURL: URL
     private let now: () -> Date
-    private let logger = Logger(subsystem: "io.github.hush-mixer.Hush", category: "settings")
+    private let logger = Logger(subsystem: HushIdentity.bundleID, category: "settings")
 
     public init(fileURL: URL = SettingsStore.defaultFileURL, now: @escaping () -> Date = Date.init) {
         self.fileURL = fileURL

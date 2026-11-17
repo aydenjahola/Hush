@@ -76,7 +76,7 @@ public struct SettingsView: View {
 
             Section("About") {
                 LabeledContent("Version", value: Self.version)
-                Link("Source code on GitHub", destination: URL(string: "https://github.com/hush-mixer/hush")!)
+                Link("Source code on GitHub", destination: URL(string: "https://github.com/aydenjahola/Hush")!)
                 Text("Hush is free software, released under the GNU General Public License v3.0. It comes with ABSOLUTELY NO WARRANTY.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

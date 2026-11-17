@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import HushCore
 import os
 
 /// Tracks the system default output device.
@@ -8,7 +9,7 @@ public final class DefaultOutputMonitor: OutputDeviceSource {
     private var onChange: (@MainActor (OutputDevice?) -> Void)?
     private var listener: AudioObjectPropertyListenerBlock?
     private var lastPublished: OutputDevice?
-    private let logger = Logger(subsystem: "io.github.hush-mixer.Hush", category: "output")
+    private let logger = Logger(subsystem: HushIdentity.bundleID, category: "output")
 
     public init() {}
 
