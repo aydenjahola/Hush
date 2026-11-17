@@ -10,7 +10,6 @@ final class PopoverModel: ObservableObject {
 public struct MixerPopover: View {
     let store: MixerStore
 
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var model = PopoverModel()
 
@@ -102,13 +101,13 @@ public struct MixerPopover: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button {
-                NSApp.activate()
-                openSettings()
-            } label: {
+            // SettingsLink is the reliable way to open Settings from a MenuBarExtra in an
+            // LSUIElement app; the tap also activates Hush so the window comes to the front.
+            SettingsLink {
                 Image(systemName: "gearshape.fill")
             }
             .buttonStyle(.borderless)
+            .simultaneousGesture(TapGesture().onEnded { NSApp.activate() })
             .help("Settings")
             .accessibilityLabel("Settings")
             .contextMenu {
