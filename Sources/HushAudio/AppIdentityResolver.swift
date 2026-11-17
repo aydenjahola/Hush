@@ -5,6 +5,8 @@ struct AppIdentity: Equatable {
     let id: String
     let displayName: String
     let icon: NSImage?
+    /// The owning app's activation policy is `.regular` (it has a Dock icon).
+    let isRegularApp: Bool
 }
 
 /// Attributes an audio process (often a helper) to the app the user knows.
@@ -50,16 +52,22 @@ final class AppIdentityResolver {
             return (identity, true)
         }
         let name = Self.executableName(pid: pid)
+        let running = NSRunningApplication(processIdentifier: pid)
         let standalone = AppIdentity(
             id: bundleID ?? name,
             displayName: name,
-            icon: NSRunningApplication(processIdentifier: pid)?.icon)
+            icon: running?.icon,
+            isRegularApp: running?.activationPolicy == .regular)
         return (standalone, false)
     }
 
     private static func identity(of app: NSRunningApplication) -> AppIdentity? {
         guard let bundleID = app.bundleIdentifier else { return nil }
-        return AppIdentity(id: bundleID, displayName: app.localizedName ?? bundleID, icon: app.icon)
+        return AppIdentity(
+            id: bundleID,
+            displayName: app.localizedName ?? bundleID,
+            icon: app.icon,
+            isRegularApp: app.activationPolicy == .regular)
     }
 
     private static func runningApp(owning bundleID: String) -> NSRunningApplication? {

@@ -122,7 +122,11 @@ final class Harness {
     let persister: FakePersister
     let store: MixerStore
 
-    init(document: SettingsDocument = SettingsDocument(), permission status: AudioCapturePermissionStatus = .authorized) {
+    init(
+        document: SettingsDocument = SettingsDocument(),
+        permission status: AudioCapturePermissionStatus = .authorized,
+        installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = { _ in nil }
+    ) {
         let processes = FakeProcessSource()
         let output = FakeOutputSource()
         let factory = FakeEngineFactory()
@@ -141,11 +145,12 @@ final class Harness {
             permissionSource: permission,
             persister: persister,
             saveDelay: .seconds(3600),
-            now: { Harness.fixedNow })
+            now: { Harness.fixedNow },
+            installedApp: installedApp)
         store.start()
     }
 }
 
-func makeApp(_ id: String, playing: Bool = true, objects: [AudioObjectID] = [42]) -> AudioApp {
-    AudioApp(id: id, displayName: id, processObjectIDs: objects, isPlaying: playing)
+func makeApp(_ id: String, playing: Bool = true, objects: [AudioObjectID] = [42], regular: Bool = true) -> AudioApp {
+    AudioApp(id: id, displayName: id, processObjectIDs: objects, isPlaying: playing, isRegularApp: regular)
 }

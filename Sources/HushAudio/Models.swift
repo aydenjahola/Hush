@@ -10,13 +10,23 @@ public struct AudioApp: Identifiable, Equatable {
     /// Core Audio process objects for the app and its helpers, sorted.
     public var processObjectIDs: [AudioObjectID]
     public var isPlaying: Bool
+    /// True when the owning app is a regular (Dock) app rather than a daemon, agent or CLI tool.
+    public var isRegularApp: Bool
 
-    public init(id: String, displayName: String, icon: NSImage? = nil, processObjectIDs: [AudioObjectID], isPlaying: Bool) {
+    public init(
+        id: String,
+        displayName: String,
+        icon: NSImage? = nil,
+        processObjectIDs: [AudioObjectID],
+        isPlaying: Bool,
+        isRegularApp: Bool = true
+    ) {
         self.id = id
         self.displayName = displayName
         self.icon = icon
         self.processObjectIDs = processObjectIDs
         self.isPlaying = isPlaying
+        self.isRegularApp = isRegularApp
     }
 
     /// Icons are ignored: they don't change identity or behavior.
@@ -25,6 +35,7 @@ public struct AudioApp: Identifiable, Equatable {
             && lhs.displayName == rhs.displayName
             && lhs.processObjectIDs == rhs.processObjectIDs
             && lhs.isPlaying == rhs.isPlaying
+            && lhs.isRegularApp == rhs.isRegularApp
     }
 }
 

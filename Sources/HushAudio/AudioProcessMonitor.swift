@@ -75,7 +75,8 @@ public final class AudioProcessMonitor: AudioProcessSource {
                     displayName: group.identity.displayName,
                     icon: group.identity.icon,
                     processObjectIDs: group.objects.sorted(),
-                    isPlaying: group.playing)
+                    isPlaying: group.playing,
+                    isRegularApp: group.identity.isRegularApp)
             }
             .sorted { $0.id < $1.id }
 

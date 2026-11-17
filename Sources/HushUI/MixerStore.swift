@@ -53,6 +53,8 @@ public final class MixerStore {
     @ObservationIgnored private let persister: any SettingsPersisting
     @ObservationIgnored private let saveDelay: Duration
     @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let installedApp: @MainActor (String) -> InstalledAppInfo?
+    @ObservationIgnored private var installedAppCache: [String: InstalledAppInfo?] = [:]
     @ObservationIgnored private var engines: [String: any AudioEngineHandle] = [:]
     @ObservationIgnored private var order: [String] = []
     @ObservationIgnored private var saveTask: Task<Void, Never>?
@@ -67,7 +69,8 @@ public final class MixerStore {
         permissionSource: any AudioCapturePermissionSource,
         persister: any SettingsPersisting,
         saveDelay: Duration = .milliseconds(500),
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = InstalledAppInfo.lookUp(bundleID:)
     ) {
         self.processSource = processSource
         self.outputSource = outputSource
@@ -76,6 +79,7 @@ public final class MixerStore {
         self.persister = persister
         self.saveDelay = saveDelay
         self.now = now
+        self.installedApp = installedApp
         let document = persister.load()
         self.preferences = document.preferences
         self.settings = document.apps
@@ -329,7 +333,10 @@ public final class MixerStore {
 
     private func rebuildStrips() {
         var byID: [String: Strip] = [:]
-        for app in apps where app.isPlaying || preferences.showInactiveApps {
+        // Idle apps are listed only when they're real (Dock) apps or the user has a level saved for them;
+        // otherwise every daemon with a Core Audio process object would get a strip.
+        for app in apps where app.isPlaying
+            || (preferences.showInactiveApps && (app.isRegularApp || settings[app.id] != nil)) {
             byID[app.id] = Strip(
                 id: app.id,
                 displayName: app.displayName,
@@ -341,8 +348,9 @@ public final class MixerStore {
         }
         if preferences.showInactiveApps {
             for (id, setting) in settings where byID[id] == nil {
+                let info = cachedInstalledApp(id)
                 byID[id] = Strip(
-                    id: id, displayName: id, icon: nil, isPlaying: false,
+                    id: id, displayName: info?.displayName ?? id, icon: info?.icon, isPlaying: false,
                     isRunning: false, setting: setting, engineError: nil)
             }
         }
@@ -356,6 +364,13 @@ public final class MixerStore {
             order = sortedIDs(Array(byID.values))
         }
         strips = order.compactMap { byID[$0] }
+    }
+
+    private func cachedInstalledApp(_ id: String) -> InstalledAppInfo? {
+        if let cached = installedAppCache[id] { return cached }
+        let info = installedApp(id)
+        installedAppCache[id] = info
+        return info
     }
 
     private func sortedIDs(_ candidates: [Strip]) -> [String] {

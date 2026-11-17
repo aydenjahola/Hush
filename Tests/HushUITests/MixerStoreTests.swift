@@ -1,3 +1,4 @@
+import AppKit
 import CoreAudio
 import Foundation
 import HushAudio
@@ -217,6 +218,56 @@ import Testing
         #expect(Set(h.store.strips.map(\.id)) == ["a", "b", "gone"])
         #expect(h.store.strips.first { $0.id == "gone" }?.isRunning == false)
         #expect(h.store.strips.first?.id == "a", "playing apps first")
+    }
+
+    @Test func showInactiveAppsShowsPausedRegularApp() {
+        let h = Harness()
+        h.processes.emit([makeApp("com.example.player", playing: false, regular: true)])
+        h.store.setShowInactiveApps(true)
+        #expect(h.store.strips.map(\.id) == ["com.example.player"])
+        #expect(h.store.strips.first?.isRunning == true)
+    }
+
+    @Test func showInactiveAppsHidesPausedBackgroundProcesses() {
+        let h = Harness()
+        h.processes.emit([makeApp("callservicesd", playing: false, regular: false)])
+        h.store.setShowInactiveApps(true)
+        #expect(h.store.strips.isEmpty)
+    }
+
+    @Test func playingBackgroundProcessAlwaysShows() {
+        let h = Harness()
+        h.processes.emit([makeApp("afplay", playing: true, regular: false)])
+        #expect(h.store.strips.map(\.id) == ["afplay"])
+    }
+
+    @Test func pausedBackgroundProcessWithSavedSettingShows() {
+        let h = Harness(document: SettingsDocument(apps: ["afplay": AppVolumeSetting(percent: 40, lastAdjusted: Harness.fixedNow)]))
+        h.processes.emit([makeApp("afplay", playing: false, regular: false)])
+        h.store.setShowInactiveApps(true)
+        #expect(h.store.strips.map(\.id) == ["afplay"])
+        #expect(h.store.strips.first?.isRunning == true)
+    }
+
+    @Test func savedAppThatIsNotRunningUsesInstalledAppNameAndIcon() throws {
+        let icon = NSImage(size: NSSize(width: 8, height: 8))
+        let h = Harness(
+            document: SettingsDocument(apps: [
+                "com.example.player": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow),
+                "com.example.uninstalled": AppVolumeSetting(percent: 70, lastAdjusted: Harness.fixedNow),
+            ]),
+            installedApp: { id in
+                id == "com.example.player" ? InstalledAppInfo(displayName: "Player", icon: icon) : nil
+            })
+        h.store.setShowInactiveApps(true)
+
+        let player = try #require(h.store.strips.first { $0.id == "com.example.player" })
+        #expect(player.displayName == "Player")
+        #expect(player.icon === icon)
+        #expect(player.isRunning == false)
+        let missing = try #require(h.store.strips.first { $0.id == "com.example.uninstalled" })
+        #expect(missing.displayName == "com.example.uninstalled")
+        #expect(missing.icon == nil)
     }
 
     @Test func stripOrderIsFrozenWhilePopoverIsOpen() {
