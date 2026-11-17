@@ -52,4 +52,25 @@ import Testing
         #expect(output.samples(0) == [0, 0])
         #expect(output.samples(1) == [0, 0])
     }
+
+    @Test func renderSkipsLeadingNonTapInputBuffers() {
+        let input = TestBufferList([(1, [0.9, 0.9]), (2, [0.1, 0.2, 0.3, 0.4])])
+        let output = TestBufferList([(2, [9, 9, 9, 9])])
+        let peak = BufferRouting.render(input: input.list, output: output.list, startGain: 1, endGain: 1, firstInputBuffer: 1)
+        #expect(output.samples(0) == [0.1, 0.2, 0.3, 0.4])
+        #expect(isApproximatelyEqual(peak, 0.4))
+    }
+
+    @Test func peakSkipsLeadingNonTapInputBuffers() {
+        let input = TestBufferList([(1, [0.9, -0.9]), (1, [0.1, -0.3])])
+        #expect(isApproximatelyEqual(BufferRouting.peak(of: input.list, firstInputBuffer: 1), 0.3))
+    }
+
+    @Test func offsetPastAllBuffersMeansSilence() {
+        let input = TestBufferList([(1, [0.9, 0.9])])
+        let output = TestBufferList([(1, [9, 9])])
+        let peak = BufferRouting.render(input: input.list, output: output.list, startGain: 1, endGain: 1, firstInputBuffer: 1)
+        #expect(output.samples(0) == [0, 0])
+        #expect(peak == 0)
+    }
 }

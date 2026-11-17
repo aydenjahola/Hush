@@ -9,10 +9,15 @@ enum BufferRouting {
         input: UnsafeMutableAudioBufferListPointer,
         output: UnsafeMutableAudioBufferListPointer,
         startGain: Float,
-        endGain: Float
+        endGain: Float,
+        firstInputBuffer: Int = 0
     ) -> Float {
         var totalInputChannels = 0
-        for buffer in input { totalInputChannels += Int(buffer.mNumberChannels) }
+        var inputIndex = firstInputBuffer
+        while inputIndex < input.count {
+            totalInputChannels += Int(input[inputIndex].mNumberChannels)
+            inputIndex += 1
+        }
 
         var peak: Float = 0
         var outputChannel = 0
@@ -27,7 +32,7 @@ enum BufferRouting {
                 let destination = outData.advanced(by: channel)
                 var written = 0
                 if totalInputChannels > 0,
-                   let source = locate(channel: outputChannel % totalInputChannels, in: input) {
+                   let source = locate(channel: outputChannel % totalInputChannels, in: input, from: firstInputBuffer) {
                     written = min(outFrames, source.frames)
                     let channelPeak = SampleProcessor.apply(
                         startGain: startGain,
@@ -50,9 +55,12 @@ enum BufferRouting {
         return peak
     }
 
-    static func peak(of input: UnsafeMutableAudioBufferListPointer) -> Float {
+    static func peak(of input: UnsafeMutableAudioBufferListPointer, firstInputBuffer: Int = 0) -> Float {
         var peak: Float = 0
-        for buffer in input {
+        var index = firstInputBuffer
+        while index < input.count {
+            let buffer = input[index]
+            index += 1
             guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
             let samples = Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
             peak = max(peak, SampleProcessor.peak(input: data, stride: 1, frameCount: samples))
@@ -70,10 +78,14 @@ enum BufferRouting {
 
     private static func locate(
         channel: Int,
-        in list: UnsafeMutableAudioBufferListPointer
+        in list: UnsafeMutableAudioBufferListPointer,
+        from first: Int
     ) -> (pointer: UnsafePointer<Float>, stride: Int, frames: Int)? {
         var remaining = channel
-        for buffer in list {
+        var index = first
+        while index < list.count {
+            let buffer = list[index]
+            index += 1
             let channels = Int(buffer.mNumberChannels)
             if remaining < channels {
                 guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { return nil }

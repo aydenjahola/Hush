@@ -63,4 +63,24 @@ enum CoreAudioProperty {
         }
         return (value?.takeRetainedValue() as String?) ?? ""
     }
+
+    /// Number of input streams (one IOProc buffer each) on a device. A device with no inputs gives 0.
+    static func inputStreamCount(_ device: AudioObjectID) throws -> Int {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        try check(
+            AudioObjectGetPropertyDataSize(device, &propertyAddress, 0, nil, &size),
+            "Sizing stream configuration")
+        guard size > 0 else { return 0 }
+        let raw = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { raw.deallocate() }
+        try check(
+            AudioObjectGetPropertyData(device, &propertyAddress, 0, nil, &size, raw),
+            "Reading stream configuration")
+        return Int(raw.assumingMemoryBound(to: AudioBufferList.self).pointee.mNumberBuffers)
+    }
 }

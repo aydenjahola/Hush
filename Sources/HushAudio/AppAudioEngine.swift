@@ -111,17 +111,39 @@ public final class AppAudioEngine: AudioEngineHandle {
             "AudioHardwareCreateAggregateDevice")
         aggregateID = newAggregate
 
+        // The aggregate's IOProc input list is the main sub-device's input streams first, then the tap's.
+        let tapBufferOffset = try CoreAudioProperty.inputStreamCount(outputDeviceID)
+
         var newProc: AudioDeviceIOProcID?
         try CoreAudioProperty.check(
-            AudioDeviceCreateIOProcIDWithBlock(&newProc, newAggregate, nil, Self.makeIOBlock(state: state, mode: mode)),
+            AudioDeviceCreateIOProcIDWithBlock(
+                &newProc, newAggregate, nil,
+                Self.makeIOBlock(state: state, mode: mode, tapBufferOffset: tapBufferOffset)),
             "AudioDeviceCreateIOProcIDWithBlock")
         ioProcID = newProc
 
+        Self.warmUpRouting()
         try CoreAudioProperty.check(AudioDeviceStart(newAggregate, newProc), "AudioDeviceStart")
     }
 
+    /// Runs the routing code once on the main thread so lazy runtime initialisation
+    /// (metadata, witness tables, swift_once) happens here and not on the HAL thread.
+    private static func warmUpRouting() {
+        let samples = UnsafeMutablePointer<Float>.allocate(capacity: 2)
+        samples.initialize(repeating: 0, count: 2)
+        let list = AudioBufferList.allocate(maximumBuffers: 1)
+        defer {
+            list.unsafeMutablePointer.deallocate()
+            samples.deallocate()
+        }
+        list[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 8, mData: samples)
+        _ = BufferRouting.render(input: list, output: list, startGain: 1, endGain: 1)
+        _ = BufferRouting.peak(of: list)
+        BufferRouting.silence(list)
+    }
+
     /// Realtime: no allocation, locks, logging, Objective-C or async inside the returned block.
-    nonisolated private static func makeIOBlock(state: EngineSharedState, mode: EngineMode) -> AudioDeviceIOBlock {
+    nonisolated private static func makeIOBlock(state: EngineSharedState, mode: EngineMode, tapBufferOffset: Int) -> AudioDeviceIOBlock {
         return { _, inputData, _, outputData, _ in
             let input = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
             let output = UnsafeMutableAudioBufferListPointer(outputData)
@@ -130,16 +152,14 @@ public final class AppAudioEngine: AudioEngineHandle {
             case .control:
                 let target = Float(bitPattern: state.targetGainBits.load(ordering: .relaxed))
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
-                peak = BufferRouting.render(input: input, output: output, startGain: applied, endGain: target)
+                peak = BufferRouting.render(input: input, output: output, startGain: applied, endGain: target, firstInputBuffer: tapBufferOffset)
                 state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
             case .meterOnly:
-                peak = BufferRouting.peak(of: input)
+                peak = BufferRouting.peak(of: input, firstInputBuffer: tapBufferOffset)
                 BufferRouting.silence(output)
             }
-            let held = Float(bitPattern: state.peakBits.load(ordering: .relaxed))
-            if peak > held {
-                state.peakBits.store(peak.bitPattern, ordering: .relaxed)
-            }
+            // Non-negative Float bit patterns order like the values, so an atomic max is a valid peak hold.
+            _ = state.peakBits.max(peak.bitPattern, ordering: .relaxed)
         }
     }
 }
