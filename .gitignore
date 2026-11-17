@@ -1,5 +1,21 @@
-.superpowers/
+# Build output
 .build/
-*.app
-.DS_Store
 build/
+DerivedData/
+*.app
+*.dmg
+
+# Xcode / SwiftPM per-user state
+.swiftpm/
+xcuserdata/
+
+# Editors
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Local-only planning and agent workspaces
+.superpowers/
+docs/superpowers/
