@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// Vertical volume fader: linear in percent, 100% tick, white fill to 100% then amber.
+/// Vertical volume fader: linear in percent, 100% tick, neutral fill to 100% then amber.
+/// The neutral fill is white in dark mode and near-black in light mode so it keeps at least
+/// 3:1 contrast against the popover in both.
 /// Drag, double-click the knob to reset, scroll ±5%, arrow keys ±5%.
 struct VerticalFader: View {
     let value: Int
@@ -13,6 +15,7 @@ struct VerticalFader: View {
     private static let snapRange = 3
     private let knobSize = CGSize(width: 22, height: 10)
 
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.isEnabled) private var isEnabled
 
@@ -33,8 +36,9 @@ struct VerticalFader: View {
                 }
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(Color.white)
+                    .strokeBorder(knobBorder, lineWidth: contrast == .increased ? 1.5 : 1)
                     .frame(width: knobSize.width, height: knobSize.height)
-                    .shadow(color: .black.opacity(0.35), radius: 1.5, y: 1)
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.3), radius: 1.5, y: 1)
                     .offset(y: knobTop)
             }
             .frame(width: geometry.size.width, height: height)
@@ -82,9 +86,21 @@ struct VerticalFader: View {
             if value > 100 {
                 Capsule().fill(Palette.amber).frame(width: 4, height: totalFill)
             }
-            Capsule().fill(Color.white).frame(width: 4, height: unityFill)
+            Capsule().fill(neutralFill).frame(width: 4, height: unityFill)
         }
         .frame(height: height, alignment: .bottom)
+    }
+
+    /// Fill up to 100%: white on dark, near-black on light (black with Increase Contrast).
+    private var neutralFill: Color {
+        if colorScheme == .dark { return .white }
+        return contrast == .increased ? .black : Color(white: 0.2)
+    }
+
+    /// The knob stays white; in light mode a dark edge separates it from the light background.
+    private var knobBorder: Color {
+        if colorScheme == .dark { return .clear }
+        return contrast == .increased ? .black : .black.opacity(0.6)
     }
 
     private func fraction(_ percent: Int) -> CGFloat {
