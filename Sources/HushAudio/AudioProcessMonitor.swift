@@ -37,6 +37,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
     }
 
     private func refresh() {
+        guard onChange != nil else { return }  // stopped: a queued listener block must not re-register listeners
         let objectIDs = (try? CoreAudioProperty.array(
             CoreAudioProperty.systemObject,
             kAudioHardwarePropertyProcessObjectList,

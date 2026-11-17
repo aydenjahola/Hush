@@ -13,7 +13,7 @@ final class AppIdentityResolver {
     private typealias ResponsibleFunction = @convention(c) (pid_t) -> pid_t
 
     private let responsiblePID: ResponsibleFunction?
-    private var cache: [pid_t: AppIdentity] = [:]
+    private var cache: [pid_t: (bundleID: String?, identity: AppIdentity)] = [:]
 
     init() {
         let rtldDefault = UnsafeMutableRawPointer(bitPattern: -2)  // RTLD_DEFAULT
@@ -22,9 +22,11 @@ final class AppIdentityResolver {
     }
 
     func identity(pid: pid_t, bundleID: String?) -> AppIdentity {
-        if let cached = cache[pid] { return cached }
-        let resolved = resolve(pid: pid, bundleID: bundleID)
-        cache[pid] = resolved
+        if let cached = cache[pid], cached.bundleID == bundleID { return cached.identity }
+        cache[pid] = nil
+        let (resolved, isAttributed) = resolve(pid: pid, bundleID: bundleID)
+        // Standalone fallbacks are not cached: the owning app may become visible later.
+        if isAttributed { cache[pid] = (bundleID, resolved) }
         return resolved
     }
 
@@ -33,25 +35,26 @@ final class AppIdentityResolver {
         cache = cache.filter { pids.contains($0.key) }
     }
 
-    private func resolve(pid: pid_t, bundleID: String?) -> AppIdentity {
+    private func resolve(pid: pid_t, bundleID: String?) -> (identity: AppIdentity, isAttributed: Bool) {
         if let responsiblePID {
             let owner = responsiblePID(pid)
             if owner > 0,
                let app = NSRunningApplication(processIdentifier: owner),
                let identity = Self.identity(of: app) {
-                return identity
+                return (identity, true)
             }
         }
         if let bundleID,
            let app = Self.runningApp(owning: bundleID),
            let identity = Self.identity(of: app) {
-            return identity
+            return (identity, true)
         }
         let name = Self.executableName(pid: pid)
-        return AppIdentity(
+        let standalone = AppIdentity(
             id: bundleID ?? name,
             displayName: name,
             icon: NSRunningApplication(processIdentifier: pid)?.icon)
+        return (standalone, false)
     }
 
     private static func identity(of app: NSRunningApplication) -> AppIdentity? {
