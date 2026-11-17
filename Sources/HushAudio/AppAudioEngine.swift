@@ -133,7 +133,7 @@ public final class AppAudioEngine: AudioEngineHandle {
         samples.initialize(repeating: 0, count: 2)
         let list = AudioBufferList.allocate(maximumBuffers: 1)
         defer {
-            list.unsafeMutablePointer.deallocate()
+            free(list.unsafeMutablePointer)  // allocate(maximumBuffers:) uses calloc
             samples.deallocate()
         }
         list[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 8, mData: samples)
