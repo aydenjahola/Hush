@@ -1,81 +1,51 @@
-import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// One app's column: percent, meter + fader, icon, name, mute button.
+///
+/// Holds no closures, only values, the meter object and `StripActions` (Equatable), so SwiftUI
+/// can tell an unchanged strip is unchanged and skip it.
 struct ChannelStrip: View {
     let strip: MixerStore.Strip
-    let meterLevel: Float?
+    let meter: StripMeter
     let maxPercent: Int
     let isEnabled: Bool
-    let onPercentChange: (Int) -> Void
-    let onReset: () -> Void
-    let onToggleMute: () -> Void
+    let actions: StripActions
 
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.mixerAppearance) private var appearance
 
-    private var isMuted: Bool { strip.setting.isMuted }
+    private var compact: Bool { appearance.isCompact }
 
     var body: some View {
-        VStack(spacing: 8) {
-            percentLabel
+        let faderHeight: CGFloat = compact ? 104 : 130
+        VStack(spacing: compact ? 5 : 8) {
+            if appearance.showPercentages || strip.setting.isMuted {
+                StripPercentLabel(strip: strip)
+            }
             HStack(alignment: .bottom, spacing: 4) {
-                LevelMeter(level: isMuted || !strip.isPlaying ? nil : (meterLevel ?? 0))
-                    .frame(height: 130)
+                if appearance.showMeters {
+                    LevelMeter(meter: meter, isActive: strip.meterIsActive)
+                        .frame(height: faderHeight)
+                }
                 VerticalFader(
                     value: strip.setting.percent,
                     maxValue: maxPercent,
                     appName: strip.displayName,
-                    onChange: onPercentChange,
-                    onReset: onReset)
-                    .frame(height: 130)
+                    onChange: actions.setPercent,
+                    onReset: actions.reset)
+                    .frame(height: faderHeight)
             }
-            icon
+            StripIcon(strip: strip, size: compact ? 26 : 34)
             Text(strip.displayName)
-                .font(.caption)
+                .font(compact ? .caption2 : .caption)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity)
                 .help(strip.displayName)
-            MuteButton(isMuted: isMuted, appName: strip.displayName, action: onToggleMute)
+            MuteButton(isMuted: strip.setting.isMuted, appName: strip.displayName, compact: compact,
+                       action: actions.toggleMute)
         }
-        .frame(width: 72)
+        .frame(width: compact ? 60 : 72)
         .disabled(!isEnabled)
         .opacity(strip.isPlaying ? 1 : 0.45)
-    }
-
-    @ViewBuilder
-    private var percentLabel: some View {
-        if isMuted {
-            Text("Muted")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Palette.mutedRed)
-        } else {
-            Text("\(strip.setting.percent)%")
-                .font(.caption.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(strip.setting.percent > 100 ? Palette.amber(colorScheme, contrast) : Color.primary)
-        }
-    }
-
-    private var icon: some View {
-        Image(nsImage: strip.icon ?? NSWorkspace.shared.icon(for: .application))
-            .resizable()
-            .interpolation(.high)
-            .frame(width: 34, height: 34)
-            .saturation(isMuted ? 0 : 1)
-            .opacity(isMuted ? 0.5 : 1)
-            .overlay(alignment: .topTrailing) {
-                if let error = strip.engineError {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .symbolRenderingMode(.multicolor)
-                        .font(.system(size: 11))
-                        .offset(x: 4, y: -4)
-                        .help(error)
-                        .accessibilityLabel("Warning: \(error)")
-                }
-            }
-            .accessibilityHidden(strip.engineError == nil)
     }
 }

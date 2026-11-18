@@ -29,12 +29,16 @@ public struct MixerPopover: View {
             if store.strips.isEmpty {
                 emptyState
             } else {
-                stripRow
+                switch appearance.layout {
+                case .channelStrips: stripRow
+                case .classicRows, .tiles: StripList(store: store, layout: appearance.layout)
+                }
             }
             footer
         }
         .padding(14)
         .frame(width: 340)
+        .environment(\.mixerAppearance, appearance)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.strips.map(\.id))
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: updates.pendingUpdate?.version)
         .background(
@@ -47,6 +51,8 @@ public struct MixerPopover: View {
                 }
             })
     }
+
+    private var appearance: MixerAppearance { MixerAppearance(store.preferences.appearance) }
 
     private var header: some View {
         HStack {
@@ -70,12 +76,10 @@ public struct MixerPopover: View {
                 ForEach(store.strips) { strip in
                     ChannelStrip(
                         strip: strip,
-                        meterLevel: store.meterLevels[strip.id],
+                        meter: store.meter(for: strip.id),
                         maxPercent: store.maxPercent,
                         isEnabled: store.controlsEnabled && strip.isRunning,
-                        onPercentChange: { store.setPercent($0, for: strip.id) },
-                        onReset: { store.resetVolume(for: strip.id) },
-                        onToggleMute: { store.toggleMute(for: strip.id) })
+                        actions: StripActions(target: store, id: strip.id))
                 }
             }
             .scrollTargetLayout()

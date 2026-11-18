@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Vertical volume fader: linear in percent, 100% tick, neutral fill to 100% then amber.
+/// Vertical volume fader: linear in percent, 100% tick, neutral fill to 100% then the boost accent.
 /// The neutral fill is white in dark mode and near-black in light mode so it keeps at least
 /// 3:1 contrast against the popover in both.
-/// Drag, double-click the knob to reset, scroll ±5%, arrow keys ±5%.
+/// Drag, double-click the knob or Option-click to reset, scroll ±5%, arrow keys ±5%.
 struct VerticalFader: View {
     let value: Int
     let maxValue: Int
@@ -11,20 +11,22 @@ struct VerticalFader: View {
     let onChange: (Int) -> Void
     let onReset: () -> Void
 
-    static let step = 5
-    private static let snapRange = 3
+    static let step = FaderScale.step
     private let knobSize = CGSize(width: 22, height: 10)
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.mixerAppearance) private var appearance
+
+    private var scale: FaderScale { FaderScale(maxValue: maxValue) }
 
     var body: some View {
         GeometryReader { geometry in
             let height = geometry.size.height
             let travel = max(height - knobSize.height, 1)
-            let knobTop = (1 - fraction(value)) * travel
-            let unityCenter = (1 - fraction(100)) * travel + knobSize.height / 2
+            let knobTop = (1 - scale.fraction(value)) * travel
+            let unityCenter = (1 - scale.fraction(100)) * travel + knobSize.height / 2
 
             ZStack(alignment: .top) {
                 track(height: height, travel: travel)
@@ -46,7 +48,12 @@ struct VerticalFader: View {
             .gesture(
                 DragGesture(minimumDistance: 0).onChanged { drag in
                     guard isEnabled else { return }
-                    let newValue = percent(atY: drag.location.y, travel: travel)
+                    if FaderScale.isOptionHeld {
+                        if value != 100 { onReset() }
+                        return
+                    }
+                    let position = 1 - (drag.location.y - knobSize.height / 2) / travel
+                    let newValue = scale.percent(atPosition: position)
                     if newValue != value { onChange(newValue) }
                 })
             .simultaneousGesture(
@@ -57,44 +64,22 @@ struct VerticalFader: View {
         }
         .frame(width: 28)
         .opacity(isEnabled ? 1 : 0.4)
-        .focusable(isEnabled)
-        .onKeyPress(.upArrow) { nudge(Self.step); return .handled }
-        .onKeyPress(.downArrow) { nudge(-Self.step); return .handled }
-        .modifier(ScrollWheelStepper { steps in
-            if isEnabled { nudge(steps * Self.step) }
-        })
-        .accessibilityElement()
-        .accessibilityLabel("\(appName) volume")
-        .accessibilityValue("\(value) percent")
-        .accessibilityAdjustableAction { direction in
-            guard isEnabled else { return }
-            switch direction {
-            case .increment: nudge(Self.step)
-            case .decrement: nudge(-Self.step)
-            @unknown default: break
-            }
-        }
+        .volumeControl(value: value, maxValue: maxValue, appName: appName, onChange: onChange)
     }
 
     private func track(height: CGFloat, travel: CGFloat) -> some View {
-        let unityFill = fraction(min(value, 100)) * travel + knobSize.height / 2
-        let totalFill = fraction(value) * travel + knobSize.height / 2
+        let unityFill = scale.fraction(min(value, 100)) * travel + knobSize.height / 2
+        let totalFill = scale.fraction(value) * travel + knobSize.height / 2
         return ZStack(alignment: .bottom) {
             Capsule()
                 .fill(Color.primary.opacity(contrast == .increased ? 0.3 : 0.12))
                 .frame(width: 4, height: height)
             if value > 100 {
-                Capsule().fill(Palette.amber(colorScheme, contrast)).frame(width: 4, height: totalFill)
+                Capsule().fill(Palette.boost(appearance.accent, colorScheme, contrast)).frame(width: 4, height: totalFill)
             }
-            Capsule().fill(neutralFill).frame(width: 4, height: unityFill)
+            Capsule().fill(Palette.neutralFill(colorScheme, contrast)).frame(width: 4, height: unityFill)
         }
         .frame(height: height, alignment: .bottom)
-    }
-
-    /// Fill up to 100%: white on dark, near-black on light (black with Increase Contrast).
-    private var neutralFill: Color {
-        if colorScheme == .dark { return .white }
-        return contrast == .increased ? .black : Color(white: 0.2)
     }
 
     /// The knob stays white; in light mode a dark edge separates it from the light background.
@@ -102,20 +87,12 @@ struct VerticalFader: View {
         if colorScheme == .dark { return .clear }
         return contrast == .increased ? .black : .black.opacity(0.6)
     }
+}
 
-    private func fraction(_ percent: Int) -> CGFloat {
-        CGFloat(percent) / CGFloat(max(maxValue, 1))
-    }
-
-    private func percent(atY y: CGFloat, travel: CGFloat) -> Int {
-        let position = 1 - (y - knobSize.height / 2) / travel
-        let raw = min(max(Int((position * CGFloat(maxValue)).rounded()), 0), maxValue)
-        if maxValue > 100, abs(raw - 100) <= Self.snapRange { return 100 }
-        return raw
-    }
-
-    private func nudge(_ delta: Int) {
-        let newValue = min(max(value + delta, 0), maxValue)
-        if newValue != value { onChange(newValue) }
+extension Palette {
+    /// Fader fill up to 100%: white on dark, near-black on light (black with Increase Contrast).
+    static func neutralFill(_ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color {
+        if scheme == .dark { return .white }
+        return contrast == .increased ? .black : Color(white: 0.2)
     }
 }

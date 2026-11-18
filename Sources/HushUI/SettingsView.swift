@@ -35,6 +35,8 @@ public struct SettingsView: View {
                 Toggle("Show apps that aren't playing", isOn: $store.showInactiveApps)
             }
 
+            AppearanceSettingsSection(store: store)
+
             Section("Levels") {
                 Button("Reset All Levels…", role: .destructive) {
                     confirmingReset = true

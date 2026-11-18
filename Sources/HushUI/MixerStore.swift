@@ -24,7 +24,8 @@ public final class MixerStore {
     // MARK: Published state
 
     public private(set) var strips: [Strip] = []
-    public private(set) var meterLevels: [String: Float] = [:]
+    /// Ballistics state for the meters. Not observed: views read their `StripMeter` instead.
+    @ObservationIgnored public private(set) var meterLevels: [String: Float] = [:]
     public private(set) var preferences: Preferences
     public private(set) var permission: AudioCapturePermissionStatus = .undetermined
     public private(set) var outputDevice: OutputDevice?
@@ -60,6 +61,7 @@ public final class MixerStore {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var hasPendingSave = false
     @ObservationIgnored private var meterTask: Task<Void, Never>?
+    @ObservationIgnored let meterBank = MeterBank()
     /// Last value pushed to `processSource.setFastPolling`.
     @ObservationIgnored private var isFastPolling = false
     /// The first-launch permission request, if one was made (exposed for tests).
@@ -146,6 +148,25 @@ public final class MixerStore {
         set { setShowInactiveApps(newValue) }
     }
 
+    /// Applies a Settings → Appearance change, persists it and updates meters and order to match.
+    func updateAppearance(_ change: (inout AppearancePreferences) -> Void) {
+        let old = preferences.appearance
+        change(&preferences.appearance)
+        let new = preferences.appearance
+        guard new != old else { return }
+        if new.sortMode != old.sortMode { order = [] }
+        if new.showLevelMeters != old.showLevelMeters, isPopoverVisible {
+            if new.showLevelMeters {
+                startMeterPolling()
+            } else {
+                stopMeterPolling()
+                meterLevels = [:]
+                meterBank.publish(meterLevels)
+            }
+        }
+        settingsDidChange()
+    }
+
     public func resetAllLevels() {
         settings = [:]
         engineErrors = [:]
@@ -161,7 +182,7 @@ public final class MixerStore {
         isPopoverVisible = true
         reconcile()
         rebuildStrips()          // pick up meter-engine failures; order is already frozen
-        startMeterPolling()
+        if preferences.appearance.showLevelMeters { startMeterPolling() }
     }
 
     public func popoverDidDisappear() {
@@ -169,6 +190,7 @@ public final class MixerStore {
         isPopoverVisible = false
         stopMeterPolling()
         meterLevels = [:]
+        meterBank.publish(meterLevels)
         reconcile()
         rebuildStrips()
     }
@@ -206,16 +228,25 @@ public final class MixerStore {
 
     // MARK: Meters
 
+    /// The live meter for a strip. Only `LevelMeter` should read its value.
+    func meter(for id: String) -> StripMeter { meterBank.meter(for: id) }
+
+    /// Advances the ballistics and publishes to the per-strip meters, which notify their views
+    /// only when the displayed height changes by a step.
     func tickMeters(elapsed: Double) {
-        var levels: [String: Float] = [:]
+        guard !engines.isEmpty || !meterLevels.isEmpty || !meterBank.isSilent else { return }
+        for id in meterLevels.keys where engines[id] == nil { meterLevels[id] = nil }
         for (id, engine) in engines {
-            levels[id] = MeterBallistics.next(
+            meterLevels[id] = MeterBallistics.next(
                 displayed: meterLevels[id] ?? 0,
                 peak: engine.currentPeak(),
                 elapsed: elapsed)
         }
-        meterLevels = levels
+        meterBank.publish(meterLevels)
     }
+
+    /// About 30 Hz. Engines report the peak since the last read, so no peak is missed between ticks.
+    static let meterInterval: Duration = .milliseconds(33)
 
     private func startMeterPolling() {
         meterTask?.cancel()
@@ -223,7 +254,7 @@ public final class MixerStore {
             let clock = ContinuousClock()
             var last = clock.now
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(33))
+                try? await Task.sleep(for: Self.meterInterval, tolerance: .milliseconds(10))
                 guard !Task.isCancelled, let self else { break }
                 let current = clock.now
                 let elapsed = (current - last) / .seconds(1)
@@ -308,7 +339,7 @@ public final class MixerStore {
             // silence the app (confirmed live), so idle apps get no engine at all.
             let desired: EngineMode? = if setting.needsEngine && app.isPlaying {
                 .control
-            } else if app.isPlaying && isPopoverVisible {
+            } else if app.isPlaying && isPopoverVisible && preferences.appearance.showLevelMeters {
                 .meterOnly
             } else {
                 nil
@@ -411,7 +442,8 @@ public final class MixerStore {
             }
         }
 
-        if isPopoverVisible {
+        // Alphabetical order doesn't jump around, so only activity order is frozen while open.
+        if isPopoverVisible && preferences.appearance.sortMode == .activity {
             let survivors = order.filter { byID[$0] != nil }
             let known = Set(survivors)
             let newcomers = sortedIDs(byID.values.filter { !known.contains($0.id) })
@@ -420,6 +452,7 @@ public final class MixerStore {
             order = sortedIDs(Array(byID.values))
         }
         strips = order.compactMap { byID[$0] }
+        meterBank.retain(only: Set(order))
     }
 
     private func cachedInstalledApp(_ id: String) -> InstalledAppInfo? {
@@ -436,6 +469,6 @@ public final class MixerStore {
                 displayName: strip.displayName,
                 isPlaying: strip.isPlaying,
                 lastAdjusted: settings[strip.id]?.lastAdjusted)
-        }).map(\.id)
+        }, mode: preferences.appearance.sortMode).map(\.id)
     }
 }
