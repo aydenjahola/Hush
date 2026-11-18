@@ -75,14 +75,13 @@ Rebuilding changes the ad-hoc signature, so macOS may ask for Audio Recording pe
 
 ## How it works
 
-For each app you adjust, Hush creates a private process tap that mutes the app at the source, then plays the tapped audio back through a private aggregate device with your gain applied. Lowered or boosted apps are processed only while they play. Muted apps are cheaper: Hush holds a lightweight tap that silences the app for as long as it's running, with no audio processing at all, so a muted app's next sound is silent from its first moment. Apps left at 100% are untouched. If Hush quits or crashes, macOS removes its taps and every app plays normally again.
+For each app you adjust, Hush creates a private process tap that mutes the app at the source, then plays the tapped audio back through a private aggregate device with your gain applied. Muting is the same with the gain at zero. Muted, lowered or boosted apps are processed only while they play, so an idle app costs nothing. Apps left at 100% are untouched. If Hush quits or crashes, macOS removes its taps and every app plays normally again.
 
 ## Known limitations
 
-- For apps that are lowered or boosted (not muted), up to about a second (usually much less) of each new sound can play at normal volume before Hush notices it and starts processing it.
-- Even a muted app can leak its very first sound after it launches, or when it starts a new audio helper process (common in browsers), because Hush can only tap a process once Core Audio reports it.
+- For muted, lowered or boosted apps, up to about a second (usually much less) of each new sound can play at normal volume before Hush notices it and starts processing it. This includes a muted app's notification sounds, and the first sound after an app launches or starts a new audio helper process (common in browsers).
 - Audio from command-line tools is attributed to the terminal app that launched them.
-- When you switch output devices, lowered or boosted apps briefly play at their normal level while Hush rebuilds their engines. Muted apps stay muted.
+- When you switch output devices, muted, lowered or boosted apps briefly play at their normal level while Hush rebuilds their engines.
 
 ## Releasing
 

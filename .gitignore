@@ -19,3 +19,6 @@ xcuserdata/
 # Local-only planning and agent workspaces
 .superpowers/
 docs/superpowers/
+
+# Claude Code local state (agent worktrees)
+.claude/
