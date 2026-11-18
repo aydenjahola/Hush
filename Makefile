@@ -18,6 +18,9 @@ else
 SIGN_FLAGS := --options runtime --timestamp
 endif
 
+DMG := build/Hush-$(VERSION).dmg
+DMG_ROOT := build/dmg-root
+
 # Command Line Tools (no Xcode) don't load the Swift Testing macro plugin on their own.
 CLT := /Library/Developer/CommandLineTools
 TESTING_PLUGIN := $(CLT)/usr/lib/swift/host/plugins/testing/libTestingMacros.dylib
@@ -25,7 +28,7 @@ ifeq ($(shell xcode-select -p),$(CLT))
 TEST_FLAGS := -Xswiftc -load-plugin-library -Xswiftc $(TESTING_PLUGIN)
 endif
 
-.PHONY: build test app icon run clean
+.PHONY: build test app dmg icon run clean
 
 build:
 	swift build
@@ -44,6 +47,22 @@ app:
 	plutil -lint $(APP)/Contents/Info.plist
 	cp Resources/Hush.icns $(APP)/Contents/Resources/Hush.icns
 	codesign --force --sign "$(SIGN_IDENTITY)" $(SIGN_FLAGS) --entitlements Resources/Hush.entitlements $(APP)
+
+# `diskutil image create from` exists from macOS 27; older systems fall back to hdiutil.
+dmg: app
+	rm -rf $(DMG_ROOT)
+	mkdir -p $(DMG_ROOT)
+	ditto $(APP) $(DMG_ROOT)/Hush.app
+	ln -s /Applications $(DMG_ROOT)/Applications
+	rm -f $(DMG)
+	if diskutil image create from -h 2>&1 | grep -q 'USAGE: diskutil image create from'; then \
+		diskutil image create from --format UDZO --volumeName Hush $(DMG_ROOT) $(DMG); \
+	else \
+		hdiutil create -volname Hush -srcfolder $(DMG_ROOT) -fs HFS+ -format UDZO -ov $(DMG); \
+	fi
+	cp $(DMG) build/Hush.dmg
+	rm -rf $(DMG_ROOT)
+	@echo "Built $(DMG) and build/Hush.dmg"
 
 # Regenerates Resources/Hush.icns and the website icons. The .icns is committed,
 # so `app` doesn't depend on this.
