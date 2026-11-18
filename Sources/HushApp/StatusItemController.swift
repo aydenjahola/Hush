@@ -15,7 +15,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     /// When a click on the icon closed the transient popover (on mouse down), the mouse up that
     /// follows must not reopen it.
-    private var closedByIconPress: Date?
+    /// System uptime (seconds) at that close.
+    private var closedByIconPress: TimeInterval?
 
     init(store: MixerStore, updates: UpdateChecker) {
         self.store = store
@@ -72,17 +73,18 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
 
     @objc private func iconClicked(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
-        let wantsMenu =
-            event?.type == .rightMouseUp
-            || (event?.type == .leftMouseUp && event?.modifierFlags.contains(.control) == true)
-        let closedJustNow = closedByIconPress.map { Date().timeIntervalSince($0) < 1 } ?? false
+        let route = StatusItemClickRouter.route(
+            eventType: event?.type,
+            controlPressed: event?.modifierFlags.contains(.control) == true,
+            popoverShown: popover.isShown,
+            closedRecently: StatusItemClickRouter.isRecent(
+                closedAt: closedByIconPress, now: ProcessInfo.processInfo.systemUptime))
         closedByIconPress = nil
-        if wantsMenu {
-            showMenu()
-        } else if popover.isShown {
-            popover.performClose(sender)
-        } else if !closedJustNow {
-            showPopover()
+        switch route {
+        case .showMenu: showMenu()
+        case .closePopover: popover.performClose(sender)
+        case .openPopover: showPopover()
+        case .ignore: break
         }
     }
 
@@ -133,7 +135,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
         if let event = NSApp.currentEvent, event.type == .leftMouseDown || event.type == .rightMouseDown,
             let button = statusItem.button, event.window === button.window
         {
-            closedByIconPress = Date()
+            closedByIconPress = ProcessInfo.processInfo.systemUptime
         }
     }
 
