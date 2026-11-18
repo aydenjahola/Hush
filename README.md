@@ -29,7 +29,7 @@ Turn Spotify down, boost a quiet call, mute a noisy tab: Hush gives every app th
    Since macOS 15, right-click → Open no longer bypasses this check.
 4. Grant Audio Recording permission when Hush asks.
 
-Each release also has a `.sha256` file, so you can check your download with `shasum -a 256 -c Hush-x.y.z.dmg.sha256`, run in the folder that holds the DMG.
+Each DMG has a matching `.sha256` file (`Hush.dmg.sha256`, `Hush-x.y.z.dmg.sha256`). To check your download, put the `.sha256` file in the same folder as the DMG and run `shasum -a 256 -c Hush.dmg.sha256` there (or the versioned name, to match the DMG you downloaded).
 
 ## Uninstall
 
@@ -75,7 +75,7 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 1. Write [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, …) on `main`.
 2. release-please keeps a release PR open that bumps `version.txt` and updates `CHANGELOG.md`.
 3. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release.
-4. The same workflow (`.github/workflows/release.yml`) then runs the tests, builds a universal DMG and uploads `Hush-X.Y.Z.dmg`, `Hush.dmg` and a `.sha256` checksum to the release.
+4. The same workflow (`.github/workflows/release.yml`) then runs the tests, builds a universal DMG and uploads `Hush-X.Y.Z.dmg`, `Hush.dmg` and a `.sha256` checksum for each to the release.
 
 The first release is pinned with `"release-as": "0.1.0"` in `release-please-config.json` so it matches `version.txt`. **Remove that line after 0.1.0 ships**, or every later release PR will propose 0.1.0 again.
 

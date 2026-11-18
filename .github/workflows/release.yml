@@ -23,6 +23,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # release-please labels its PRs "autorelease: pending" / "autorelease: tagged".
+      issues: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -51,6 +53,8 @@ jobs:
           ref: ${{ needs.release-please.outputs.tag_name }}
           # Full history, so CFBundleVersion (git rev-list --count HEAD) is right.
           fetch-depth: 0
+          # This job never pushes; uploads go through gh with GH_TOKEN.
+          persist-credentials: false
 
       - name: Toolchain
         run: swift --version
@@ -67,6 +71,15 @@ jobs:
       - name: Test
         run: make test
 
+      - name: Warn about partial signing secrets
+        if: env.HAS_SIGNING != env.HAS_NOTARY
+        run: |
+          if [ "$HAS_SIGNING" = "true" ]; then
+            echo "::warning::Signing secrets are set but notary secrets aren't: the DMG will be Developer ID signed but not notarized, so Gatekeeper will still block it."
+          else
+            echo "::warning::Notary secrets are set but signing secrets aren't: notarization needs a Developer ID signature, so the DMG will be ad-hoc signed and not notarized."
+          fi
+
       - name: Import Developer ID certificate
         if: env.HAS_SIGNING == 'true'
         env:
@@ -75,12 +88,15 @@ jobs:
         run: |
           KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
           echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Split on purpose: one argument per existing keychain path (no spaces on the runner).
+          # shellcheck disable=SC2046
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           rm -f "$RUNNER_TEMP/cert.p12"
           IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
@@ -105,20 +121,38 @@ jobs:
           NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
-          xcrun notarytool submit "build/Hush-$VERSION.dmg" \
+          # Keep the app-specific password in the temporary keychain rather than
+          # on the submit command line.
+          xcrun notarytool store-credentials hush-notary \
             --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD" \
-            --wait
+            --keychain "$KEYCHAIN"
+          RESULT="$RUNNER_TEMP/notary.json"
+          xcrun notarytool submit "build/Hush-$VERSION.dmg" \
+            --keychain-profile hush-notary --keychain "$KEYCHAIN" \
+            --wait --output-format json > "$RESULT" || true
+          cat "$RESULT"
+          ID="$(plutil -extract id raw -o - "$RESULT" 2>/dev/null || true)"
+          STATUS="$(plutil -extract status raw -o - "$RESULT" 2>/dev/null || true)"
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed (status: ${STATUS:-unknown})"
+            if [ -n "$ID" ]; then
+              xcrun notarytool log "$ID" --keychain-profile hush-notary --keychain "$KEYCHAIN" || true
+            fi
+            exit 1
+          fi
           xcrun stapler staple "build/Hush-$VERSION.dmg"
 
       - name: Refresh Hush.dmg copy
         # make dmg copied the DMG before signing/stapling; copy the final one.
         run: cp "build/Hush-$VERSION.dmg" build/Hush.dmg
 
-      - name: Checksum
+      - name: Checksums
+        # One file per DMG, so `shasum -a 256 -c` works with just the file you downloaded.
         working-directory: build
         run: |
-          shasum -a 256 "Hush-$VERSION.dmg" Hush.dmg > "Hush-$VERSION.dmg.sha256"
-          cat "Hush-$VERSION.dmg.sha256"
+          shasum -a 256 "Hush-$VERSION.dmg" > "Hush-$VERSION.dmg.sha256"
+          shasum -a 256 Hush.dmg > Hush.dmg.sha256
+          cat "Hush-$VERSION.dmg.sha256" Hush.dmg.sha256
 
       - name: Upload to release
         env:
@@ -128,6 +162,7 @@ jobs:
             "build/Hush-$VERSION.dmg" \
             build/Hush.dmg \
             "build/Hush-$VERSION.dmg.sha256" \
+            build/Hush.dmg.sha256 \
             --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Remove signing keychain
