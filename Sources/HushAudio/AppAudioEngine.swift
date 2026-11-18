@@ -11,9 +11,11 @@ final class EngineSharedState: Sendable {
     /// True: replay the tap with gain (`.control`). False: only measure it (`.meterOnly`).
     let replaying: Atomic<Bool>
 
+    /// `appliedGainBits` is the replay's current gain: a meter-only engine starts at 0, so it has
+    /// nothing to fade out.
     init(gain: Float, mode: EngineMode) {
         targetGainBits = Atomic(gain.bitPattern)
-        appliedGainBits = Atomic(gain.bitPattern)
+        appliedGainBits = Atomic((mode == .control ? gain : 0).bitPattern)
         replaying = Atomic(mode == .control)
     }
 }
@@ -105,20 +107,22 @@ public final class AppAudioEngine: AudioEngineHandle {
             if newMode == .control { setGain(gain) }
             return
         }
-        if newMode == .control {
-            state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
-            state.appliedGainBits.store(gain.bitPattern, ordering: .relaxed)
-        }
         guard tapID != kAudioObjectUnknown else {
             mode = newMode
+            state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
+            state.appliedGainBits.store((newMode == .control ? gain : 0).bitPattern, ordering: .relaxed)
             state.replaying.store(newMode == .control, ordering: .releasing)
             return
         }
+        // Both directions overlap rather than gap: the replay is on while the source's mute state
+        // changes, and the IOProc crossfades its side over one buffer. A gap is digital silence
+        // (a dropout); an overlap is at most source + replay, and only until coreaudiod applies the
+        // new mute behaviour (the integration tests bound and log how long that is).
         switch newMode {
         case .control:
-            // Replay first, then mute the source. Until coreaudiod applies the mute, the app plays
-            // both directly and through the replay; that overlap comes before the level drops. The
-            // other order leaves a gap of silence between the mute and the first replayed buffer.
+            // Replay first, fading in from gain 0, then mute the source.
+            state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
+            state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed)
             state.replaying.store(true, ordering: .releasing)
             do {
                 try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .control))
@@ -127,15 +131,9 @@ public final class AppAudioEngine: AudioEngineHandle {
                 throw error
             }
         case .meterOnly:
-            // Stop replaying first, then unmute: a brief gap rather than the source and the
-            // replay playing together, so the app is never louder than the level it's going to.
+            // Unmute the source first, then stop the replay (it fades out over one buffer).
+            try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .meterOnly))
             state.replaying.store(false, ordering: .releasing)
-            do {
-                try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .meterOnly))
-            } catch {
-                state.replaying.store(true, ordering: .releasing)
-                throw error
-            }
         }
         mode = newMode
     }
@@ -173,6 +171,7 @@ public final class AppAudioEngine: AudioEngineHandle {
     private func build() throws {
         tapUUID = UUID()
         let description = makeDescription(processes: processObjectIDs, mode: mode)
+        if mode == .meterOnly { state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed) }
         state.replaying.store(mode == .control, ordering: .releasing)
 
         var newTap = AudioObjectID(kAudioObjectUnknown)
@@ -231,7 +230,7 @@ public final class AppAudioEngine: AudioEngineHandle {
     }
 
     /// Realtime: no allocation, locks, logging, Objective-C or async inside the returned block.
-    nonisolated private static func makeIOBlock(state: EngineSharedState, tapBufferOffset: Int) -> AudioDeviceIOBlock {
+    nonisolated static func makeIOBlock(state: EngineSharedState, tapBufferOffset: Int) -> AudioDeviceIOBlock {
         return { _, inputData, _, outputData, _ in
             let input = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
             let output = UnsafeMutableAudioBufferListPointer(outputData)
@@ -243,8 +242,15 @@ public final class AppAudioEngine: AudioEngineHandle {
                 peak = BufferRouting.render(input: input, output: output, startGain: applied, endGain: target, firstInputBuffer: tapBufferOffset)
                 state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
             } else {
+                let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
+                if applied != 0 {
+                    // The replay just stopped: fade it out over this buffer instead of cutting.
+                    _ = BufferRouting.render(input: input, output: output, startGain: applied, endGain: 0, firstInputBuffer: tapBufferOffset)
+                    state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed)
+                } else {
+                    BufferRouting.silence(output)
+                }
                 peak = BufferRouting.peak(of: input, firstInputBuffer: tapBufferOffset)
-                BufferRouting.silence(output)
             }
             // Non-negative Float bit patterns order like the values, so an atomic max is a valid peak hold.
             _ = state.peakBits.max(peak.bitPattern, ordering: .relaxed)
