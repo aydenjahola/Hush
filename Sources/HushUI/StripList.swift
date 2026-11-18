@@ -30,6 +30,10 @@ struct StripList: View {
         }
         .scrollIndicators(.automatic)
         .frame(height: min(contentHeight > 0 ? contentHeight : estimatedHeight, maxHeight))
+        // Room at the sides for the focus ring of a mute button at a row's trailing edge, which the
+        // scroll view would otherwise clip; the negative padding gives it back so rows keep their width.
+        .contentMargins(.horizontal, MixerPopover.focusRingRoom, for: .scrollContent)
+        .padding(.horizontal, -MixerPopover.focusRingRoom)
     }
 
     private var spacing: CGFloat {

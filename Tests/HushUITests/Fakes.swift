@@ -41,6 +41,28 @@ final class FakeOutputSource: OutputDeviceSource {
         self.device = device
         onChange?(device)
     }
+
+    private var onDevicesChange: (@MainActor ([OutputDevice]) -> Void)?
+    private(set) var devices: [OutputDevice] = []
+    /// Device IDs passed to `setDefaultOutput`, in order (including ones that threw).
+    private(set) var selections: [AudioObjectID] = []
+    var selectionError: (any Error)?
+
+    func observeDevices(onChange: @escaping @MainActor ([OutputDevice]) -> Void) {
+        onDevicesChange = onChange
+        onChange(devices)
+    }
+
+    func emitDevices(_ devices: [OutputDevice]) {
+        self.devices = devices
+        onDevicesChange?(devices)
+    }
+
+    /// Records the request only; like the HAL, the new default arrives later through `emit`.
+    func setDefaultOutput(_ id: AudioObjectID) throws {
+        selections.append(id)
+        if let selectionError { throw selectionError }
+    }
 }
 
 @MainActor
@@ -188,6 +210,7 @@ final class Harness {
         document: SettingsDocument = SettingsDocument(),
         permission status: AudioCapturePermissionStatus = .authorized,
         answer: AudioCapturePermissionStatus? = nil,
+        outputErrorDuration: Duration = .seconds(3600),
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = { _ in nil }
     ) {
         let processes = FakeProcessSource()
@@ -209,6 +232,7 @@ final class Harness {
             permissionSource: permission,
             persister: persister,
             saveDelay: .seconds(3600),
+            outputErrorDuration: outputErrorDuration,
             now: { Harness.fixedNow },
             installedApp: installedApp)
         store.start()

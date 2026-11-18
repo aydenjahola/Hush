@@ -42,6 +42,10 @@ package enum L10n {
     package static func outputDevice(named name: String?) -> LocalizedStringResource {
         if let name { resource("Output: \(name)") } else { resource("Output: none") }
     }
+    package static let soundSettings = resource("Sound Settings…")
+    package static func outputSwitchFailed(_ device: String) -> LocalizedStringResource {
+        resource("Couldn't switch to \(device)")
+    }
     package static let nothingIsPlaying = resource("Nothing is playing")
     package static let settings = resource("Settings")
     package static let quit = resource("Quit Hush")
@@ -146,7 +150,8 @@ package enum L10n {
     package static var all: [LocalizedStringResource] {
         [
             appName, menuBarLabel(updateAvailable: true), noOutput, outputDevice(named: "x"), outputDevice(named: nil),
-            nothingIsPlaying, settings, quit, playingSummary(count: 0), playingSummary(count: 2),
+            soundSettings, outputSwitchFailed("x"), nothingIsPlaying, settings, quit, playingSummary(count: 0),
+            playingSummary(count: 2),
             muted, percent(50), mute("x"), unmute("x"), volumeLabel("x"), volumeValue(50), warning("x"),
             clickToMute, clickToUnmute, permissionNeeded, openSystemSettings, updateAvailable("x"), download, later,
             skipThisVersion, downloadHelp, laterHelp, general, launchAtLogin, maximumBoost, showInactiveApps, levels,

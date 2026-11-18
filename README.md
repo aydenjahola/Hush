@@ -33,6 +33,7 @@ Hush has three layouts, chosen in Settings:
 - **Appearance options:** comfortable or compact size, percentages on or off, playing-first or alphabetical order, amber or your system accent colour for the fills (boost is always amber), and a speaker or fader-glyph menu bar icon
 - **Remembers** each app's level across restarts
 - Apps you haven't touched aren't processed at all (except to measure them for the level meters while the mixer is open, if meters are on)
+- **Switch your Mac's output device from the menu bar**
 - **Follows your output device** when you switch headphones or speakers
 - **Tells you when a new version is available**
 - **No driver, no admin password**

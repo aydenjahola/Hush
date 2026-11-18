@@ -34,6 +34,9 @@ final class EngineSharedState: Sendable {
 /// app through at full level until the replacement's IO is running, even with make-before-break.
 @MainActor
 package final class AppAudioEngine: AudioEngineHandle {
+    /// Every private aggregate Hush creates has a UID starting with this, so the output picker can leave them out.
+    nonisolated package static let privateAggregateUIDPrefix = "\(HushIdentity.bundleID).aggregate."
+
     package private(set) var mode: EngineMode
     package private(set) var processObjectIDs: [AudioObjectID]
 
@@ -277,7 +280,7 @@ package final class AppAudioEngine: AudioEngineHandle {
         let outputUID = try CoreAudioProperty.string(outputDeviceID, kAudioDevicePropertyDeviceUID)
         let configuration: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Hush – \(appID)",
-            kAudioAggregateDeviceUIDKey: "\(HushIdentity.bundleID).aggregate.\(UUID().uuidString)",
+            kAudioAggregateDeviceUIDKey: "\(Self.privateAggregateUIDPrefix)\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: outputUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,

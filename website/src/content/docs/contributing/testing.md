@@ -77,6 +77,7 @@ Run this before every release, on the build you're about to ship. `make run` bui
 - [ ] **Two apps at different levels.** Play audio in two apps (e.g. Music and a browser video). Set one to 30% and the other to 150%. Each changes independently.
 - [ ] **Boost to 200%.** Play a quiet source and raise it to 200%. It's louder, with no harsh clipping on peaks.
 - [ ] **Disconnect headphones mid-playback.** With one app at 50%, unplug or disconnect headphones. Audio continues on the new output at 50%; the header pill shows the new device.
+- [ ] **Switch outputs from the pill.** Set a playing app to 50%, open the popover and pick another output from the header pill (e.g. headphones, then back to the speakers). Each time, the checkmark and pill follow, every app moves to the new device, and the adjusted app stays at 50% after at most a brief blip. The list gains and loses devices as you connect and disconnect them, never shows a "Hush – …" device, and "Sound Settings…" opens System Settings → Sound.
 - [ ] **Force-quit Hush mid-playback.** With an app muted, run `killall -9 Hush`. The app's audio returns immediately at normal volume.
 - [ ] **Output device with a microphone.** Switch output to a device that also has a mic (USB headset, AirPods, or a display with a built-in mic). Set an app to 50%. You hear the app at 50%, not your own microphone.
 - [ ] **Multichannel output.** If you have a 5.1/7.1 device or a multichannel interface, set an app to 50%. It plays only on the front left/right pair, not on every speaker.

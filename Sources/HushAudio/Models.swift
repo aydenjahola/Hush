@@ -39,16 +39,36 @@ package struct AudioApp: Identifiable, Equatable {
     }
 }
 
-package struct OutputDevice: Equatable, Sendable {
+package struct OutputDevice: Identifiable, Equatable, Sendable {
     package let id: AudioObjectID
     package let uid: String
     package let name: String
+    package let transport: OutputTransport
 
-    package init(id: AudioObjectID, uid: String, name: String) {
+    package init(id: AudioObjectID, uid: String, name: String, transport: OutputTransport = .other) {
         self.id = id
         self.uid = uid
         self.name = name
+        self.transport = transport
     }
+}
+
+/// How an output device is connected (`kAudioDevicePropertyTransportType`), refined by the
+/// built-in device's data source where that tells speakers from headphones.
+package enum OutputTransport: CaseIterable, Sendable, Equatable {
+    case builtInSpeakers
+    case builtInHeadphones
+    /// Built in, but the data source doesn't say which (or there isn't one).
+    case builtIn
+    case bluetooth
+    case usb
+    case hdmi
+    case displayPort
+    case airPlay
+    case thunderbolt
+    case virtual
+    case aggregate
+    case other
 }
 
 package enum EngineMode: Sendable, Equatable {

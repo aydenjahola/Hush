@@ -44,6 +44,9 @@
 
 "Couldn't check for updates" = "Couldn't check for updates";
 
+/* Shown briefly under the popover header when choosing an output device fails. %@ is the device name. */
+"Couldn't switch to %@" = "Couldn't switch to %@";
+
 "Download" = "Download";
 
 "Download it from GitHub when you're ready." = "Download it from GitHub when you're ready.";
@@ -101,9 +104,10 @@
 
 "Open the download in your browser" = "Open the download in your browser";
 
-/* VoiceOver label of the output device chip. %@ is the device name. */
+/* VoiceOver label of the output device menu in the popover header (VoiceOver adds "pop-up button"). %@ is the device name. */
 "Output: %@" = "Output: %@";
 
+/* VoiceOver label of the output device menu when there is no output device. */
 "Output: none" = "Output: none";
 
 "Playing & recently adjusted first" = "Playing & recently adjusted first";
@@ -135,6 +139,9 @@
 "Size" = "Size";
 
 "Skip This Version" = "Skip This Version";
+
+/* Last item of the output device menu; opens System Settings → Sound. */
+"Sound Settings…" = "Sound Settings…";
 
 "Sort apps" = "Sort apps";
 
