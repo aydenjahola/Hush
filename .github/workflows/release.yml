@@ -2,7 +2,9 @@ name: Release
 
 # One workflow on purpose. A release that release-please creates with GITHUB_TOKEN
 # doesn't trigger other workflows (no `release: published`, no tag `push`), so a
-# separate "build on release" workflow would never run. The DMG build and the
+# separate "build on release" workflow would never run. (With RELEASE_PLEASE_TOKEN set,
+# the tag and draft are created by the owner's token instead; no workflow listens for
+# tags or release events, so nothing extra runs either way.) The DMG build and the
 # website redeploy are therefore downstream jobs here, gated on release_created.
 #
 # Releases are immutable once published (Settings → "Enable release immutability"),
@@ -48,6 +50,12 @@ jobs:
       - uses: googleapis/release-please-action@v5
         id: release
         with:
+          # A fine-grained token (Contents and Pull requests: read/write on this repo only), so
+          # the release PR is authored by the owner and its CI runs without waiting for approval.
+          # Pull requests opened with GITHUB_TOKEN are authored by github-actions[bot], and GitHub
+          # holds their workflow runs until a maintainer approves them. Falls back to
+          # GITHUB_TOKEN (and that approval step) if the secret is missing or has expired.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
