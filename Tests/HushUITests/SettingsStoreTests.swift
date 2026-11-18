@@ -3,7 +3,7 @@ import HushCore
 import Testing
 @testable import HushUI
 
-@Suite struct SettingsStoreTests {
+@Suite(.timeLimit(.minutes(1))) struct SettingsStoreTests {
     private func makeDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "HushTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

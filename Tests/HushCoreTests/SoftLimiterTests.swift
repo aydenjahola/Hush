@@ -2,10 +2,9 @@ import Testing
 @testable import HushCore
 
 @Suite struct SoftLimiterTests {
-    @Test func identityAtOrBelowThreshold() {
-        for x: Float in [0, 0.25, -0.5, 0.9, -0.9] {
-            #expect(SoftLimiter.process(x) == x)
-        }
+    @Test(arguments: [0, 0.25, -0.5, 0.9, -0.9] as [Float])
+    func identityAtOrBelowThreshold(x: Float) {
+        #expect(SoftLimiter.process(x) == x)
     }
 
     @Test func outputStaysBelowOneUpToTen() {
@@ -18,10 +17,9 @@ import Testing
         }
     }
 
-    @Test func symmetricForNegativeInput() {
-        for x: Float in [0.95, 1.2, 3, 10] {
-            #expect(SoftLimiter.process(-x) == -SoftLimiter.process(x))
-        }
+    @Test(arguments: [0.95, 1.2, 3, 10] as [Float])
+    func symmetricForNegativeInput(x: Float) {
+        #expect(SoftLimiter.process(-x) == -SoftLimiter.process(x))
     }
 
     @Test func increasesMonotonically() {

@@ -3,7 +3,7 @@ import Testing
 @testable import HushUI
 
 @MainActor
-@Suite struct MenuBarIconTests {
+@Suite(.timeLimit(.minutes(1))) struct MenuBarIconTests {
     /// Alpha (0...1) at a point given in image points from the top-left, rendered at 2×.
     private func alpha(of image: NSImage, atX x: CGFloat, y: CGFloat) throws -> CGFloat {
         let scale: CGFloat = 2

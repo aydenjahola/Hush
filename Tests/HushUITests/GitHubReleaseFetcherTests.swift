@@ -3,7 +3,7 @@ import HushCore
 import Testing
 @testable import HushUI
 
-@Suite struct GitHubReleaseFetcherTests {
+@Suite(.timeLimit(.minutes(1))) struct GitHubReleaseFetcherTests {
     private let endpoint = URL(string: "https://api.github.com/repos/aydenjahola/Hush/releases/latest")!
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
     private let releaseJSON = Data(#"{"tag_name": "v0.2.0", "html_url": "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0", "draft": false, "prerelease": false, "assets": []}"#.utf8)

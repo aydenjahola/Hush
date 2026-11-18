@@ -37,7 +37,7 @@ final class FakeRunningApps: RunningAppsProviding {
 }
 
 @MainActor
-@Suite struct AppIdentityResolverTests {
+@Suite(.timeLimit(.minutes(1))) struct AppIdentityResolverTests {
     func makeResolver(_ apps: FakeRunningApps) -> (AppIdentityResolver, () -> Int) {
         let resolver = AppIdentityResolver(provider: apps)
         var invalidations = 0

@@ -6,7 +6,7 @@ import UserNotifications
 
 /// Only the pure parts: `UNUserNotificationCenter.current()` needs an app bundle, which tests don't have.
 @MainActor
-@Suite struct UserNotificationUpdateNotifierTests {
+@Suite(.timeLimit(.minutes(1))) struct UserNotificationUpdateNotifierTests {
     private let update = AvailableUpdate(
         version: SemanticVersion("0.2.0")!,
         downloadURL: dmgURL("0.2.0"),

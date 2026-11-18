@@ -14,7 +14,7 @@ final class FakeRunningReader {
 }
 
 @MainActor
-@Suite struct RunningStatePollerTests {
+@Suite(.timeLimit(.minutes(1))) struct RunningStatePollerTests {
     func makePoller(_ reader: FakeRunningReader, sleeper: FakeSleeper = FakeSleeper()) -> (RunningStatePoller, () -> [[AudioObjectID: Bool]]) {
         var changes: [[AudioObjectID: Bool]] = []
         let poller = RunningStatePoller(

@@ -6,7 +6,7 @@ import Testing
 struct OfflineError: Error {}
 
 @MainActor
-@Suite struct UpdateCheckerTests {
+@Suite(.timeLimit(.minutes(1))) struct UpdateCheckerTests {
     private static let day: TimeInterval = 24 * 60 * 60
 
     // MARK: Finding an update
@@ -304,7 +304,12 @@ struct OfflineError: Error {}
         let fetcher = GatedReleaseFetcher(release: makeRelease("0.1.0"))
         let h = UpdateHarness(fetcher: fetcher)
         let check = Task { await h.checker.checkNow() }
-        while await fetcher.started == 0 { await Task.yield() }
+        var spins = 0
+        while await fetcher.started == 0 {
+            spins += 1
+            try #require(spins < 10_000, "the fetch never started")
+            await Task.yield()
+        }
         #expect(h.checker.checkStatus == .checking)
 
         // A second request joins the one in flight instead of fetching again.

@@ -7,7 +7,7 @@ import Testing
 @testable import HushUI
 
 @MainActor
-@Suite struct MeterToggleTests {
+@Suite(.timeLimit(.minutes(1))) struct MeterToggleTests {
     private func harness(meters: Bool) -> Harness {
         Harness(document: SettingsDocument(
             preferences: Preferences(appearance: AppearancePreferences(showLevelMeters: meters))))
@@ -54,7 +54,7 @@ import Testing
 }
 
 @MainActor
-@Suite struct SortModeTests {
+@Suite(.timeLimit(.minutes(1))) struct SortModeTests {
     @Test func alphabeticalSortsIgnoringPlayback() {
         let h = Harness()
         h.processes.emit([
@@ -91,7 +91,7 @@ import Testing
 }
 
 @MainActor
-@Suite struct StripMeterTests {
+@Suite(.timeLimit(.minutes(1))) struct StripMeterTests {
     @Test func publishesOnlyWhenTheDisplayedHeightChanges() {
         let meter = StripMeter()
         #expect(meter.update(level: 0.5))
@@ -201,31 +201,29 @@ import Testing
 /// Renders every layout offscreen with real strips, so a broken layout fails here rather than
 /// in the menu bar.
 @MainActor
-@Suite struct LayoutSmokeTests {
-    @Test(arguments: MixerLayout.allCases)
-    func everyLayoutRenders(layout: MixerLayout) throws {
-        for density in MixerDensity.allCases {
-            for meters in [true, false] {
-                let h = Harness(document: SettingsDocument(apps: [
-                    "boosted": AppVolumeSetting(percent: 170, lastAdjusted: Harness.fixedNow),
-                    "muted": mutedSetting(),
-                ]))
-                let ids = ["boosted", "muted"] + (2..<8).map { "app\($0)" }
-                h.processes.emit(ids.enumerated().map { index, id in makeApp(id, objects: [UInt32(index + 1)]) })
-                h.store.layout = layout
-                h.store.density = density
-                h.store.showLevelMeters = meters
-                h.store.popoverDidAppear()
-                h.store.tickMeters(elapsed: 1.0 / 30.0)
+@Suite(.timeLimit(.minutes(1))) struct LayoutSmokeTests {
+    @Test(arguments: MixerLayout.allCases, MixerDensity.allCases)
+    func everyLayoutRenders(layout: MixerLayout, density: MixerDensity) throws {
+        for meters in [true, false] {
+            let h = Harness(document: SettingsDocument(apps: [
+                "boosted": AppVolumeSetting(percent: 170, lastAdjusted: Harness.fixedNow),
+                "muted": mutedSetting(),
+            ]))
+            let ids = ["boosted", "muted"] + (2..<8).map { "app\($0)" }
+            h.processes.emit(ids.enumerated().map { index, id in makeApp(id, objects: [UInt32(index + 1)]) })
+            h.store.layout = layout
+            h.store.density = density
+            h.store.showLevelMeters = meters
+            h.store.popoverDidAppear()
+            h.store.tickMeters(elapsed: 1.0 / 30.0)
 
-                let host = NSHostingView(rootView: MixerPopover(store: h.store, updates: UpdateHarness().checker))
-                host.frame = CGRect(x: 0, y: 0, width: 340, height: 600)
-                host.layoutSubtreeIfNeeded()
-                let rep = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
-                host.cacheDisplay(in: host.bounds, to: rep)
-                #expect(host.fittingSize.height > 100)
-                h.store.popoverDidDisappear()
-            }
+            let host = NSHostingView(rootView: MixerPopover(store: h.store, updates: UpdateHarness().checker))
+            host.frame = CGRect(x: 0, y: 0, width: 340, height: 600)
+            host.layoutSubtreeIfNeeded()
+            let rep = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: rep)
+            #expect(host.fittingSize.height > 100)
+            h.store.popoverDidDisappear()
         }
     }
 

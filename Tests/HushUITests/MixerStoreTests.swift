@@ -7,7 +7,7 @@ import Testing
 @testable import HushUI
 
 @MainActor
-@Suite struct MixerStoreTests {
+@Suite(.timeLimit(.minutes(1))) struct MixerStoreTests {
     @Test func appearingAppShowsStripWithSavedSetting() throws {
         let saved = AppVolumeSetting(percent: 62, lastAdjusted: Date(timeIntervalSince1970: 1_700_000_000))
         let h = Harness(document: SettingsDocument(apps: ["com.example.player": saved]))

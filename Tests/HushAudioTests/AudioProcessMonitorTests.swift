@@ -129,7 +129,7 @@ final class MonitorHarness {
 }
 
 @MainActor
-@Suite struct AudioProcessMonitorTests {
+@Suite(.timeLimit(.minutes(1))) struct AudioProcessMonitorTests {
     @Test func startPublishesTheCurrentApps() {
         let h = MonitorHarness()
         h.hal.add(10, pid: 100, playing: true)
