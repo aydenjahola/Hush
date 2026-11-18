@@ -15,6 +15,7 @@ extension CoreAudioIntegration {
             "A control engine's tap receives the tone within 1 s",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func controlEngineReceivesAudio() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
             let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
@@ -34,6 +35,7 @@ extension CoreAudioIntegration {
             "Gain 0.25 (50%) scales the engine's output peak to a quarter",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func gainScalesOutputPeak() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
             let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
@@ -60,6 +62,7 @@ extension CoreAudioIntegration {
             "200% boost keeps every output sample below full scale",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func boostStaysBelowFullScale() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
             // Into BlackHole a -3 dBFS tone doubled would reach +3 dBFS without the limiter.
             // On real speakers it stays at -60 dBFS, so only the 2x scaling is checked.
@@ -91,6 +94,7 @@ extension CoreAudioIntegration {
             "A meter-only engine reports the source level and leaves it playing",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func meterOnlyLeavesSourcePlaying() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
             let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
@@ -124,6 +128,7 @@ extension CoreAudioIntegration {
             "stop() leaves no Hush aggregate device or process tap behind",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func stopTearsEverythingDown() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
             let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
@@ -164,6 +169,7 @@ extension CoreAudioIntegration {
             "AudioProcessMonitor sees the tone start, stop and resume within about 1.5 s",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func monitorTracksPlayingState() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
             let monitor = AudioProcessMonitor()
             let latest = AppsBox()

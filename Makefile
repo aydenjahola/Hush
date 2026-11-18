@@ -56,11 +56,25 @@ test: require-xcode
 	swift test
 
 # Real Core Audio tests (taps, aggregates, BlackHole loopback). Needs Audio Recording permission
-# for the app running this (Terminal/VS Code); Group B also needs BlackHole 2ch. See website/src/content/docs/contributing/testing.md.
-# Tests that can't run are reported as skipped with the reason.
+# for the app running this (Terminal/VS Code), requested once if undetermined (never under CI);
+# Group B also needs BlackHole 2ch. See website/src/content/docs/contributing/testing.md.
+# Each test that really runs appends a line to the marker file. If none ran (everything skipped),
+# this fails unless ALLOW_SKIP=1.
+INTEGRATION_MARKER := .build/hush-integration-ran
+
 integration-test: require-xcode
 	swift build --product HushToneGenerator
-	HUSH_INTEGRATION=1 swift test --no-parallel --filter HushIntegrationTests
+	@mkdir -p .build && : > $(INTEGRATION_MARKER)
+	HUSH_INTEGRATION=1 HUSH_INTEGRATION_MARKER="$(CURDIR)/$(INTEGRATION_MARKER)" swift test --no-parallel --filter HushIntegrationTests
+	@ran=$$(wc -l < $(INTEGRATION_MARKER) | tr -d ' '); \
+	group_a=$$(grep -c '^A ' $(INTEGRATION_MARKER) || true); \
+	group_b=$$(grep -c '^B ' $(INTEGRATION_MARKER) || true); \
+	if [ "$$group_b" -gt 0 ]; then b_state="ran ($$group_b)"; else b_state="skipped"; fi; \
+	echo "Integration tests: $$ran ran (Group A engine level: $$group_a; Group B BlackHole end to end: $$b_state)"; \
+	if [ "$$ran" -eq 0 ] && [ "$(ALLOW_SKIP)" != "1" ]; then \
+		echo "No integration tests ran (permission or BlackHole missing). See the message above. Set ALLOW_SKIP=1 to bypass." >&2; \
+		exit 1; \
+	fi
 
 app: require-xcode
 	$(SWIFT_BUILD)

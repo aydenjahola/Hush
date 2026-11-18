@@ -80,6 +80,7 @@ extension CoreAudioIntegration {
             "Baseline: the tone reaches the BlackHole capture at its expected level",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func baselineReachesCapture() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
             let expected = sineRMS(peakDB: LoopbackRig.toneLevel)
@@ -91,6 +92,7 @@ extension CoreAudioIntegration {
             "Mute: a control engine at gain 0 silences the app within 300 ms (regression)",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func muteSilencesOutput() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
             let engine = rig.makeEngine(.control, gain: 0)
@@ -113,6 +115,7 @@ extension CoreAudioIntegration {
             "50%: the captured level drops by 12 dB",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func halfVolumeAttenuates() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
             let engine = rig.makeEngine(.control, gain: VolumeCurve.gain(percent: 50))
@@ -129,6 +132,7 @@ extension CoreAudioIntegration {
             "Make before break: meter-only → control at 50% never bursts or gaps",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func meterOnlyToControlSwap() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
             let meter = rig.makeEngine(.meterOnly, gain: 1)
@@ -157,6 +161,7 @@ extension CoreAudioIntegration {
             "Make before break: control → control at 50% never bursts or gaps",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func controlToControlSwap() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
             let gain = VolumeCurve.gain(percent: 50)
@@ -184,6 +189,7 @@ extension CoreAudioIntegration {
             "MixerStore with real sources: 50% attenuates, mute silences, 100% restores",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func mixerStoreEndToEnd() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
 
