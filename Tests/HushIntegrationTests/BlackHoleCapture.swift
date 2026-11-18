@@ -75,13 +75,17 @@ final class BlackHoleCapture {
         let end = end ?? ring.frameCount
         guard end > start else { throw IntegrationError("Empty capture range \(start)..<\(end)") }
         guard let samples = ring.samples(from: start, to: end) else {
-            throw IntegrationError("Capture frames \(start)..<\(end) aren't available (captured so far: \(ring.frameCount), ring holds \(ring.capacity)): not arrived yet or overrun")
+            throw IntegrationError(
+                "Capture frames \(start)..<\(end) aren't available (captured so far: \(ring.frameCount), ring holds \(ring.capacity)): not arrived yet or overrun"
+            )
         }
         return samples
     }
 
     func frames(for duration: Duration) -> Int {
-        Int(Double(duration.components.seconds) * sampleRate + Double(duration.components.attoseconds) * 1e-18 * sampleRate)
+        Int(
+            Double(duration.components.seconds) * sampleRate + Double(duration.components.attoseconds) * 1e-18
+                * sampleRate)
     }
 
     /// Waits until `duration` of new audio has arrived and returns it.
@@ -112,16 +116,24 @@ final class BlackHoleCapture {
             mScope: kAudioObjectPropertyScopeInput,
             mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0
-        try CoreAudioProperty.check(AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size), "Sizing BlackHole input streams")
+        try CoreAudioProperty.check(
+            AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size), "Sizing BlackHole input streams")
         var streams = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-        guard let first = streams.indices.first else { throw IntegrationError("BlackHole has no input stream to capture") }
-        try CoreAudioProperty.check(AudioObjectGetPropertyData(device, &address, 0, nil, &size, &streams), "Reading BlackHole input streams")
-        let format = try CoreAudioProperty.scalar(streams[first], kAudioStreamPropertyVirtualFormat, initial: AudioStreamBasicDescription())
-        let isFloat32 = format.mFormatID == kAudioFormatLinearPCM
+        guard let first = streams.indices.first else {
+            throw IntegrationError("BlackHole has no input stream to capture")
+        }
+        try CoreAudioProperty.check(
+            AudioObjectGetPropertyData(device, &address, 0, nil, &size, &streams), "Reading BlackHole input streams")
+        let format = try CoreAudioProperty.scalar(
+            streams[first], kAudioStreamPropertyVirtualFormat, initial: AudioStreamBasicDescription())
+        let isFloat32 =
+            format.mFormatID == kAudioFormatLinearPCM
             && format.mFormatFlags & kAudioFormatFlagIsFloat != 0
             && format.mBitsPerChannel == 32
         guard isFloat32 else {
-            throw IntegrationError("BlackHole's input virtual format isn't Float32 (format \(format.mFormatID), flags \(format.mFormatFlags), \(format.mBitsPerChannel) bits); the capture can't read it")
+            throw IntegrationError(
+                "BlackHole's input virtual format isn't Float32 (format \(format.mFormatID), flags \(format.mFormatFlags), \(format.mBitsPerChannel) bits); the capture can't read it"
+            )
         }
     }
 
@@ -135,9 +147,10 @@ final class BlackHoleCapture {
             mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr,
-              size >= UInt32(MemoryLayout<AudioHardwareIOProcStreamUsage>.size)
+            size >= UInt32(MemoryLayout<AudioHardwareIOProcStreamUsage>.size)
         else { return }
-        let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioHardwareIOProcStreamUsage>.alignment)
+        let raw = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(size), alignment: MemoryLayout<AudioHardwareIOProcStreamUsage>.alignment)
         defer { raw.deallocate() }
         let usage = raw.assumingMemoryBound(to: AudioHardwareIOProcStreamUsage.self)
         usage.pointee.mIOProc = unsafeBitCast(procID, to: UnsafeMutableRawPointer.self)

@@ -19,8 +19,14 @@ import Testing
             draft: draft,
             prerelease: prerelease,
             assets: assets ?? [
-                .init(name: "Hush.dmg", browserDownloadURL: URL(string: "https://github.com/aydenjahola/Hush/releases/download/\(tag)/Hush.dmg")!),
-                .init(name: "Hush-\(version).dmg", browserDownloadURL: URL(string: "https://github.com/aydenjahola/Hush/releases/download/\(tag)/Hush-\(version).dmg")!),
+                .init(
+                    name: "Hush.dmg",
+                    browserDownloadURL: URL(
+                        string: "https://github.com/aydenjahola/Hush/releases/download/\(tag)/Hush.dmg")!),
+                .init(
+                    name: "Hush-\(version).dmg",
+                    browserDownloadURL: URL(
+                        string: "https://github.com/aydenjahola/Hush/releases/download/\(tag)/Hush-\(version).dmg")!),
             ])
     }
 
@@ -28,22 +34,22 @@ import Testing
 
     @Test func decodesGitHubReleaseJSON() throws {
         let json = """
-        {
-          "url": "https://api.github.com/repos/aydenjahola/Hush/releases/1",
-          "html_url": "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0",
-          "tag_name": "v0.2.0",
-          "name": "v0.2.0",
-          "draft": false,
-          "prerelease": false,
-          "published_at": "2026-12-01T10:00:00Z",
-          "assets": [
-            { "name": "Hush-0.2.0.dmg", "size": 123,
-              "browser_download_url": "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg" },
-            { "name": "Hush-0.2.0.dmg.sha256",
-              "browser_download_url": "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg.sha256" }
-          ]
-        }
-        """
+            {
+              "url": "https://api.github.com/repos/aydenjahola/Hush/releases/1",
+              "html_url": "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0",
+              "tag_name": "v0.2.0",
+              "name": "v0.2.0",
+              "draft": false,
+              "prerelease": false,
+              "published_at": "2026-12-01T10:00:00Z",
+              "assets": [
+                { "name": "Hush-0.2.0.dmg", "size": 123,
+                  "browser_download_url": "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg" },
+                { "name": "Hush-0.2.0.dmg.sha256",
+                  "browser_download_url": "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg.sha256" }
+              ]
+            }
+            """
         let decoded = try GitHubRelease.decode(from: Data(json.utf8))
         #expect(decoded.tagName == "v0.2.0")
         #expect(decoded.htmlURL.absoluteString == "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0")
@@ -58,7 +64,9 @@ import Testing
     }
 
     @Test func decodingRejectsGarbage() {
-        #expect(throws: (any Error).self) { try GitHubRelease.decode(from: Data(#"{"message": "API rate limit exceeded"}"#.utf8)) }
+        #expect(throws: (any Error).self) {
+            try GitHubRelease.decode(from: Data(#"{"message": "API rate limit exceeded"}"#.utf8))
+        }
         #expect(throws: (any Error).self) { try GitHubRelease.decode(from: Data("<html>".utf8)) }
     }
 
@@ -67,7 +75,9 @@ import Testing
     @Test func newerReleaseIsAnUpdateWithTheVersionedDMG() throws {
         let update = try #require(UpdatePolicy.availableUpdate(in: release(), current: current))
         #expect(update.version == SemanticVersion("0.2.0"))
-        #expect(update.downloadURL.absoluteString == "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg")
+        #expect(
+            update.downloadURL.absoluteString
+                == "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg")
         #expect(update.releasePageURL.absoluteString == "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0")
     }
 
@@ -105,7 +115,9 @@ import Testing
             tagName: "v0.2.0",
             htmlURL: URL(string: "http://github.com/aydenjahola/Hush/releases/tag/v0.2.0")!,
             draft: false, prerelease: false,
-            assets: [.init(name: "Hush-0.2.0.dmg", browserDownloadURL: URL(string: "https://evil.example/Hush-0.2.0.dmg")!)])
+            assets: [
+                .init(name: "Hush-0.2.0.dmg", browserDownloadURL: URL(string: "https://evil.example/Hush-0.2.0.dmg")!)
+            ])
         let update = try #require(UpdatePolicy.availableUpdate(in: hostile, current: current))
         #expect(update.downloadURL == UpdatePolicy.releasesPageURL)
         #expect(update.releasePageURL == UpdatePolicy.releasesPageURL)
@@ -124,15 +136,15 @@ import Testing
     }
 
     @Test(arguments: [
-        "https://github.com/attacker/Hush/releases/latest",           // another repo
-        "https://github.com/aydenjahola/HushEvil/releases/latest",    // look-alike repo
-        "https://github.com/aydenjahola/Hush/issues/1",                // not a release
-        "https://github.com:444/aydenjahola/Hush/releases/latest",    // port
-        "https://evil@github.com/aydenjahola/Hush/releases/latest",   // user
-        "https://a:b@github.com/aydenjahola/Hush/releases/latest",    // user and password
-        "http://github.com/aydenjahola/Hush/releases/latest",         // not https
+        "https://github.com/attacker/Hush/releases/latest",  // another repo
+        "https://github.com/aydenjahola/HushEvil/releases/latest",  // look-alike repo
+        "https://github.com/aydenjahola/Hush/issues/1",  // not a release
+        "https://github.com:444/aydenjahola/Hush/releases/latest",  // port
+        "https://evil@github.com/aydenjahola/Hush/releases/latest",  // user
+        "https://a:b@github.com/aydenjahola/Hush/releases/latest",  // user and password
+        "http://github.com/aydenjahola/Hush/releases/latest",  // not https
         "https://github.com.evil.example/aydenjahola/Hush/releases/latest",
-        "https://github.com/aydenjahola/Hush/../evil/releases/latest", // traversal
+        "https://github.com/aydenjahola/Hush/../evil/releases/latest",  // traversal
         "https://github.com/aydenjahola/Hush/releases/../../../evil/x",
         "https://github.com/aydenjahola/Hush/releases/%2e%2e/%2e%2e/%2e%2e/evil",
         "file:///aydenjahola/Hush/releases/latest",
@@ -146,7 +158,9 @@ import Testing
         let page = URL(string: "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0")!
         #expect(UpdatePolicy.isTrustedDownload(asset))
         #expect(!UpdatePolicy.isTrustedDownload(page))
-        #expect(!UpdatePolicy.isTrustedDownload(URL(string: "https://github.com/attacker/x/releases/download/v1/Hush-0.2.0.dmg")!))
+        #expect(
+            !UpdatePolicy.isTrustedDownload(
+                URL(string: "https://github.com/attacker/x/releases/download/v1/Hush-0.2.0.dmg")!))
     }
 
     @Test func assetOutsideReleaseDownloadsFallsBackToTheReleasePage() throws {
@@ -154,7 +168,11 @@ import Testing
             tagName: "v0.2.0",
             htmlURL: URL(string: "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0")!,
             draft: false, prerelease: false,
-            assets: [.init(name: "Hush-0.2.0.dmg", browserDownloadURL: URL(string: "https://github.com/aydenjahola/Hush/releases/tag/Hush-0.2.0.dmg")!)])
+            assets: [
+                .init(
+                    name: "Hush-0.2.0.dmg",
+                    browserDownloadURL: URL(string: "https://github.com/aydenjahola/Hush/releases/tag/Hush-0.2.0.dmg")!)
+            ])
         let update = try #require(UpdatePolicy.availableUpdate(in: odd, current: current))
         #expect(update.downloadURL == update.releasePageURL)
     }
@@ -162,7 +180,9 @@ import Testing
     // MARK: Suppression
 
     private func update(_ version: String) -> AvailableUpdate {
-        AvailableUpdate(version: SemanticVersion(version)!, downloadURL: UpdatePolicy.releasesPageURL, releasePageURL: UpdatePolicy.releasesPageURL)
+        AvailableUpdate(
+            version: SemanticVersion(version)!, downloadURL: UpdatePolicy.releasesPageURL,
+            releasePageURL: UpdatePolicy.releasesPageURL)
     }
 
     @Test func nothingSuppressesByDefault() {
@@ -197,13 +217,17 @@ import Testing
         let schedule = UpdateSchedule()
         #expect(schedule.nextCheck(lastAttempt: nil, launchedAt: now, now: now) == now.addingTimeInterval(30))
         // Still anchored to launch if computed a little later.
-        #expect(schedule.nextCheck(lastAttempt: nil, launchedAt: now, now: now.addingTimeInterval(10)) == now.addingTimeInterval(30))
+        #expect(
+            schedule.nextCheck(lastAttempt: nil, launchedAt: now, now: now.addingTimeInterval(10))
+                == now.addingTimeInterval(30))
     }
 
     @Test func laterChecksAreADayAfterTheLastAttempt() {
         let schedule = UpdateSchedule()
         let attempt = now.addingTimeInterval(30)
-        #expect(schedule.nextCheck(lastAttempt: attempt, launchedAt: now, now: attempt) == attempt.addingTimeInterval(86_400))
+        #expect(
+            schedule.nextCheck(lastAttempt: attempt, launchedAt: now, now: attempt)
+                == attempt.addingTimeInterval(86_400))
         // Overdue (e.g. the Mac slept through it): due now, not in the past's future.
         let overdue = schedule.nextCheck(lastAttempt: attempt, launchedAt: now, now: attempt.addingTimeInterval(90_000))
         #expect(overdue == attempt.addingTimeInterval(86_400))
@@ -212,7 +236,8 @@ import Testing
     @Test func clockMovingBackwardsNeverPushesTheCheckPastADay() {
         let schedule = UpdateSchedule()
         let futureAttempt = now.addingTimeInterval(10 * 86_400)
-        #expect(schedule.nextCheck(lastAttempt: futureAttempt, launchedAt: now, now: now) == now.addingTimeInterval(86_400))
+        #expect(
+            schedule.nextCheck(lastAttempt: futureAttempt, launchedAt: now, now: now) == now.addingTimeInterval(86_400))
     }
 
     @Test func failuresBackOffOneHourThenFourThenADay() {
@@ -232,15 +257,20 @@ import Testing
     @Test func notBeforeDelaysTheCheckButNeverPastADay() {
         let schedule = UpdateSchedule()
         let later = now.addingTimeInterval(7_200)
-        #expect(schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, notBefore: later, launchedAt: now, now: now) == later)
+        #expect(
+            schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, notBefore: later, launchedAt: now, now: now)
+                == later)
         let tooLate = now.addingTimeInterval(10 * 86_400)
-        #expect(schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, notBefore: tooLate, launchedAt: now, now: now)
+        #expect(
+            schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, notBefore: tooLate, launchedAt: now, now: now)
                 == now.addingTimeInterval(86_400))
     }
 
     @Test func attemptsAreAlwaysAtLeastAMinuteApart() {
         let schedule = UpdateSchedule(launchDelay: 30, interval: 5, retryIntervals: [1])
         #expect(schedule.nextCheck(lastAttempt: now, launchedAt: now, now: now) == now.addingTimeInterval(60))
-        #expect(schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, launchedAt: now, now: now) == now.addingTimeInterval(60))
+        #expect(
+            schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, launchedAt: now, now: now)
+                == now.addingTimeInterval(60))
     }
 }

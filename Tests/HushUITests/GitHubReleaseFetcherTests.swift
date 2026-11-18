@@ -6,13 +6,17 @@ import Testing
 @Suite(.timeLimit(.minutes(1))) struct GitHubReleaseFetcherTests {
     private let endpoint = URL(string: "https://api.github.com/repos/aydenjahola/Hush/releases/latest")!
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
-    private let releaseJSON = Data(#"{"tag_name": "v0.2.0", "html_url": "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0", "draft": false, "prerelease": false, "assets": []}"#.utf8)
+    private let releaseJSON = Data(
+        #"{"tag_name": "v0.2.0", "html_url": "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0", "draft": false, "prerelease": false, "assets": []}"#
+            .utf8)
 
     private func response(_ status: Int, headers: [String: String] = [:]) -> HTTPURLResponse {
         HTTPURLResponse(url: endpoint, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
     }
 
-    private func result(_ status: Int, _ data: Data = Data(), headers: [String: String] = [:]) throws -> ReleaseFetchResult {
+    private func result(_ status: Int, _ data: Data = Data(), headers: [String: String] = [:]) throws
+        -> ReleaseFetchResult
+    {
         try GitHubReleaseFetcher.result(from: data, response: response(status, headers: headers), now: now)
     }
 
@@ -26,8 +30,10 @@ import Testing
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(request.value(forHTTPHeaderField: "Cookie") == nil)
         #expect(request.httpShouldHandleCookies == false)
-        #expect(Set(request.allHTTPHeaderFields?.keys.map { $0.lowercased() } ?? []) ==
-                ["user-agent", "accept", "accept-language", "x-github-api-version"])
+        #expect(
+            Set(request.allHTTPHeaderFields?.keys.map { $0.lowercased() } ?? []) == [
+                "user-agent", "accept", "accept-language", "x-github-api-version",
+            ])
     }
 
     @Test func requestSendsTheLastETag() {
@@ -69,7 +75,9 @@ import Testing
 
     @Test func rateLimitResetIsHonored() {
         #expect(throws: ReleaseFetchError.rateLimited(retryAfter: 300)) {
-            try result(403, headers: ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "\(Int(now.timeIntervalSince1970) + 300)"])
+            try result(
+                403,
+                headers: ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "\(Int(now.timeIntervalSince1970) + 300)"])
         }
     }
 
@@ -78,7 +86,9 @@ import Testing
             try result(429, headers: ["Retry-After": "999999"])
         }
         #expect(throws: ReleaseFetchError.rateLimited(retryAfter: 0)) {
-            try result(403, headers: ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "\(Int(now.timeIntervalSince1970) - 50)"])
+            try result(
+                403,
+                headers: ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "\(Int(now.timeIntervalSince1970) - 50)"])
         }
     }
 

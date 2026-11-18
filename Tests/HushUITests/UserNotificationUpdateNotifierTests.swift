@@ -24,8 +24,10 @@ import UserNotifications
         let category = UserNotificationUpdateNotifier.category
         #expect(category.identifier == UserNotificationUpdateNotifier.categoryIdentifier)
         #expect(category.actions.map(\.title) == ["Download", "Later", "Skip This Version"])
-        #expect(category.actions.map(\.identifier).compactMap(UserNotificationUpdateNotifier.action(for:)) ==
-                [.download, .later, .skip])
+        #expect(
+            category.actions.map(\.identifier).compactMap(UserNotificationUpdateNotifier.action(for:)) == [
+                .download, .later, .skip,
+            ])
     }
 
     @Test func clickingTheNotificationDownloads() {

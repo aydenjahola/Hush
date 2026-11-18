@@ -90,7 +90,8 @@ package final class AudioProcessMonitor: AudioProcessSource {
     /// notifications (list, running) separately but within a few milliseconds, so one short window
     /// catches them all while adding at most `delay` before a muted app's engine starts.
     package static func coalescing(within delay: Duration) -> Scheduler {
-        let nanoseconds = Int(delay.components.seconds) * 1_000_000_000 + Int(delay.components.attoseconds / 1_000_000_000)
+        let nanoseconds =
+            Int(delay.components.seconds) * 1_000_000_000 + Int(delay.components.attoseconds / 1_000_000_000)
         return { work in
             DispatchQueue.main.asyncAfter(deadline: .now() + .nanoseconds(nanoseconds)) {
                 MainActor.assumeIsolated { work() }
@@ -100,7 +101,8 @@ package final class AudioProcessMonitor: AudioProcessSource {
 
     package func start(onChange: @escaping @MainActor ([AudioApp]) -> Void) {
         self.onChange = onChange
-        listListener = hal.addListener(CoreAudioProperty.systemObject, kAudioHardwarePropertyProcessObjectList) { [weak self] in
+        listListener = hal.addListener(CoreAudioProperty.systemObject, kAudioHardwarePropertyProcessObjectList) {
+            [weak self] in
             self?.listDidChange()
         }
         if listListener == nil { logger.error("Could not listen to the process list") }
@@ -191,7 +193,8 @@ package final class AudioProcessMonitor: AudioProcessSource {
         do {
             fresh = try hal.processObjects()
         } catch {
-            logger.error("Process list unreadable, keeping the last state: \(String(describing: error), privacy: .public)")
+            logger.error(
+                "Process list unreadable, keeping the last state: \(String(describing: error), privacy: .public)")
             return
         }
         let current = Set(fresh)
@@ -204,7 +207,9 @@ package final class AudioProcessMonitor: AudioProcessSource {
         }
         // A list change gives objects that ran out of retries a fresh round.
         for objectID in fresh where info[objectID] == nil { infoAttempts[objectID] = 0 }
-        for objectID in fresh where info[objectID] != nil && runningListeners[objectID] == nil { listenerAttempts[objectID] = 0 }
+        for objectID in fresh where info[objectID] != nil && runningListeners[objectID] == nil {
+            listenerAttempts[objectID] = 0
+        }
         objectIDs = fresh
     }
 
@@ -221,7 +226,9 @@ package final class AudioProcessMonitor: AudioProcessSource {
                 info[objectID] = ObjectInfo(pid: pid, bundleID: bundleID)
             } catch {
                 infoAttempts[objectID] = attempts + 1
-                logger.debug("Couldn't read process object \(objectID) (attempt \(attempts + 1)): \(String(describing: error), privacy: .public)")
+                logger.debug(
+                    "Couldn't read process object \(objectID) (attempt \(attempts + 1)): \(String(describing: error), privacy: .public)"
+                )
                 continue
             }
             infoAttempts[objectID] = nil
@@ -231,9 +238,12 @@ package final class AudioProcessMonitor: AudioProcessSource {
         for objectID in objectIDs where info[objectID] != nil && runningListeners[objectID] == nil {
             guard let attempts = listenerAttempts[objectID], attempts < Self.maxRetries else { continue }
             // IsRunningOutput only: it's what decides `isPlaying`, and the poller reads the same flag.
-            if let listener = hal.addListener(objectID, kAudioProcessPropertyIsRunningOutput, { [weak self] in
-                self?.runningDidChange(objectID)
-            }) {
+            if let listener = hal.addListener(
+                objectID, kAudioProcessPropertyIsRunningOutput,
+                { [weak self] in
+                    self?.runningDidChange(objectID)
+                })
+            {
                 runningListeners[objectID] = listener
                 listenerAttempts[objectID] = nil
             } else {
@@ -241,7 +251,8 @@ package final class AudioProcessMonitor: AudioProcessSource {
                 logger.debug("HAL refused a running listener on object \(objectID) (attempt \(attempts + 1))")
             }
         }
-        let pending = infoAttempts.values.contains { $0 < Self.maxRetries }
+        let pending =
+            infoAttempts.values.contains { $0 < Self.maxRetries }
             || listenerAttempts.values.contains { $0 < Self.maxRetries }
         if pending { scheduleRetry() }
     }
@@ -258,11 +269,12 @@ package final class AudioProcessMonitor: AudioProcessSource {
 
     private func updatePollTargets() {
         let known = Set(objectIDs.filter { info[$0] != nil })
-        let targets: Set<AudioObjectID> = switch polling {
-        case .off: []
-        case .objects(let ids): ids.intersection(known)
-        case .all: known
-        }
+        let targets: Set<AudioObjectID> =
+            switch polling {
+            case .off: []
+            case .objects(let ids): ids.intersection(known)
+            case .all: known
+            }
         poller.setTargets(targets)
     }
 

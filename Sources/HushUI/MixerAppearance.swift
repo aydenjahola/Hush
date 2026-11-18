@@ -84,7 +84,9 @@ extension Palette {
     }
 
     /// The system accent when chosen, else nil (callers then use their neutral).
-    static func systemAccentIfChosen(_ accent: AccentChoice, _ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color? {
+    static func systemAccentIfChosen(_ accent: AccentChoice, _ scheme: ColorScheme, _ contrast: ColorSchemeContrast)
+        -> Color?
+    {
         accent == .system ? systemAccent(scheme, contrast) : nil
     }
 
@@ -100,12 +102,13 @@ extension Palette {
     /// pale accent such as yellow still reads as a mark and as text on the light popover.
     static func systemAccent(_ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color {
         let base = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .systemBlue
-        let adjusted: NSColor = switch (scheme, contrast) {
-        case (.dark, .increased): base.blended(withFraction: 0.25, of: .white) ?? base
-        case (.dark, _): base
-        case (_, .increased): base.blended(withFraction: 0.5, of: .black) ?? base
-        default: base.blended(withFraction: 0.3, of: .black) ?? base
-        }
+        let adjusted: NSColor =
+            switch (scheme, contrast) {
+            case (.dark, .increased): base.blended(withFraction: 0.25, of: .white) ?? base
+            case (.dark, _): base
+            case (_, .increased): base.blended(withFraction: 0.5, of: .black) ?? base
+            default: base.blended(withFraction: 0.3, of: .black) ?? base
+            }
         return Color(nsColor: adjusted)
     }
 }

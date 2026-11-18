@@ -67,7 +67,8 @@ struct HorizontalFader: View {
                     }
                     let newValue = scale.percent(atPosition: (drag.location.x - knob / 2) / travel)
                     if newValue != value { onChange(newValue) }
-                })
+                }
+            )
             .simultaneousGesture(
                 SpatialTapGesture(count: 2).onEnded { tap in
                     guard isEnabled else { return }

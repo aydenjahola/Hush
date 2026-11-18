@@ -59,7 +59,9 @@ extension CoreAudioIntegration {
 
             let ratio = half / full
             #expect(settled, "the 50% peak never came within 0.25 ± 0.025 of the 100% peak within 1 s")
-            #expect(abs(ratio - 0.25) <= 0.025, "50% peak / 100% peak = \(ratio), expected 0.25 ± 0.025 (full \(full), half \(half))")
+            #expect(
+                abs(ratio - 0.25) <= 0.025,
+                "50% peak / 100% peak = \(ratio), expected 0.25 ± 0.025 (full \(full), half \(half))")
         }
 
         @Test(
@@ -86,10 +88,14 @@ extension CoreAudioIntegration {
             let loudest = peaks.max() ?? 0
             #expect(loudest < 1.0, "200% output peaked at \(loudest)")
             if output.isBlackHole {
-                #expect(loudest > SoftLimiter.threshold, "expected the limiter's range (> \(SoftLimiter.threshold)), got \(loudest): was the boost applied?")
+                #expect(
+                    loudest > SoftLimiter.threshold,
+                    "expected the limiter's range (> \(SoftLimiter.threshold)), got \(loudest): was the boost applied?")
             } else {
                 let expected = 2 * linear(dB: level)
-                #expect(abs(median(peaks) - expected) <= expected * 0.1, "200% peak \(median(peaks)), expected about \(expected)")
+                #expect(
+                    abs(median(peaks) - expected) <= expected * 0.1,
+                    "200% peak \(median(peaks)), expected about \(expected)")
             }
         }
 
@@ -111,18 +117,24 @@ extension CoreAudioIntegration {
                 outputDeviceID: output.device.id)
             defer { engine.stop() }
             try engine.start()
-            #expect(await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 }, "meter-only engine reported no level")
+            #expect(
+                await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 },
+                "meter-only engine reported no level")
 
             let peak = median(await collectPeaks(engine, for: .milliseconds(400)))
             let expected = linear(dB: output.quietLevel)
-            #expect(abs(peak - expected) <= expected * 0.1, "meter-only peak \(peak), expected the source's \(expected)")
-            #expect(AudioDevices.isRunningOutput(object), "the tone process stopped running output under a meter-only tap")
+            #expect(
+                abs(peak - expected) <= expected * 0.1, "meter-only peak \(peak), expected the source's \(expected)")
+            #expect(
+                AudioDevices.isRunningOutput(object), "the tone process stopped running output under a meter-only tap")
 
             if let capture {
                 let heard = rms(try await capture.record(.milliseconds(300)))
                 let expectedRMS = sineRMS(peakDB: output.quietLevel)
-                #expect(abs(dBFS(heard) - dBFS(expectedRMS)) <= 1.5,
-                        "BlackHole heard \(dBFS(heard)) dBFS under a meter-only tap, expected \(dBFS(expectedRMS)) dBFS (the source must stay audible)")
+                #expect(
+                    abs(dBFS(heard) - dBFS(expectedRMS)) <= 1.5,
+                    "BlackHole heard \(dBFS(heard)) dBFS under a meter-only tap, expected \(dBFS(expectedRMS)) dBFS (the source must stay audible)"
+                )
             }
         }
 
@@ -146,8 +158,9 @@ extension CoreAudioIntegration {
                 try engine.start()
 
                 // Prove the lists can see what we create, or the "after" check proves nothing.
-                #expect(Set(AudioDevices.hushAggregateUIDs()).subtracting(aggregatesBefore).count == 1,
-                        "expected exactly one new Hush aggregate while a \(mode) engine runs")
+                #expect(
+                    Set(AudioDevices.hushAggregateUIDs()).subtracting(aggregatesBefore).count == 1,
+                    "expected exactly one new Hush aggregate while a \(mode) engine runs")
                 let tapsWhileRunning = AudioDevices.tapIDs().map(Set.init)
                 let tapsVisible = tapsBefore != nil && tapsWhileRunning.map { $0.count > tapsBefore!.count } == true
 
@@ -156,7 +169,10 @@ extension CoreAudioIntegration {
                 let aggregatesGone = await waitUntil(timeout: .seconds(1)) {
                     Set(AudioDevices.hushAggregateUIDs()) == aggregatesBefore
                 }
-                #expect(aggregatesGone, "Hush aggregate devices left after stop(): \(Set(AudioDevices.hushAggregateUIDs()).subtracting(aggregatesBefore))")
+                #expect(
+                    aggregatesGone,
+                    "Hush aggregate devices left after stop(): \(Set(AudioDevices.hushAggregateUIDs()).subtracting(aggregatesBefore))"
+                )
                 if tapsVisible, let tapsBefore {
                     let tapsGone = await waitUntil(timeout: .seconds(1)) {
                         AudioDevices.tapIDs().map(Set.init) == tapsBefore

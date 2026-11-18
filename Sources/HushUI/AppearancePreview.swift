@@ -37,16 +37,18 @@ struct AppearancePreview: View {
         case .channelStrips:
             HStack(alignment: .top, spacing: 8) {
                 ForEach(samples) { sample in
-                    ChannelStrip(strip: sample.strip, meter: sample.meter, maxPercent: maxPercent,
-                                 isEnabled: true, actions: sample.actions)
+                    ChannelStrip(
+                        strip: sample.strip, meter: sample.meter, maxPercent: maxPercent,
+                        isEnabled: true, actions: sample.actions)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         case .classicRows, .tiles:
             VStack(spacing: appearance.layout == .tiles ? 6 : 2) {
                 ForEach(samples) { sample in
-                    StripListRow(layout: appearance.layout, strip: sample.strip, meter: sample.meter,
-                                 maxPercent: maxPercent, isEnabled: true, actions: sample.actions)
+                    StripListRow(
+                        layout: appearance.layout, strip: sample.strip, meter: sample.meter,
+                        maxPercent: maxPercent, isEnabled: true, actions: sample.actions)
                 }
             }
         }
@@ -98,7 +100,8 @@ enum SampleStrips {
         ]
     }
 
-    private static func sample(_ id: String, _ name: String, percent: Int, muted: Bool = false, level: Float) -> Sample {
+    private static func sample(_ id: String, _ name: String, percent: Int, muted: Bool = false, level: Float) -> Sample
+    {
         var setting = AppVolumeSetting(percent: percent)
         setting.isMuted = muted
         let meter = StripMeter()

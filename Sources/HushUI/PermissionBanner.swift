@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 struct PermissionBanner: View {
-    static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture")!
+    static let settingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture")!
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

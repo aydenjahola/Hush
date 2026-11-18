@@ -42,7 +42,9 @@ final class LoopbackRig {
             // "attenuated" and "muted" pass vacuously.
             let expected = dBFS(Self.expectedBaseline)
             guard abs(dBFS(baseline) - expected) <= 3 else {
-                throw IntegrationError("The unprocessed tone captured at \(dBFS(baseline)) dBFS RMS, expected \(expected) dBFS ± 3 dB. Is BlackHole's loopback working, and is something else playing into it?")
+                throw IntegrationError(
+                    "The unprocessed tone captured at \(dBFS(baseline)) dBFS RMS, expected \(expected) dBFS ± 3 dB. Is BlackHole's loopback working, and is something else playing into it?"
+                )
             }
         } catch {
             tearDown()
@@ -56,7 +58,8 @@ final class LoopbackRig {
     }
 
     func makeEngine(_ mode: EngineMode, gain: Float) -> AppAudioEngine {
-        AppAudioEngine(appID: "tone", processObjectIDs: [toneObject], mode: mode, initialGain: gain, outputDeviceID: blackHole.id)
+        AppAudioEngine(
+            appID: "tone", processObjectIDs: [toneObject], mode: mode, initialGain: gain, outputDeviceID: blackHole.id)
     }
 
     /// Waits until the recent capture level is within `tolerance` dB of `target`.
@@ -103,8 +106,9 @@ extension CoreAudioIntegration {
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
             let expected = LoopbackRig.expectedBaseline
-            #expect(abs(dBFS(rig.baseline) - dBFS(expected)) <= 1.5,
-                    "captured \(dBFS(rig.baseline)) dBFS RMS, expected \(dBFS(expected)) dBFS ± 1.5 dB")
+            #expect(
+                abs(dBFS(rig.baseline) - dBFS(expected)) <= 1.5,
+                "captured \(dBFS(rig.baseline)) dBFS RMS, expected \(dBFS(expected)) dBFS ± 1.5 dB")
         }
 
         @Test(
@@ -125,14 +129,19 @@ extension CoreAudioIntegration {
 
             let remaining = max(.milliseconds(300) - (ContinuousClock.now - startBegan), .zero)
             let silenced = await rig.waitForSilence(timeout: remaining)
-            #expect(silenced, "still \(rig.capture.recentLevel(.milliseconds(20))) 300 ms after calling start() (start() took \(startTook)); the app isn't muted")
+            #expect(
+                silenced,
+                "still \(rig.capture.recentLevel(.milliseconds(20))) 300 ms after calling start() (start() took \(startTook)); the app isn't muted"
+            )
 
             let held = rms(try await rig.capture.record(.milliseconds(500)))
             #expect(dBFS(held) < silenceDB, "mute didn't hold: \(dBFS(held)) dBFS over the next 500 ms")
 
             // Positive control: the silence was the engine's doing, not a dead tone or capture.
             engine.stop()
-            #expect(await rig.waitForLevel(rig.baseline), "after stop() the tone didn't come back to its baseline (now \(rig.capture.recentLevel()))")
+            #expect(
+                await rig.waitForLevel(rig.baseline),
+                "after stop() the tone didn't come back to its baseline (now \(rig.capture.recentLevel()))")
             #expect(rig.tone.process.isRunning, "the tone process died during the test")
         }
 
@@ -164,11 +173,17 @@ extension CoreAudioIntegration {
             let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
             defer { engine.stop() }
             // Full volume is expected until the mute lands; after that it must not come back.
-            let onset = try #require(check.sustainedOnset, "the level never stayed attenuated (below baseline × 0.75, above silence) for 3 windows during the swap")
-            #expect(check.loudestWindow(from: onset) <= check.threshold,
-                    "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
-            #expect(check.loudestWindow(in: 0..<onset) <= meterToControlLimit(rig),
-                    "before the level dropped it reached \(check.loudestWindow(in: 0..<onset)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay")
+            let onset = try #require(
+                check.sustainedOnset,
+                "the level never stayed attenuated (below baseline × 0.75, above silence) for 3 windows during the swap"
+            )
+            #expect(
+                check.loudestWindow(from: onset) <= check.threshold,
+                "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
+            #expect(
+                check.loudestWindow(in: 0..<onset) <= meterToControlLimit(rig),
+                "before the level dropped it reached \(check.loudestWindow(in: 0..<onset)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay"
+            )
             #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't settle at -12 dB after the swap")
         }
 
@@ -183,10 +198,14 @@ extension CoreAudioIntegration {
             let gain = VolumeCurve.gain(percent: 99)
             let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
             defer { engine.stop() }
-            #expect(check.loudestWindow(from: 0) <= meterToControlLimit(rig),
-                    "the swap reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay")
+            #expect(
+                check.loudestWindow(from: 0) <= meterToControlLimit(rig),
+                "the swap reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay"
+            )
             // Positive control: an unmuted source plus the replay would settle near +6 dB.
-            #expect(await rig.waitForLevel(rig.baseline * gain), "the level didn't settle at 99% (now \(rig.capture.recentLevel()))")
+            #expect(
+                await rig.waitForLevel(rig.baseline * gain),
+                "the level didn't settle at 99% (now \(rig.capture.recentLevel()))")
         }
 
         @Test(
@@ -201,10 +220,14 @@ extension CoreAudioIntegration {
             defer { engine.stop() }
             try engine.start()  // what MixerStore does on the first setPercent with no engine yet
 
-            let check = try await swapCheck(rig, after: mark, "first adjust (new control engine) at 0.25", zeroRunAllowance: takeoverAllowance)
-            #expect(check.loudestWindow(from: 0) <= meterToControlLimit(rig),
-                    "the takeover reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
-            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't settle at -12 dB (now \(rig.capture.recentLevel()))")
+            let check = try await swapCheck(
+                rig, after: mark, "first adjust (new control engine) at 0.25", zeroRunAllowance: takeoverAllowance)
+            #expect(
+                check.loudestWindow(from: 0) <= meterToControlLimit(rig),
+                "the takeover reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
+            #expect(
+                await rig.waitForLevel(rig.baseline * 0.25),
+                "the level didn't settle at -12 dB (now \(rig.capture.recentLevel()))")
         }
 
         @Test(
@@ -226,11 +249,17 @@ extension CoreAudioIntegration {
             #expect(engine.mode == .meterOnly)
             let check = try await swapCheck(rig, after: mark, "control → meter-only")
             let overlapLimit = rig.baseline * (1 + gain) * 1.1
-            #expect(check.loudestWindow(from: 0) <= overlapLimit,
-                    "the swap reached \(check.loudestWindow(from: 0)) RMS, more than source + replay (limit \(overlapLimit))")
-            #expect(await rig.waitForLevel(rig.baseline), "the level didn't return to full after the swap (now \(rig.capture.recentLevel()))")
+            #expect(
+                check.loudestWindow(from: 0) <= overlapLimit,
+                "the swap reached \(check.loudestWindow(from: 0)) RMS, more than source + replay (limit \(overlapLimit))"
+            )
+            #expect(
+                await rig.waitForLevel(rig.baseline),
+                "the level didn't return to full after the swap (now \(rig.capture.recentLevel()))")
             _ = engine.currentPeak()
-            #expect(await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 }, "the converted engine stopped metering")
+            #expect(
+                await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 },
+                "the converted engine stopped metering")
         }
 
         /// Measured on hardware, the level before the takeover stayed at 1.00× baseline (the source
@@ -247,7 +276,9 @@ extension CoreAudioIntegration {
 
         /// Starts a meter-only engine, switches it to control at `gain`, and returns it (the caller
         /// stops it) with the analysed 600 ms after the switch (zero runs already checked).
-        private func switchMeteredEngineToControl(_ rig: LoopbackRig, gain: Float) async throws -> (AppAudioEngine, SwapCheck) {
+        private func switchMeteredEngineToControl(_ rig: LoopbackRig, gain: Float) async throws -> (
+            AppAudioEngine, SwapCheck
+        ) {
             let engine = rig.makeEngine(.meterOnly, gain: 1)
             do {
                 try engine.start()
@@ -268,7 +299,11 @@ extension CoreAudioIntegration {
             }
             #expect(engine.mode == .control)
             do {
-                return (engine, try await swapCheck(rig, after: mark, "meter-only → control at \(gain)", zeroRunAllowance: takeoverAllowance))
+                return (
+                    engine,
+                    try await swapCheck(
+                        rig, after: mark, "meter-only → control at \(gain)", zeroRunAllowance: takeoverAllowance)
+                )
             } catch {
                 engine.stop()
                 throw error
@@ -277,14 +312,22 @@ extension CoreAudioIntegration {
 
         /// Analyses the 600 ms after `mark`, checks the zero run, and logs how long the level sat
         /// above the unprocessed baseline (the source/replay overlap while the mute changes).
-        private func swapCheck(_ rig: LoopbackRig, after mark: Int, _ what: String, zeroRunAllowance: Int = 0) async throws -> SwapCheck {
+        private func swapCheck(_ rig: LoopbackRig, after mark: Int, _ what: String, zeroRunAllowance: Int = 0)
+            async throws -> SwapCheck
+        {
             let swap = try await rig.samples(after: mark, .milliseconds(600))
-            let check = SwapCheck(samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize, window: windowFrames(rig))
+            let check = SwapCheck(
+                samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize,
+                window: windowFrames(rig))
             let windowMS = Double(windowFrames(rig)) / rig.capture.sampleRate * 1000
             let above = Double(check.windowCount(above: rig.baseline * 1.05)) * windowMS
-            print("[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames))")
-            #expect(check.longestZeroRun <= check.bufferFrames + zeroRunAllowance,
-                    "\(what): \(check.longestZeroRun) frames of digital silence (limit: one buffer, \(check.bufferFrames), + \(zeroRunAllowance))")
+            print(
+                "[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames))"
+            )
+            #expect(
+                check.longestZeroRun <= check.bufferFrames + zeroRunAllowance,
+                "\(what): \(check.longestZeroRun) frames of digital silence (limit: one buffer, \(check.bufferFrames), + \(zeroRunAllowance))"
+            )
             return check
         }
 
@@ -320,12 +363,16 @@ extension CoreAudioIntegration {
                 try engine.updateProcesses([rig.toneObject, playingObject].sorted())
             }
             let bothAtHalf = rig.baseline * 0.25 * Float(2).squareRoot()
-            #expect(await rig.waitForLevel(bothAtHalf, timeout: .milliseconds(1500)),
-                    "with the helper playing the capture is \(rig.capture.recentLevel()), expected \(dBFS(bothAtHalf)) dBFS: the updated tap isn't processing the helper")
+            #expect(
+                await rig.waitForLevel(bothAtHalf, timeout: .milliseconds(1500)),
+                "with the helper playing the capture is \(rig.capture.recentLevel()), expected \(dBFS(bothAtHalf)) dBFS: the updated tap isn't processing the helper"
+            )
 
             // The helper exits, and its object goes with it.
             helper.terminate()
-            #expect(await rig.waitForLevel(rig.baseline * 0.25, timeout: .milliseconds(1500)), "the level didn't return to -12 dB after the helper quit")
+            #expect(
+                await rig.waitForLevel(rig.baseline * 0.25, timeout: .milliseconds(1500)),
+                "the level didn't return to -12 dB after the helper quit")
             mark = rig.capture.frameCount
             try engine.updateProcesses([rig.toneObject])
             try await expectNoBurstOrGap(rig, after: mark, "dropping the helper")
@@ -336,11 +383,15 @@ extension CoreAudioIntegration {
         /// more than one buffer.
         private func expectNoBurstOrGap(_ rig: LoopbackRig, after mark: Int, _ what: String) async throws {
             let swap = try await rig.samples(after: mark, .milliseconds(600))
-            let check = SwapCheck(samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize, window: windowFrames(rig))
-            #expect(check.loudestWindow(from: 0) <= check.threshold,
-                    "\(what): a burst of \(check.loudestWindow(from: 0)) RMS (limit \(check.threshold))")
-            #expect(check.longestZeroRun <= check.bufferFrames,
-                    "\(what): \(check.longestZeroRun) frames of digital silence (one buffer is \(check.bufferFrames))")
+            let check = SwapCheck(
+                samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize,
+                window: windowFrames(rig))
+            #expect(
+                check.loudestWindow(from: 0) <= check.threshold,
+                "\(what): a burst of \(check.loudestWindow(from: 0)) RMS (limit \(check.threshold))")
+            #expect(
+                check.longestZeroRun <= check.bufferFrames,
+                "\(what): \(check.longestZeroRun) frames of digital silence (one buffer is \(check.bufferFrames))")
         }
 
         @Test(
@@ -375,17 +426,23 @@ extension CoreAudioIntegration {
                 toneAppID = processes.apps.first { $0.processObjectIDs.contains(rig.toneObject) && $0.isPlaying }?.id
                 return toneAppID != nil
             }
-            let id = try #require(toneAppID, "MixerStore's process source never listed the tone as playing (found: \(found))")
+            let id = try #require(
+                toneAppID, "MixerStore's process source never listed the tone as playing (found: \(found))")
             #expect(store.engineCount == 0, "no engine should run before any level is changed")
 
             store.setPercent(50, for: id)
             #expect(store.engineMode(for: id) == .control)
-            #expect(await rig.waitForLevel(rig.baseline * 0.25, timeout: .milliseconds(1500)),
-                    "setPercent(50) didn't bring the capture to -12 dB (now \(rig.capture.recentLevel()), baseline \(dBFS(rig.baseline)) dBFS)")
+            #expect(
+                await rig.waitForLevel(rig.baseline * 0.25, timeout: .milliseconds(1500)),
+                "setPercent(50) didn't bring the capture to -12 dB (now \(rig.capture.recentLevel()), baseline \(dBFS(rig.baseline)) dBFS)"
+            )
 
             store.toggleMute(for: id)
             let muted = await rig.waitForSilence(timeout: .milliseconds(300))
-            #expect(muted, "toggleMute didn't silence the capture within 300 ms (now \(rig.capture.recentLevel(.milliseconds(20))))")
+            #expect(
+                muted,
+                "toggleMute didn't silence the capture within 300 ms (now \(rig.capture.recentLevel(.milliseconds(20))))"
+            )
             let held = rms(try await rig.capture.record(.milliseconds(300)))
             #expect(dBFS(held) < silenceDB, "mute didn't hold: \(dBFS(held)) dBFS")
 
@@ -394,9 +451,13 @@ extension CoreAudioIntegration {
 
             // The rig guarantees an audible baseline, so this can't pass at silence.
             store.setPercent(100, for: id)
-            #expect(await rig.waitForLevel(rig.baseline, timeout: .milliseconds(1500)), "back at 100% the tone isn't at full level (now \(rig.capture.recentLevel()))")
+            #expect(
+                await rig.waitForLevel(rig.baseline, timeout: .milliseconds(1500)),
+                "back at 100% the tone isn't at full level (now \(rig.capture.recentLevel()))")
             let restored = rms(try await rig.capture.record(.milliseconds(300)))
-            #expect(abs(dBFS(restored) - dBFS(rig.baseline)) <= 1.5, "at 100% the capture is \(dBFS(restored)) dBFS, baseline \(dBFS(rig.baseline)) dBFS")
+            #expect(
+                abs(dBFS(restored) - dBFS(rig.baseline)) <= 1.5,
+                "at 100% the capture is \(dBFS(restored)) dBFS, baseline \(dBFS(rig.baseline)) dBFS")
             #expect(store.engineCount == 0, "an app at 100% should have no engine")
             #expect(rig.tone.process.isRunning, "the tone process died during the test")
         }

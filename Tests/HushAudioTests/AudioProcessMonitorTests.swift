@@ -50,7 +50,9 @@ final class FakeProcessHAL: ProcessHAL {
         return running[object] ?? false
     }
 
-    func addListener(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ handler: @escaping @MainActor () -> Void) -> HALListener? {
+    func addListener(
+        _ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ handler: @escaping @MainActor () -> Void
+    ) -> HALListener? {
         if let remaining = listenerRefusals[object], remaining > 0 {
             listenerRefusals[object] = remaining - 1
             return nil
@@ -330,7 +332,8 @@ final class MonitorHarness {
         #expect(h.hal.listeners.isEmpty)
 
         h.start()
-        #expect(h.hal.listeners.keys.contains { $0.object == 10 }, "per-object caches were cleared, so listeners come back")
+        #expect(
+            h.hal.listeners.keys.contains { $0.object == 10 }, "per-object caches were cleared, so listeners come back")
         #expect(h.published.count == 2)
         #expect(h.app(100)?.isPlaying == true)
     }

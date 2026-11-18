@@ -11,8 +11,8 @@ enum Palette {
     static func amber(_ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color {
         switch (scheme, contrast) {
         case (.dark, _): Color(nsColor: .systemOrange)
-        case (_, .increased): Color(red: 0x7A / 255, green: 0x3D / 255, blue: 0)   // #7A3D00
-        default: Color(red: 0xA6 / 255, green: 0x53 / 255, blue: 0)                // #A65300
+        case (_, .increased): Color(red: 0x7A / 255, green: 0x3D / 255, blue: 0)  // #7A3D00
+        default: Color(red: 0xA6 / 255, green: 0x53 / 255, blue: 0)  // #A65300
         }
     }
 }

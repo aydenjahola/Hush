@@ -58,9 +58,10 @@ struct StripPercentLabel: View {
             Text(L10n.percent(strip.setting.percent))
                 .font(font)
                 .monospacedDigit()
-                .foregroundStyle(strip.setting.percent > 100 && !boostInPrimary
-                    ? Palette.boost(colorScheme, contrast)
-                    : Color.primary)
+                .foregroundStyle(
+                    strip.setting.percent > 100 && !boostInPrimary
+                        ? Palette.boost(colorScheme, contrast)
+                        : Color.primary)
         }
     }
 }

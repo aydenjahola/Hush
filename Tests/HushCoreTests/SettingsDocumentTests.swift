@@ -18,15 +18,15 @@ import Testing
 
     @Test func decodesSpecExample() throws {
         let json = """
-        {
-          "version": 1,
-          "preferences": { "maxBoostPercent": 200, "showInactiveApps": false },
-          "apps": {
-            "com.example.player": { "percent": 62, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" },
-            "com.example.chat":   { "percent": 150, "isMuted": false, "lastAdjusted": "2026-11-17T13:40:12Z" }
-          }
-        }
-        """
+            {
+              "version": 1,
+              "preferences": { "maxBoostPercent": 200, "showInactiveApps": false },
+              "apps": {
+                "com.example.player": { "percent": 62, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" },
+                "com.example.chat":   { "percent": 150, "isMuted": false, "lastAdjusted": "2026-11-17T13:40:12Z" }
+              }
+            }
+            """
         let document = try SettingsDocument.decode(from: Data(json.utf8))
         #expect(document.preferences == Preferences())
         #expect(document.apps["com.example.player"]?.percent == 62)
@@ -77,12 +77,12 @@ import Testing
 
     @Test func versionOneFileWithoutUpdateFieldsLoadsWithDefaults() throws {
         let json = """
-        {
-          "version": 1,
-          "preferences": { "maxBoostPercent": 150, "showInactiveApps": true },
-          "apps": {}
-        }
-        """
+            {
+              "version": 1,
+              "preferences": { "maxBoostPercent": 150, "showInactiveApps": true },
+              "apps": {}
+            }
+            """
         let document = try SettingsDocument.decode(from: Data(json.utf8))
         #expect(document.version == 1)
         #expect(document.preferences == Preferences(maxBoostPercent: .percent150, showInactiveApps: true))

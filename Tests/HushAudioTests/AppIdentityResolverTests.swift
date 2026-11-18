@@ -90,7 +90,9 @@ final class FakeRunningApps: RunningAppsProviding {
         #expect(resolver.identity(pid: 201, bundleID: "app.zen.helper").id == "app.zen.helper")
 
         apps.apps[200] = FakeRunningApps.regular("app.zen", name: "Zen")
-        #expect(resolver.identity(pid: 201, bundleID: "app.zen.helper").id == "app.zen.helper", "cached until something launches")
+        #expect(
+            resolver.identity(pid: 201, bundleID: "app.zen.helper").id == "app.zen.helper",
+            "cached until something launches")
 
         apps.emit(.launched(200))
         #expect(invalidations() == 1, "the monitor is told to regroup")

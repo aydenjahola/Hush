@@ -16,8 +16,10 @@ struct StripListBuilder {
         var byID: [String: MixerStore.Strip] = [:]
         // Idle apps are listed only when they're real (Dock) apps or the user has a level saved for them;
         // otherwise every daemon with a Core Audio process object would get a strip.
-        for app in apps where app.isPlaying
-            || (preferences.showInactiveApps && (app.isRegularApp || settings[app.id] != nil)) {
+        for app in apps
+        where app.isPlaying
+            || (preferences.showInactiveApps && (app.isRegularApp || settings[app.id] != nil))
+        {
             byID[app.id] = MixerStore.Strip(
                 id: app.id,
                 displayName: app.displayName,
@@ -50,12 +52,14 @@ struct StripListBuilder {
     }
 
     private func sortedIDs(_ candidates: [MixerStore.Strip]) -> [String] {
-        StripOrdering.sorted(candidates.map { strip in
-            StripSortKey(
-                id: strip.id,
-                displayName: strip.displayName,
-                isPlaying: strip.isPlaying,
-                lastAdjusted: settings[strip.id]?.lastAdjusted)
-        }, mode: preferences.appearance.sortMode).map(\.id)
+        StripOrdering.sorted(
+            candidates.map { strip in
+                StripSortKey(
+                    id: strip.id,
+                    displayName: strip.displayName,
+                    isPlaying: strip.isPlaying,
+                    lastAdjusted: settings[strip.id]?.lastAdjusted)
+            }, mode: preferences.appearance.sortMode
+        ).map(\.id)
     }
 }

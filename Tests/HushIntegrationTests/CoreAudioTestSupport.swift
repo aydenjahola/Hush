@@ -63,7 +63,8 @@ enum AudioDevices {
     }
 
     static func isRunningOutput(_ processObject: AudioObjectID) -> Bool {
-        ((try? CoreAudioProperty.scalar(processObject, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0) != 0
+        ((try? CoreAudioProperty.scalar(processObject, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0)
+            != 0
     }
 
     static func nominalSampleRate(_ device: AudioObjectID) -> Double {
@@ -139,7 +140,9 @@ func waitUntil(
 
 /// Samples `engine.currentPeak()` for `duration` and returns the non-zero readings.
 @MainActor
-func collectPeaks(_ engine: any AudioEngineHandle, for duration: Duration, every interval: Duration = .milliseconds(20)) async -> [Float] {
+func collectPeaks(_ engine: any AudioEngineHandle, for duration: Duration, every interval: Duration = .milliseconds(20))
+    async -> [Float]
+{
     _ = engine.currentPeak()  // drop whatever accumulated before
     var peaks: [Float] = []
     let deadline = ContinuousClock.now + duration

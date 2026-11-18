@@ -45,7 +45,8 @@ final class CoreAudioProcessHAL: ProcessHAL {
     }
 
     func isRunningOutput(_ object: AudioObjectID) -> Bool {
-        let value = (try? CoreAudioProperty.scalar(object, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0
+        let value =
+            (try? CoreAudioProperty.scalar(object, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0
         return value != 0
     }
 

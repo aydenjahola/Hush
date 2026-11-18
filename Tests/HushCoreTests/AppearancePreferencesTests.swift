@@ -17,12 +17,12 @@ import Testing
     /// A settings.json written before Appearance existed still loads, with every option at its default.
     @Test func fileWithoutAppearanceDecodesWithDefaults() throws {
         let json = """
-        {
-          "version": 1,
-          "preferences": { "maxBoostPercent": 150, "showInactiveApps": true },
-          "apps": {}
-        }
-        """
+            {
+              "version": 1,
+              "preferences": { "maxBoostPercent": 150, "showInactiveApps": true },
+              "apps": {}
+            }
+            """
         let document = try SettingsDocument.decode(from: Data(json.utf8))
         #expect(document.preferences.maxBoostPercent == .percent150)
         #expect(document.preferences.showInactiveApps)
@@ -31,12 +31,12 @@ import Testing
 
     @Test func missingKeysTakeTheirDefaults() throws {
         let json = """
-        {
-          "version": 1,
-          "preferences": { "appearance": { "layout": "tiles", "showLevelMeters": false } },
-          "apps": {}
-        }
-        """
+            {
+              "version": 1,
+              "preferences": { "appearance": { "layout": "tiles", "showLevelMeters": false } },
+              "apps": {}
+            }
+            """
         let appearance = try SettingsDocument.decode(from: Data(json.utf8)).preferences.appearance
         #expect(appearance.layout == .tiles)
         #expect(!appearance.showLevelMeters)
@@ -49,15 +49,15 @@ import Testing
     /// whole file, which would move it aside and lose every saved level.
     @Test func unknownValuesFallBackWithoutLosingTheFile() throws {
         let json = """
-        {
-          "version": 1,
-          "preferences": {
-            "maxBoostPercent": 200,
-            "appearance": { "layout": "hexagons", "density": 3, "accent": "system" }
-          },
-          "apps": { "com.example.player": { "percent": 62, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" } }
-        }
-        """
+            {
+              "version": 1,
+              "preferences": {
+                "maxBoostPercent": 200,
+                "appearance": { "layout": "hexagons", "density": 3, "accent": "system" }
+              },
+              "apps": { "com.example.player": { "percent": 62, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" } }
+            }
+            """
         let document = try SettingsDocument.decode(from: Data(json.utf8))
         #expect(document.preferences.appearance.layout == .channelStrips)
         #expect(document.preferences.appearance.density == .comfortable)
@@ -67,8 +67,8 @@ import Testing
 
     @Test func malformedAppearanceSectionFallsBackToDefaults() throws {
         let json = """
-        { "version": 1, "preferences": { "maxBoostPercent": 100, "appearance": "tiles" }, "apps": {} }
-        """
+            { "version": 1, "preferences": { "maxBoostPercent": 100, "appearance": "tiles" }, "apps": {} }
+            """
         let document = try SettingsDocument.decode(from: Data(json.utf8))
         #expect(document.preferences.maxBoostPercent == .percent100)
         #expect(document.preferences.appearance == AppearancePreferences())

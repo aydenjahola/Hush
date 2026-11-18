@@ -9,9 +9,12 @@ func makeRelease(_ version: String, draft: Bool = false, prerelease: Bool = fals
         htmlURL: URL(string: "https://github.com/aydenjahola/Hush/releases/tag/v\(version)")!,
         draft: draft,
         prerelease: prerelease,
-        assets: [.init(
-            name: "Hush-\(version).dmg",
-            browserDownloadURL: URL(string: "https://github.com/aydenjahola/Hush/releases/download/v\(version)/Hush-\(version).dmg")!)])
+        assets: [
+            .init(
+                name: "Hush-\(version).dmg",
+                browserDownloadURL: URL(
+                    string: "https://github.com/aydenjahola/Hush/releases/download/v\(version)/Hush-\(version).dmg")!)
+        ])
 }
 
 func dmgURL(_ version: String) -> URL {

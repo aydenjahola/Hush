@@ -27,7 +27,8 @@ struct UpdateBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.accentColor.opacity(0.12)))
+                .fill(Color.accentColor.opacity(0.12))
+        )
         .accessibilityElement(children: .contain)
     }
 }

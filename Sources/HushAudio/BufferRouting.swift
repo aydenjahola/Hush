@@ -35,7 +35,8 @@ enum BufferRouting {
                 // and output channels beyond the tap's (e.g. surround on a 5.1 device) stay silent.
                 let sourceChannel = totalInputChannels == 1 ? 0 : outputChannel
                 if sourceChannel < totalInputChannels,
-                   let source = locate(channel: sourceChannel, in: input, from: firstInputBuffer) {
+                    let source = locate(channel: sourceChannel, in: input, from: firstInputBuffer)
+                {
                     written = min(outFrames, source.frames)
                     let channelPeak = SampleProcessor.apply(
                         startGain: startGain,

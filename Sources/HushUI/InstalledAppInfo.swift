@@ -16,7 +16,8 @@ package struct InstalledAppInfo {
     package static func lookUp(bundleID: String) -> InstalledAppInfo? {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
         let bundle = Bundle(url: url)
-        let name = bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+        let name =
+            bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? url.deletingPathExtension().lastPathComponent
         return InstalledAppInfo(displayName: name, icon: NSWorkspace.shared.icon(forFile: url.path))

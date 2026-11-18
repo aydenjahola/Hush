@@ -83,11 +83,12 @@ final class WorkspaceRunningApps: RunningAppsProviding {
             (NSWorkspace.didTerminateApplicationNotification, false),
         ]
         for (name, launched) in names {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { note in
-                let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-                let pid = app?.processIdentifier ?? 0
-                MainActor.assumeIsolated { handler(launched ? .launched(pid) : .terminated(pid)) }
-            })
+            observers.append(
+                center.addObserver(forName: name, object: nil, queue: .main) { note in
+                    let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                    let pid = app?.processIdentifier ?? 0
+                    MainActor.assumeIsolated { handler(launched ? .launched(pid) : .terminated(pid)) }
+                })
         }
     }
 

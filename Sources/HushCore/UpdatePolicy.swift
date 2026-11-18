@@ -88,7 +88,9 @@ package enum UpdatePolicy {
     /// True while the user has asked not to hear about `update`: snoozed, or this version (or a newer one) skipped.
     package static func isSuppressed(_ update: AvailableUpdate, settings: UpdateSettings, now: Date) -> Bool {
         if let snoozedUntil = settings.snoozedUntil, now < snoozedUntil { return true }
-        if let skipped = settings.skippedVersion.flatMap(SemanticVersion.init), update.version <= skipped { return true }
+        if let skipped = settings.skippedVersion.flatMap(SemanticVersion.init), update.version <= skipped {
+            return true
+        }
         return false
     }
 
@@ -108,10 +110,10 @@ package enum UpdatePolicy {
     /// The lowercased, standardized, percent-decoded path of a trusted URL, or nil.
     private static func trustedPath(of url: URL) -> String? {
         guard url.scheme?.lowercased() == "https",
-              url.host(percentEncoded: false)?.lowercased() == "github.com",
-              url.port == nil,
-              url.user(percentEncoded: false) == nil,
-              url.password(percentEncoded: false) == nil
+            url.host(percentEncoded: false)?.lowercased() == "github.com",
+            url.port == nil,
+            url.user(percentEncoded: false) == nil,
+            url.password(percentEncoded: false) == nil
         else { return nil }
         let raw = url.path(percentEncoded: false)
         let standardized = url.standardized.path(percentEncoded: false)
@@ -156,7 +158,8 @@ package struct UpdateSchedule: Equatable, Sendable {
         now: Date
     ) -> Date {
         guard let lastAttempt else { return launchedAt.addingTimeInterval(launchDelay) }
-        let delay = consecutiveFailures > 0 && !retryIntervals.isEmpty
+        let delay =
+            consecutiveFailures > 0 && !retryIntervals.isEmpty
             ? retryIntervals[min(consecutiveFailures, retryIntervals.count) - 1]
             : interval
         var due = lastAttempt.addingTimeInterval(delay)

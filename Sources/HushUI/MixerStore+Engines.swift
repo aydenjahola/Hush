@@ -43,7 +43,9 @@ extension MixerStore {
             // app through at full level until a replacement's IO runs, and a new aggregate starts
             // with a gap. A helper spawning (process list) or the user adjusting a metered app
             // (mode) therefore keeps the same tap, aggregate and IOProc.
-            if let existing, applyInPlace(to: existing, id: id, processObjectIDs: app.processObjectIDs, mode: mode, setting: setting) {
+            if let existing,
+                applyInPlace(to: existing, id: id, processObjectIDs: app.processObjectIDs, mode: mode, setting: setting)
+            {
                 continue
             }
             // Fallback, make before break: the old engine keeps the app muted or processed until
@@ -98,7 +100,9 @@ extension MixerStore {
             }
             return true
         } catch {
-            logger.error("In-place change for \(id, privacy: .public) failed, rebuilding: \(String(describing: error), privacy: .public)")
+            logger.error(
+                "In-place change for \(id, privacy: .public) failed, rebuilding: \(String(describing: error), privacy: .public)"
+            )
             return false
         }
     }
@@ -122,10 +126,11 @@ extension MixerStore {
     }
 
     private func recordFailure(_ error: any Error, for id: String, mode: EngineMode) {
-        let summary = switch mode {
-        case .control: String(localized: L10n.controlFailed)
-        case .meterOnly: String(localized: L10n.meterFailed)
-        }
+        let summary =
+            switch mode {
+            case .control: String(localized: L10n.controlFailed)
+            case .meterOnly: String(localized: L10n.meterFailed)
+            }
         engineErrors[id] = String(localized: L10n.failureDetail(summary, "\(error)"))
         if mode == .meterOnly { meterOnlyErrorIDs.insert(id) } else { meterOnlyErrorIDs.remove(id) }
         logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")

@@ -73,14 +73,16 @@ final class AppIdentityResolver {
 
     private func resolve(pid: pid_t, bundleID: String?) -> Entry {
         if let owner = provider.responsiblePID(for: pid),
-           let app = provider.app(pid: owner),
-           let identity = Self.identity(of: app) {
+            let app = provider.app(pid: owner),
+            let identity = Self.identity(of: app)
+        {
             return Entry(bundleID: bundleID, identity: identity, ownerPID: owner)
         }
         if let bundleID,
-           let owner = regularApp(owning: bundleID),
-           let app = provider.app(pid: owner),
-           let identity = Self.identity(of: app) {
+            let owner = regularApp(owning: bundleID),
+            let app = provider.app(pid: owner),
+            let identity = Self.identity(of: app)
+        {
             return Entry(bundleID: bundleID, identity: identity, ownerPID: owner)
         }
         let running = provider.app(pid: pid)
@@ -106,7 +108,8 @@ final class AppIdentityResolver {
     private func regularApp(owning bundleID: String) -> pid_t? {
         let apps = regularApps ?? provider.regularApps()
         regularApps = apps
-        return apps
+        return
+            apps
             .filter { bundleID == $0.bundleID || bundleID.hasPrefix($0.bundleID + ".") }
             .max { $0.bundleID.count < $1.bundleID.count }?
             .pid

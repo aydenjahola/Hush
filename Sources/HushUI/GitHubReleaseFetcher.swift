@@ -77,7 +77,8 @@ nonisolated package struct GitHubReleaseFetcher: ReleaseFetching {
         if let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(finiteSeconds) {
             delay = retryAfter
         } else if http.value(forHTTPHeaderField: "x-ratelimit-remaining") == "0",
-                  let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(finiteSeconds) {
+            let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(finiteSeconds)
+        {
             delay = reset - now.timeIntervalSince1970
         } else {
             return nil

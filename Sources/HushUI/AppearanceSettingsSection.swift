@@ -6,7 +6,7 @@ import SwiftUI
 struct AppearanceSettingsSection: View {
     @Bindable var store: MixerStore
 
-        var body: some View {
+    var body: some View {
         Section(L10n.appearance) {
             AppearancePreview(appearance: MixerAppearance(store.preferences.appearance), maxPercent: store.maxPercent)
                 .padding(.vertical, 4)

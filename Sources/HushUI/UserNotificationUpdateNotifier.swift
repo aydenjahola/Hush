@@ -16,7 +16,8 @@ package final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, U
             (UpdateAction.later, L10n.later),
             (UpdateAction.skip, L10n.skipThisVersion),
         ].map { action, title in
-            UNNotificationAction(identifier: actionPrefix + action.rawValue, title: String(localized: title), options: [])
+            UNNotificationAction(
+                identifier: actionPrefix + action.rawValue, title: String(localized: title), options: [])
         }
         return UNNotificationCategory(identifier: categoryIdentifier, actions: actions, intentIdentifiers: [])
     }
@@ -73,8 +74,8 @@ package final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, U
     ) async {
         let content = response.notification.request.content
         guard content.categoryIdentifier == Self.categoryIdentifier,
-              let action = Self.action(for: response.actionIdentifier),
-              let version = content.userInfo["version"] as? String
+            let action = Self.action(for: response.actionIdentifier),
+            let version = content.userInfo["version"] as? String
         else { return }
         let url = (content.userInfo["url"] as? String).flatMap(URL.init(string:))
         onAction?(action, version, url)

@@ -188,7 +188,8 @@ import Testing
     }
 
     @Test func loweringMaxBoostClampsSettingsAndGain() throws {
-        let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 200, lastAdjusted: Harness.fixedNow)]))
+        let h = Harness(
+            document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 200, lastAdjusted: Harness.fixedNow)]))
         h.processes.emit([makeApp("a")])
 
         h.store.setMaxBoost(.percent150)
@@ -382,7 +383,8 @@ import Testing
     }
 
     @Test func loweredAppGetsNoEngineWhileIdleAndControlWhilePlaying() throws {
-        let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
+        let h = Harness(
+            document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
         h.processes.emit([makeApp("a", playing: false)])
         #expect(h.factory.made.isEmpty)
 
@@ -525,10 +527,11 @@ import Testing
     }
 
     @Test func revokingPermissionTearsDownEveryEngine() throws {
-        let h = Harness(document: SettingsDocument(apps: [
-            "muted": mutedSetting(),
-            "lowered": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow),
-        ]))
+        let h = Harness(
+            document: SettingsDocument(apps: [
+                "muted": mutedSetting(),
+                "lowered": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow),
+            ]))
         h.processes.emit([
             makeApp("muted", objects: [1]),
             makeApp("lowered", objects: [2]),
@@ -573,7 +576,8 @@ import Testing
     }
 
     @Test func showInactiveAppsIncludesPausedAndSavedApps() {
-        let h = Harness(document: SettingsDocument(apps: ["gone": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
+        let h = Harness(
+            document: SettingsDocument(apps: ["gone": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
         h.processes.emit([makeApp("a"), makeApp("b", playing: false)])
         #expect(h.store.strips.map(\.id) == ["a"])
 
@@ -605,7 +609,8 @@ import Testing
     }
 
     @Test func pausedBackgroundProcessWithSavedSettingShows() {
-        let h = Harness(document: SettingsDocument(apps: ["afplay": AppVolumeSetting(percent: 40, lastAdjusted: Harness.fixedNow)]))
+        let h = Harness(
+            document: SettingsDocument(apps: ["afplay": AppVolumeSetting(percent: 40, lastAdjusted: Harness.fixedNow)]))
         h.processes.emit([makeApp("afplay", playing: false, regular: false)])
         h.store.setShowInactiveApps(true)
         #expect(h.store.strips.map(\.id) == ["afplay"])
@@ -776,7 +781,10 @@ import Testing
         let before = h.factory.events.count
 
         h.store.setPercent(50, for: "a")
-        #expect(Array(h.factory.events.dropFirst(before)) == ["update a [42, 43]", "switch a control", "make a control", "stop a meterOnly"])
+        #expect(
+            Array(h.factory.events.dropFirst(before)) == [
+                "update a [42, 43]", "switch a control", "make a control", "stop a meterOnly",
+            ])
         #expect(meter.isStopped)
         let replacement = try #require(h.factory.live("a"))
         #expect(replacement.mode == .control)
@@ -786,7 +794,8 @@ import Testing
     }
 
     @Test func savedLoweredSettingPollsWhenTheAppAppearsAndStopsWhenItLeaves() {
-        let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 150, lastAdjusted: Harness.fixedNow)]))
+        let h = Harness(
+            document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 150, lastAdjusted: Harness.fixedNow)]))
         h.processes.emit([makeApp("a", playing: false, objects: [9])])
         #expect(h.processes.pollingCalls == [.objects([9])])
 
@@ -800,7 +809,9 @@ import Testing
     @Test func idleMutedAppIsPolled() {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.pollingCalls == [.objects([42])], "a muted app's missed start plays unmuted until the next poll")
+        #expect(
+            h.processes.pollingCalls == [.objects([42])], "a muted app's missed start plays unmuted until the next poll"
+        )
 
         h.store.toggleMute(for: "a")
         #expect(h.processes.pollingCalls == [.objects([42]), .off])
@@ -895,7 +906,8 @@ import Testing
         let before = h.factory.events.count
 
         h.store.setPercent(50, for: "a")
-        #expect(Array(h.factory.events.dropFirst(before)) == ["switch a control", "make a control", "stop a meterOnly"])
+        #expect(
+            Array(h.factory.events.dropFirst(before)) == ["switch a control", "make a control", "stop a meterOnly"])
         #expect(h.factory.live("a")?.mode == .control)
         #expect(h.store.meterLevels["a"] == nil, "the new engine starts with a fresh meter")
     }

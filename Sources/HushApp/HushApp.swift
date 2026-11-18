@@ -46,7 +46,8 @@ struct HushApp: App {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         // UNUserNotificationCenter needs an app bundle; the bare binary (no bundle, no version)
         // never checks for updates anyway.
-        let notifier: any UpdateNotifying = Bundle.main.bundleIdentifier == nil
+        let notifier: any UpdateNotifying =
+            Bundle.main.bundleIdentifier == nil
             ? NoUpdateNotifications()
             : UserNotificationUpdateNotifier()
         return UpdateChecker(
@@ -61,11 +62,13 @@ struct HushApp: App {
         MenuBarExtra {
             MixerPopover(store: store, updates: updates)
         } label: {
-            Image(nsImage: MenuBarIcon.image(
-                style: store.preferences.appearance.menuBarIcon,
-                attenuated: store.isAnyAppAttenuated,
-                badged: updates.hasPendingUpdate))
-                .accessibilityLabel(Text(L10n.menuBarLabel(updateAvailable: updates.hasPendingUpdate)))
+            Image(
+                nsImage: MenuBarIcon.image(
+                    style: store.preferences.appearance.menuBarIcon,
+                    attenuated: store.isAnyAppAttenuated,
+                    badged: updates.hasPendingUpdate)
+            )
+            .accessibilityLabel(Text(L10n.menuBarLabel(updateAvailable: updates.hasPendingUpdate)))
         }
         .menuBarExtraStyle(.window)
 

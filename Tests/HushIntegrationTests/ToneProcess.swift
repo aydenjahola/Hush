@@ -54,7 +54,9 @@ final class ToneProcess {
         let productsDirectory = Bundle(for: BundleMarker.self).bundleURL.deletingLastPathComponent()
         let url = productsDirectory.appendingPathComponent("HushToneGenerator")
         guard FileManager.default.isExecutableFile(atPath: url.path) else {
-            throw IntegrationError("HushToneGenerator isn't built at \(url.path). Run `swift build --product HushToneGenerator` (make integration-test does).")
+            throw IntegrationError(
+                "HushToneGenerator isn't built at \(url.path). Run `swift build --product HushToneGenerator` (make integration-test does)."
+            )
         }
         return url
     }
@@ -74,7 +76,9 @@ final class ToneProcess {
             throw IntegrationError("HushToneGenerator exited (\(process.terminationStatus)): \(message)")
         }
         guard ready, let object else {
-            throw IntegrationError("HushToneGenerator (pid \(pid)) never \(playing ? "started playing" : "reached Core Audio") within \(timeout)")
+            throw IntegrationError(
+                "HushToneGenerator (pid \(pid)) never \(playing ? "started playing" : "reached Core Audio") within \(timeout)"
+            )
         }
         return object
     }

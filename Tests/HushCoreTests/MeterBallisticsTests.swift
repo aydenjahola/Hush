@@ -8,7 +8,9 @@ import Testing
 
     @Test func decaysTwentyDecibelsPerSecond() {
         #expect(isApproximatelyEqual(MeterBallistics.next(displayed: 1, peak: 0, elapsed: 1), 0.1))
-        #expect(isApproximatelyEqual(MeterBallistics.next(displayed: 1, peak: 0, elapsed: 0.5), 0.316_227_8, tolerance: 1e-4))
+        #expect(
+            isApproximatelyEqual(
+                MeterBallistics.next(displayed: 1, peak: 0, elapsed: 0.5), 0.316_227_8, tolerance: 1e-4))
     }
 
     @Test func holdsDecayedLevelWhenPeakIsLower() {

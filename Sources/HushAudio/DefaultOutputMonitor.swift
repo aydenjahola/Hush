@@ -31,10 +31,11 @@ package final class DefaultOutputMonitor: OutputDeviceSource {
     }
 
     package func current() -> OutputDevice? {
-        guard let id = try? CoreAudioProperty.scalar(
-            CoreAudioProperty.systemObject,
-            kAudioHardwarePropertyDefaultOutputDevice,
-            initial: AudioObjectID(kAudioObjectUnknown)),
+        guard
+            let id = try? CoreAudioProperty.scalar(
+                CoreAudioProperty.systemObject,
+                kAudioHardwarePropertyDefaultOutputDevice,
+                initial: AudioObjectID(kAudioObjectUnknown)),
             id != kAudioObjectUnknown
         else { return nil }
         let uid = (try? CoreAudioProperty.string(id, kAudioDevicePropertyDeviceUID)) ?? ""

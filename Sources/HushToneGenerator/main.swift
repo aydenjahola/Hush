@@ -79,7 +79,9 @@ func parseOptions(_ arguments: [String]) -> Options {
 
 // MARK: Devices
 
-func globalAddress(_ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
+func globalAddress(
+    _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal
+) -> AudioObjectPropertyAddress {
     AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
 }
 
@@ -107,18 +109,25 @@ func deviceID(forUID uid: String) -> AudioObjectID? {
 func listOutputDevices() {
     var address = globalAddress(kAudioHardwarePropertyDevices)
     var size: UInt32 = 0
-    guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else {
+    guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr
+    else {
         fail("couldn't list devices", code: 1)
     }
     var devices = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &devices) == noErr else {
+    guard
+        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &devices) == noErr
+    else {
         fail("couldn't list devices", code: 1)
     }
     for device in devices {
         var streams = globalAddress(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput)
         var streamSize: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(device, &streams, 0, nil, &streamSize) == noErr, streamSize > 0 else { continue }
-        print("\(stringProperty(device, kAudioDevicePropertyDeviceUID) ?? "?")\t\(stringProperty(device, kAudioObjectPropertyName) ?? "?")")
+        guard AudioObjectGetPropertyDataSize(device, &streams, 0, nil, &streamSize) == noErr, streamSize > 0 else {
+            continue
+        }
+        print(
+            "\(stringProperty(device, kAudioDevicePropertyDeviceUID) ?? "?")\t\(stringProperty(device, kAudioObjectPropertyName) ?? "?")"
+        )
     }
 }
 
@@ -170,20 +179,23 @@ final class TonePlayer {
             mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
             mBytesPerPacket: 8, mFramesPerPacket: 1, mBytesPerFrame: 8,
             mChannelsPerFrame: 2, mBitsPerChannel: 32, mReserved: 0)
-        let sine = Unmanaged.passRetained(SineState(frequency: options.frequency, amplitude: options.amplitude, sampleRate: sampleRate))
+        let sine = Unmanaged.passRetained(
+            SineState(frequency: options.frequency, amplitude: options.amplitude, sampleRate: sampleRate))
         var newQueue: AudioQueueRef?
         let callback: AudioQueueOutputCallback = { context, queue, buffer in
             guard let context else { return }
             Unmanaged<SineState>.fromOpaque(context).takeUnretainedValue().fill(buffer)
             AudioQueueEnqueueBuffer(queue, buffer, 0, nil)
         }
-        try check(AudioQueueNewOutput(&format, callback, sine.toOpaque(), nil, nil, 0, &newQueue), "AudioQueueNewOutput")
+        try check(
+            AudioQueueNewOutput(&format, callback, sine.toOpaque(), nil, nil, 0, &newQueue), "AudioQueueNewOutput")
         guard let newQueue else { throw ToneError(message: "AudioQueueNewOutput returned no queue") }
         do {
             if let uid = options.deviceUID {
                 var cfUID = uid as CFString
                 let status = withUnsafePointer(to: &cfUID) { pointer in
-                    AudioQueueSetProperty(newQueue, kAudioQueueProperty_CurrentDevice, pointer, UInt32(MemoryLayout<CFString>.size))
+                    AudioQueueSetProperty(
+                        newQueue, kAudioQueueProperty_CurrentDevice, pointer, UInt32(MemoryLayout<CFString>.size))
                 }
                 try check(status, "setting the output device")
             }
@@ -256,8 +268,12 @@ var signalSources: [any DispatchSourceSignal] = []
 }
 handle(SIGUSR1) { player.stop() }
 handle(SIGUSR2) { startOrExit() }
-handle(SIGTERM) { player.stop(); exit(0) }
-handle(SIGINT) { player.stop(); exit(0) }
+handle(SIGTERM) {
+    player.stop(); exit(0)
+}
+handle(SIGINT) {
+    player.stop(); exit(0)
+}
 
 // Quit when the parent (the test runner) dies: launchd adopts orphans.
 let parentAtLaunch = getppid()

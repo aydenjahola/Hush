@@ -32,7 +32,8 @@ package struct Preferences: Codable, Equatable, Sendable {
         maxBoostPercent = try container.decodeIfPresent(BoostLimit.self, forKey: .maxBoostPercent) ?? .percent200
         showInactiveApps = try container.decodeIfPresent(Bool.self, forKey: .showInactiveApps) ?? false
         // A malformed appearance section falls back to defaults rather than discarding the file.
-        appearance = (try? container.decodeIfPresent(AppearancePreferences.self, forKey: .appearance))
+        appearance =
+            (try? container.decodeIfPresent(AppearancePreferences.self, forKey: .appearance))
             ?? AppearancePreferences()
     }
 }

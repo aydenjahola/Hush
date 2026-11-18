@@ -6,7 +6,8 @@ extension Bundle {
     /// bundle, so look there first and fall back to `Bundle.module` (tests, `swift run`).
     nonisolated static let hushUI: Bundle = {
         if let url = Bundle.main.resourceURL?.appendingPathComponent("Hush_HushUI.bundle"),
-           let bundle = Bundle(url: url) {
+            let bundle = Bundle(url: url)
+        {
             return bundle
         }
         return Bundle.module
@@ -58,7 +59,9 @@ package enum L10n {
 
     package static let permissionNeeded = resource("Hush needs Audio Recording access to control app volumes.")
     package static let openSystemSettings = resource("Open System Settings")
-    package static func updateAvailable(_ version: String) -> LocalizedStringResource { resource("Hush \(version) is available") }
+    package static func updateAvailable(_ version: String) -> LocalizedStringResource {
+        resource("Hush \(version) is available")
+    }
     package static let download = resource("Download")
     package static let later = resource("Later")
     package static let skipThisVersion = resource("Skip This Version")
@@ -82,8 +85,12 @@ package enum L10n {
     package static let about = resource("About")
     package static let version = resource("Version")
     package static let sourceCode = resource("Source code on GitHub")
-    package static let licence = resource("Hush is free software, released under the GNU General Public License v3.0. It comes with ABSOLUTELY NO WARRANTY.")
-    package static func lastChecked(_ relativeDate: String) -> LocalizedStringResource { resource("Last checked \(relativeDate)") }
+    package static let licence = resource(
+        "Hush is free software, released under the GNU General Public License v3.0. It comes with ABSOLUTELY NO WARRANTY."
+    )
+    package static func lastChecked(_ relativeDate: String) -> LocalizedStringResource {
+        resource("Last checked \(relativeDate)")
+    }
     package static let checking = resource("Checking…")
     package static let upToDate = resource("Hush is up to date")
     package static let checkFailed = resource("Couldn't check for updates")
@@ -99,7 +106,9 @@ package enum L10n {
     package static let comfortable = resource("Comfortable")
     package static let compact = resource("Compact")
     package static let showLevelMeters = resource("Show level meters")
-    package static let recordingIndicatorNote = resource("The purple dot in the menu bar is macOS's audio-recording indicator. It appears while Hush is adjusting an app's volume and, with meters on, while the mixer is open.")
+    package static let recordingIndicatorNote = resource(
+        "The purple dot in the menu bar is macOS's audio-recording indicator. It appears while Hush is adjusting an app's volume and, with meters on, while the mixer is open."
+    )
     package static let showPercentages = resource("Show percentages")
     package static let sortApps = resource("Sort apps")
     package static let sortActivity = resource("Playing & recently adjusted first")
@@ -118,7 +127,9 @@ package enum L10n {
 
     package static let controlFailed = resource("Hush couldn't control this app's audio, so it's playing normally.")
     package static let meterFailed = resource("Hush couldn't read this app's level.")
-    package static func failureDetail(_ summary: String, _ error: String) -> LocalizedStringResource { resource("\(summary) (\(error))") }
+    package static func failureDetail(_ summary: String, _ error: String) -> LocalizedStringResource {
+        resource("\(summary) (\(error))")
+    }
 
     // MARK: Notifications
 

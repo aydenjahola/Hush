@@ -9,8 +9,9 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct MeterToggleTests {
     private func harness(meters: Bool) -> Harness {
-        Harness(document: SettingsDocument(
-            preferences: Preferences(appearance: AppearancePreferences(showLevelMeters: meters))))
+        Harness(
+            document: SettingsDocument(
+                preferences: Preferences(appearance: AppearancePreferences(showLevelMeters: meters))))
     }
 
     @Test func metersOffCreatesNoMeterOnlyEnginesWhenThePopoverOpens() {
@@ -81,8 +82,9 @@ import Testing
     }
 
     @Test func alphabeticalPlacesNewcomersInOrderWhileOpen() {
-        let h = Harness(document: SettingsDocument(
-            preferences: Preferences(appearance: AppearancePreferences(sortMode: .alphabetical))))
+        let h = Harness(
+            document: SettingsDocument(
+                preferences: Preferences(appearance: AppearancePreferences(sortMode: .alphabetical))))
         h.processes.emit([makeApp("c")])
         h.store.popoverDidAppear()
         h.processes.emit([makeApp("c"), makeApp("a")])
@@ -108,7 +110,11 @@ import Testing
         let meter = StripMeter()
         meter.update(level: 0.5)
         let notifications = Counter()
-        withObservationTracking { _ = meter.fraction } onChange: { notifications.increment() }
+        withObservationTracking {
+            _ = meter.fraction
+        } onChange: {
+            notifications.increment()
+        }
         meter.update(level: 0.5 * 1.001)
         #expect(notifications.value == 0)
         meter.update(level: 0.1)
@@ -126,7 +132,9 @@ import Testing
         withObservationTracking {
             _ = h.store.strips
             _ = h.store.preferences
-        } onChange: { storeChanges.increment() }
+        } onChange: {
+            storeChanges.increment()
+        }
         h.store.tickMeters(elapsed: 1.0 / 30.0)
 
         #expect(storeChanges.value == 0, "a tick must not re-render strips, rows or the popover")
@@ -143,11 +151,19 @@ import Testing
         h.factory.live("a")?.peak = 0.5
 
         let notifications = Counter()
-        withObservationTracking { _ = meter.fraction } onChange: { notifications.increment() }
+        withObservationTracking {
+            _ = meter.fraction
+        } onChange: {
+            notifications.increment()
+        }
         h.store.tickMeters(elapsed: 1.0 / 30.0)
         #expect(notifications.value == 1)
         // Same peak every tick: the ballistics hold at the peak, so nothing more is published.
-        withObservationTracking { _ = meter.fraction } onChange: { notifications.increment() }
+        withObservationTracking {
+            _ = meter.fraction
+        } onChange: {
+            notifications.increment()
+        }
         for _ in 0..<10 { h.store.tickMeters(elapsed: 1.0 / 30.0) }
         #expect(notifications.value == 1)
     }
@@ -205,10 +221,11 @@ import Testing
     @Test(arguments: MixerLayout.allCases, MixerDensity.allCases)
     func everyLayoutRenders(layout: MixerLayout, density: MixerDensity) throws {
         for meters in [true, false] {
-            let h = Harness(document: SettingsDocument(apps: [
-                "boosted": AppVolumeSetting(percent: 170, lastAdjusted: Harness.fixedNow),
-                "muted": mutedSetting(),
-            ]))
+            let h = Harness(
+                document: SettingsDocument(apps: [
+                    "boosted": AppVolumeSetting(percent: 170, lastAdjusted: Harness.fixedNow),
+                    "muted": mutedSetting(),
+                ]))
             let ids = ["boosted", "muted"] + (2..<8).map { "app\($0)" }
             h.processes.emit(ids.enumerated().map { index, id in makeApp(id, objects: [UInt32(index + 1)]) })
             h.store.layout = layout
@@ -229,8 +246,9 @@ import Testing
 
     @Test(arguments: MixerLayout.allCases)
     func appearancePreviewRenders(layout: MixerLayout) {
-        let host = NSHostingView(rootView: AppearancePreview(
-            appearance: MixerAppearance(layout: layout), maxPercent: 200))
+        let host = NSHostingView(
+            rootView: AppearancePreview(
+                appearance: MixerAppearance(layout: layout), maxPercent: 200))
         host.frame = CGRect(x: 0, y: 0, width: 400, height: 300)
         host.layoutSubtreeIfNeeded()
         #expect(host.fittingSize.height > 50)
@@ -242,7 +260,10 @@ import Testing
         #expect(full.isTemplate && lowered.isTemplate)
         #expect(full !== lowered)
         #expect(MenuBarIcon.image(style: .fader, attenuated: false, badged: true).size == full.size)
-        #expect(zip(MenuBarIcon.faderLevels(attenuated: true), MenuBarIcon.faderLevels(attenuated: false)).allSatisfy { $0 < $1 })
+        #expect(
+            zip(MenuBarIcon.faderLevels(attenuated: true), MenuBarIcon.faderLevels(attenuated: false)).allSatisfy {
+                $0 < $1
+            })
     }
 }
 

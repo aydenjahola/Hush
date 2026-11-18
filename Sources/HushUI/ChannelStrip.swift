@@ -36,8 +36,9 @@ struct ChannelStrip: View {
                     maxValue: maxPercent,
                     appName: strip.displayName,
                     onChange: actions.setPercent,
-                    onReset: actions.reset)
-                    .frame(height: faderHeight)
+                    onReset: actions.reset
+                )
+                .frame(height: faderHeight)
             }
             StripIcon(strip: strip, size: compact ? 26 : 34)
             Text(strip.displayName)
@@ -46,8 +47,9 @@ struct ChannelStrip: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity)
                 .help(Text(verbatim: strip.displayName))
-            MuteButton(isMuted: strip.setting.isMuted, appName: strip.displayName, compact: compact,
-                       action: actions.toggleMute)
+            MuteButton(
+                isMuted: strip.setting.isMuted, appName: strip.displayName, compact: compact,
+                action: actions.toggleMute)
         }
         .frame(width: compact ? 60 : 72)
         .disabled(!isEnabled)

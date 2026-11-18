@@ -42,7 +42,10 @@ package final class AppAudioEngine: AudioEngineHandle {
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
 
-    package init(appID: String, processObjectIDs: [AudioObjectID], mode: EngineMode, initialGain: Float, outputDeviceID: AudioObjectID) {
+    package init(
+        appID: String, processObjectIDs: [AudioObjectID], mode: EngineMode, initialGain: Float,
+        outputDeviceID: AudioObjectID
+    ) {
         self.appID = appID
         self.processObjectIDs = processObjectIDs
         self.mode = mode
@@ -186,7 +189,8 @@ package final class AppAudioEngine: AudioEngineHandle {
         state.replaying.store(mode == .control, ordering: .releasing)
 
         var newTap = AudioObjectID(kAudioObjectUnknown)
-        try CoreAudioProperty.check(AudioHardwareCreateProcessTap(description, &newTap), "AudioHardwareCreateProcessTap")
+        try CoreAudioProperty.check(
+            AudioHardwareCreateProcessTap(description, &newTap), "AudioHardwareCreateProcessTap")
         tapID = newTap
 
         let outputUID = try CoreAudioProperty.string(outputDeviceID, kAudioDevicePropertyDeviceUID)
@@ -198,10 +202,12 @@ package final class AppAudioEngine: AudioEngineHandle {
             kAudioAggregateDeviceIsStackedKey: false,
             kAudioAggregateDeviceTapAutoStartKey: true,
             kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: outputUID]],
-            kAudioAggregateDeviceTapListKey: [[
-                kAudioSubTapDriftCompensationKey: true,
-                kAudioSubTapUIDKey: description.uuid.uuidString,
-            ]],
+            kAudioAggregateDeviceTapListKey: [
+                [
+                    kAudioSubTapDriftCompensationKey: true,
+                    kAudioSubTapUIDKey: description.uuid.uuidString,
+                ]
+            ],
         ]
         var newAggregate = AudioObjectID(kAudioObjectUnknown)
         try CoreAudioProperty.check(
@@ -250,13 +256,16 @@ package final class AppAudioEngine: AudioEngineHandle {
             if state.replaying.load(ordering: .acquiring) {
                 let target = Float(bitPattern: state.targetGainBits.load(ordering: .relaxed))
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
-                peak = BufferRouting.render(input: input, output: output, startGain: applied, endGain: target, firstInputBuffer: tapBufferOffset)
+                peak = BufferRouting.render(
+                    input: input, output: output, startGain: applied, endGain: target, firstInputBuffer: tapBufferOffset
+                )
                 state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
             } else {
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
                 if applied != 0 {
                     // The replay just stopped: fade it out over this buffer instead of cutting.
-                    _ = BufferRouting.render(input: input, output: output, startGain: applied, endGain: 0, firstInputBuffer: tapBufferOffset)
+                    _ = BufferRouting.render(
+                        input: input, output: output, startGain: applied, endGain: 0, firstInputBuffer: tapBufferOffset)
                     state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed)
                 } else {
                     BufferRouting.silence(output)

@@ -22,7 +22,11 @@ struct StripList: View {
                         actions: StripActions(target: store, id: strip.id))
                 }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.height
+            } action: {
+                contentHeight = $0
+            }
         }
         .scrollIndicators(.automatic)
         .frame(height: min(contentHeight > 0 ? contentHeight : estimatedHeight, maxHeight))

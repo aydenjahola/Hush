@@ -349,7 +349,11 @@ struct OfflineError: Error {}
         h.checker.start()
         await h.checker.scheduleTask?.value
 
-        #expect(h.sleeps == [.seconds(30), .seconds(3_600), .seconds(14_400), .seconds(Self.day), .seconds(Self.day), .seconds(Self.day)])
+        #expect(
+            h.sleeps == [
+                .seconds(30), .seconds(3_600), .seconds(14_400), .seconds(Self.day), .seconds(Self.day),
+                .seconds(Self.day),
+            ])
         #expect(h.fake.calls == 5)
     }
 

@@ -55,7 +55,8 @@ struct VerticalFader: View {
                     let position = 1 - (drag.location.y - knobSize.height / 2) / travel
                     let newValue = scale.percent(atPosition: position)
                     if newValue != value { onChange(newValue) }
-                })
+                }
+            )
             .simultaneousGesture(
                 SpatialTapGesture(count: 2).onEnded { tap in
                     guard isEnabled else { return }

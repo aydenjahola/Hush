@@ -24,8 +24,10 @@ import Testing
         #expect(SemanticVersion("1.0.0+20261118") == SemanticVersion("1.0.0"))
     }
 
-    @Test(arguments: ["", "1", "1.2", "1.2.3.4", "a.b.c", "1.2.x", "-1.2.3", "1.2.3-", "1.2.3-beta..1", "01.2.3",
-                      "1.2.3-01", "vv1.2.3", " 1.2.3", "1.2.3 "])
+    @Test(arguments: [
+        "", "1", "1.2", "1.2.3.4", "a.b.c", "1.2.x", "-1.2.3", "1.2.3-", "1.2.3-beta..1", "01.2.3",
+        "1.2.3-01", "vv1.2.3", " 1.2.3", "1.2.3 ",
+    ])
     func rejectsMalformed(_ text: String) {
         #expect(SemanticVersion(text) == nil)
     }
@@ -43,8 +45,10 @@ import Testing
 
     /// The precedence example from semver.org §11.
     @Test func followsSemverPrecedenceChain() throws {
-        let chain = ["1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2",
-                     "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0"]
+        let chain = [
+            "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2",
+            "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0",
+        ]
         let versions = try chain.map { try #require(SemanticVersion($0)) }
         for (lower, higher) in zip(versions, versions.dropFirst()) {
             #expect(lower < higher, "\(lower) < \(higher)")

@@ -40,13 +40,23 @@ struct VolumeControlBehavior: ViewModifier {
     func body(content: Content) -> some View {
         content
             .focusable(isEnabled && !isPreview)
-            .onKeyPress(.upArrow) { nudge(FaderScale.step); return .handled }
-            .onKeyPress(.downArrow) { nudge(-FaderScale.step); return .handled }
-            .onKeyPress(.rightArrow) { nudge(FaderScale.step); return .handled }
-            .onKeyPress(.leftArrow) { nudge(-FaderScale.step); return .handled }
-            .modifier(ScrollWheelStepper(requiresOption: appearance.scrollNeedsOption) { steps in
-                if isEnabled { nudge(steps * FaderScale.step) }
-            })
+            .onKeyPress(.upArrow) {
+                nudge(FaderScale.step); return .handled
+            }
+            .onKeyPress(.downArrow) {
+                nudge(-FaderScale.step); return .handled
+            }
+            .onKeyPress(.rightArrow) {
+                nudge(FaderScale.step); return .handled
+            }
+            .onKeyPress(.leftArrow) {
+                nudge(-FaderScale.step); return .handled
+            }
+            .modifier(
+                ScrollWheelStepper(requiresOption: appearance.scrollNeedsOption) { steps in
+                    if isEnabled { nudge(steps * FaderScale.step) }
+                }
+            )
             .accessibilityElement()
             .accessibilityLabel(Text(L10n.volumeLabel(appName)))
             .accessibilityValue(Text(L10n.volumeValue(value)))
@@ -68,7 +78,9 @@ struct VolumeControlBehavior: ViewModifier {
 
 extension View {
     func volumeControl(value: Int, maxValue: Int, appName: String, onChange: @escaping (Int) -> Void) -> some View {
-        modifier(VolumeControlBehavior(value: value, scale: FaderScale(maxValue: maxValue), appName: appName, onChange: onChange))
+        modifier(
+            VolumeControlBehavior(
+                value: value, scale: FaderScale(maxValue: maxValue), appName: appName, onChange: onChange))
     }
 }
 

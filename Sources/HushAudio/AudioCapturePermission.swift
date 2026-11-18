@@ -7,7 +7,8 @@ import Foundation
 @MainActor
 package final class AudioCapturePermission: AudioCapturePermissionSource {
     private typealias PreflightFunction = @convention(c) (CFString, CFDictionary?) -> Int32
-    private typealias RequestFunction = @convention(c) (CFString, CFDictionary?, @escaping @convention(block) (Bool) -> Void) -> Void
+    private typealias RequestFunction =
+        @convention(c) (CFString, CFDictionary?, @escaping @convention(block) (Bool) -> Void) -> Void
 
     private let preflight: PreflightFunction?
     private let request: RequestFunction?

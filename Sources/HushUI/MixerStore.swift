@@ -184,10 +184,10 @@ package final class MixerStore {
     package func popoverDidAppear() {
         guard !isPopoverVisible else { return }
         refreshPermission()
-        rebuildStrips()          // fresh order while still "closed"
+        rebuildStrips()  // fresh order while still "closed"
         isPopoverVisible = true
         reconcile()
-        rebuildStrips()          // pick up meter-engine failures; order is already frozen
+        rebuildStrips()  // pick up meter-engine failures; order is already frozen
         if preferences.appearance.showLevelMeters { startMeterPolling() }
     }
 

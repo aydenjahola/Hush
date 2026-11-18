@@ -15,7 +15,9 @@ final class FakeRunningReader {
 
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct RunningStatePollerTests {
-    func makePoller(_ reader: FakeRunningReader, sleeper: FakeSleeper = FakeSleeper()) -> (RunningStatePoller, () -> [[AudioObjectID: Bool]]) {
+    func makePoller(_ reader: FakeRunningReader, sleeper: FakeSleeper = FakeSleeper()) -> (
+        RunningStatePoller, () -> [[AudioObjectID: Bool]]
+    ) {
         var changes: [[AudioObjectID: Bool]] = []
         let poller = RunningStatePoller(
             interval: .seconds(1),
@@ -62,7 +64,7 @@ final class FakeRunningReader {
         poller.record([1: true])
         poller.setTargets([1, 3])
 
-        poller.record([1: false, 3: true])   // a refresh already saw the new state
+        poller.record([1: false, 3: true])  // a refresh already saw the new state
         #expect(poller.poll() == false)
         #expect(changes().isEmpty)
     }

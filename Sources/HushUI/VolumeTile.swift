@@ -41,8 +41,9 @@ struct VolumeTile: View {
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
-                MuteButton(isMuted: strip.setting.isMuted, appName: strip.displayName, compact: true,
-                           action: actions.toggleMute)
+                MuteButton(
+                    isMuted: strip.setting.isMuted, appName: strip.displayName, compact: true,
+                    action: actions.toggleMute)
             }
             .padding(.leading, compact ? 8 : 10)
             .padding(.trailing, compact ? 5 : 6)
@@ -121,10 +122,12 @@ private struct TileSurface: View {
                     }
                     let newValue = scale.percent(atPosition: drag.location.x / max(width, 1))
                     if newValue != value { actions.setPercent(newValue) }
-                })
+                }
+            )
             .simultaneousGesture(TapGesture(count: 2).onEnded { if isEnabled { actions.reset() } })
         }
-        .volumeControl(value: value, maxValue: maxPercent, appName: strip.displayName,
-                       onChange: actions.setPercent)
+        .volumeControl(
+            value: value, maxValue: maxPercent, appName: strip.displayName,
+            onChange: actions.setPercent)
     }
 }

@@ -149,11 +149,12 @@ package final class UpdateChecker {
     /// Settings → "Check Now": checks immediately and reports the result in `checkStatus`.
     package func checkNow() async {
         checkStatus = .checking
-        checkStatus = switch await check() {
-        case .upToDate: .upToDate
-        case .failed: .failed
-        case .available(let update): .available(update.version)
-        }
+        checkStatus =
+            switch await check() {
+            case .upToDate: .upToDate
+            case .failed: .failed
+            case .available(let update): .available(update.version)
+            }
         if isStarted { reschedule() }
     }
 
@@ -187,7 +188,9 @@ package final class UpdateChecker {
             if case ReleaseFetchError.rateLimited(let retryAfter) = error, let retryAfter {
                 retryNotBefore = now().addingTimeInterval(min(retryAfter, 24 * 60 * 60))
             }
-            logger.debug("Update check failed (\(self.consecutiveFailures, privacy: .public) in a row): \(String(describing: error), privacy: .public)")
+            logger.debug(
+                "Update check failed (\(self.consecutiveFailures, privacy: .public) in a row): \(String(describing: error), privacy: .public)"
+            )
             return .failed
         }
         consecutiveFailures = 0
@@ -199,7 +202,8 @@ package final class UpdateChecker {
         case .release(let release, let newETag):
             etag = newETag
             if let release, UpdatePolicy.isIgnored(release) {
-                logger.debug("Ignoring release \(release.tagName, privacy: .public): draft, prerelease or unparseable tag")
+                logger.debug(
+                    "Ignoring release \(release.tagName, privacy: .public): draft, prerelease or unparseable tag")
             } else {
                 latestUpdate = release.flatMap { UpdatePolicy.availableUpdate(in: $0, current: currentVersion) }
             }

@@ -39,7 +39,7 @@ enum IntegrationEnvironment {
     static func captureAuthorized() async -> Bool {
         guard isEnabled else { return true }
         guard let handle = dlopen("/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW),
-              dlsym(handle, "TCCAccessPreflight") != nil
+            dlsym(handle, "TCCAccessPreflight") != nil
         else {
             recordRun(group: "SKIP", test: "permission")
             return false
@@ -97,7 +97,9 @@ enum CapturePermissionGate {
     }
 
     /// `requestAccess()` can't be cancelled, so it races a timer; whichever finishes first wins.
-    private static func request(_ source: any AudioCapturePermissionSource, timeout: Duration) async -> AudioCapturePermissionStatus? {
+    private static func request(_ source: any AudioCapturePermissionSource, timeout: Duration) async
+        -> AudioCapturePermissionStatus?
+    {
         await withCheckedContinuation { continuation in
             let once = ResumeOnce(continuation)
             Task { @MainActor in once.resume(await source.requestAccess()) }
@@ -111,7 +113,9 @@ enum CapturePermissionGate {
     @MainActor
     private final class ResumeOnce {
         private var continuation: CheckedContinuation<AudioCapturePermissionStatus?, Never>?
-        init(_ continuation: CheckedContinuation<AudioCapturePermissionStatus?, Never>) { self.continuation = continuation }
+        init(_ continuation: CheckedContinuation<AudioCapturePermissionStatus?, Never>) {
+            self.continuation = continuation
+        }
         func resume(_ value: AudioCapturePermissionStatus?) {
             continuation?.resume(returning: value)
             continuation = nil

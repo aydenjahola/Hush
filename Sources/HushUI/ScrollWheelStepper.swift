@@ -17,7 +17,8 @@ struct ScrollWheelStepper: ViewModifier {
         // Keep the handler current so steps are computed from the latest value, not the one at hover start.
         monitor?.handler = onSteps
         monitor?.requiresOption = requiresOption
-        return content
+        return
+            content
             .onContinuousHover { phase in
                 switch phase {
                 case .active:

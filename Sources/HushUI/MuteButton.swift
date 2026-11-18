@@ -17,9 +17,11 @@ struct MuteButton: View {
                 .foregroundStyle(isMuted ? Color.white : Color.primary)
                 .frame(width: compact ? 34 : 44, height: compact ? 22 : 26)
                 .background(
-                    Capsule().fill(isMuted
-                        ? Palette.mutedRed
-                        : Color.primary.opacity(contrast == .increased ? 0.2 : 0.08)))
+                    Capsule().fill(
+                        isMuted
+                            ? Palette.mutedRed
+                            : Color.primary.opacity(contrast == .increased ? 0.2 : 0.08))
+                )
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)

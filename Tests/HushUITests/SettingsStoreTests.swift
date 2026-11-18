@@ -21,7 +21,8 @@ import Testing
         let file = try makeDirectory().appending(path: "Hush/settings.json")
         let store = SettingsStore(fileURL: file)
         let document = SettingsDocument(apps: [
-            "com.example.player": AppVolumeSetting(percent: 62, lastAdjusted: Date(timeIntervalSince1970: 1_794_924_180)),
+            "com.example.player": AppVolumeSetting(
+                percent: 62, lastAdjusted: Date(timeIntervalSince1970: 1_794_924_180))
         ])
         store.save(document)
         #expect(FileManager.default.fileExists(atPath: file.path))

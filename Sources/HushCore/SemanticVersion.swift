@@ -36,9 +36,9 @@ package struct SemanticVersion: Comparable, Hashable, Sendable, CustomStringConv
         }
         let core = rest.split(separator: ".", omittingEmptySubsequences: false)
         guard core.count == 3,
-              let major = Self.parseNumber(core[0]),
-              let minor = Self.parseNumber(core[1]),
-              let patch = Self.parseNumber(core[2])
+            let major = Self.parseNumber(core[0]),
+            let minor = Self.parseNumber(core[1]),
+            let patch = Self.parseNumber(core[2])
         else { return nil }
         self.init(major: major, minor: minor, patch: patch, prerelease: prerelease)
     }
@@ -61,7 +61,7 @@ package struct SemanticVersion: Comparable, Hashable, Sendable, CustomStringConv
         for (a, b) in zip(lhs.prerelease, rhs.prerelease) where a != b {
             switch (Int(a), Int(b)) {
             case let (x?, y?): return x < y
-            case (.some, nil): return true       // numeric identifiers rank below alphanumeric ones
+            case (.some, nil): return true  // numeric identifiers rank below alphanumeric ones
             case (nil, .some): return false
             case (nil, nil): return a < b
             }

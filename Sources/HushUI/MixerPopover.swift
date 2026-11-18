@@ -66,13 +66,13 @@ package struct MixerPopover: View {
             } icon: {
                 Image(systemName: "hifispeaker.fill")
             }
-                .labelStyle(.titleAndIcon)
-                .font(.caption.weight(.medium))
-                .lineLimit(1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .glassEffect(.regular, in: .capsule)
-                .accessibilityLabel(Text(L10n.outputDevice(named: store.outputDevice?.name)))
+            .labelStyle(.titleAndIcon)
+            .font(.caption.weight(.medium))
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .glassEffect(.regular, in: .capsule)
+            .accessibilityLabel(Text(L10n.outputDevice(named: store.outputDevice?.name)))
         }
     }
 

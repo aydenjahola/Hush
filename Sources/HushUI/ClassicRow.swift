@@ -42,8 +42,9 @@ struct ClassicRow: View {
                 }
             }
             .frame(width: 40, alignment: .trailing)
-            MuteButton(isMuted: strip.setting.isMuted, appName: strip.displayName, compact: true,
-                       action: actions.toggleMute)
+            MuteButton(
+                isMuted: strip.setting.isMuted, appName: strip.displayName, compact: true,
+                action: actions.toggleMute)
         }
         .padding(.vertical, compact ? 2 : 4)
         .disabled(!isEnabled)

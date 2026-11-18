@@ -23,10 +23,12 @@ package enum MenuBarIcon {
     package static func image(style: MenuBarIconStyle = .speaker, attenuated: Bool, badged: Bool) -> NSImage {
         let key = Key(style: style, attenuated: attenuated, badged: badged)
         if let cached = cache[key] { return cached }
-        let image = switch style {
-        case .speaker: render(symbolName: attenuated ? "speaker.wave.1.fill" : "speaker.wave.2.fill", badged: badged)
-        case .fader: renderFaders(attenuated: attenuated, badged: badged)
-        }
+        let image =
+            switch style {
+            case .speaker:
+                render(symbolName: attenuated ? "speaker.wave.1.fill" : "speaker.wave.2.fill", badged: badged)
+            case .fader: renderFaders(attenuated: attenuated, badged: badged)
+            }
         cache[key] = image
         return image
     }
@@ -38,8 +40,10 @@ package enum MenuBarIcon {
 
     private static func render(symbolName: String, badged: Bool) -> NSImage {
         let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
-        guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: String(localized: L10n.appName))?
-            .withSymbolConfiguration(configuration)
+        guard
+            let symbol = NSImage(
+                systemSymbolName: symbolName, accessibilityDescription: String(localized: L10n.appName))?
+                .withSymbolConfiguration(configuration)
         else { return NSImage() }
         // A little room on the trailing side so the dot only clips the symbol's outer edge.
         // Both states use the same canvas, so the item doesn't change width when the dot appears.
@@ -72,7 +76,8 @@ package enum MenuBarIcon {
                 NSColor.black.setFill()
                 let fill = NSRect(x: centerX - fillWidth / 2, y: knobY, width: fillWidth, height: bottom - knobY)
                 NSBezierPath(roundedRect: fill, xRadius: fillWidth / 2, yRadius: fillWidth / 2).fill()
-                let cap = NSRect(x: centerX - knob.width / 2, y: knobY - knob.height / 2, width: knob.width, height: knob.height)
+                let cap = NSRect(
+                    x: centerX - knob.width / 2, y: knobY - knob.height / 2, width: knob.width, height: knob.height)
                 NSBezierPath(roundedRect: cap, xRadius: 1.25, yRadius: 1.25).fill()
             }
         }
