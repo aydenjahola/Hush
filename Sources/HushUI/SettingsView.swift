@@ -117,6 +117,8 @@ package struct SettingsView: View {
     }
 
     private static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let build = BuildInfo.current
+        let version = build.version ?? "dev"
+        return build.isLocal ? String(localized: L10n.localVersion(version, commit: build.commit)) : version
     }
 }

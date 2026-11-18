@@ -162,5 +162,23 @@
 
 "Version" = "Version";
 
+/* Settings > About, local builds. First %@ is the version (1.2.0), second the short git commit (abc1234). */
+"%@ (local build, %@)" = "%@ (local build, %@)";
+
+/* Settings > About, local builds without a known commit. %@ is the version. */
+"%@ (local build)" = "%@ (local build)";
+
+/* Badge next to the app name in the popover of a build that isn't a downloaded release. Keep it very short. */
+"DEV" = "DEV";
+
+/* VoiceOver label of the DEV badge. */
+"Local build" = "Local build";
+
+/* Tooltip of the DEV badge. %@ is the short git commit (abc1234). */
+"Local build from commit %@, not a downloaded release" = "Local build from commit %@, not a downloaded release";
+
+/* Tooltip of the DEV badge when the commit isn't known. */
+"Local build, not a downloaded release" = "Local build, not a downloaded release";
+
 /* VoiceOver label of the warning badge. %@ is the explanation. */
 "Warning: %@" = "Warning: %@";

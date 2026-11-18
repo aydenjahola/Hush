@@ -96,6 +96,8 @@ make icon     # regenerate Resources/Hush.icns from scripts/make-icon.swift
 
 Run `Hush.app` (via `make run`), not the bare binary from Xcode's Run button. Without the app bundle there's no bundle ID or Audio Recording usage description, so the permission prompt and the Settings window misbehave.
 
+Apps you build yourself show an orange **DEV** badge next to "Hush" in the popover, and Settings → About shows the commit they were built from (for example `0.2.0 (local build, 545d335)`). Downloaded releases have no badge.
+
 Rebuilding changes the ad-hoc signature, so macOS may ask for Audio Recording permission again.
 
 `make install` builds first, so a failed build leaves your installed copy alone. It accepts `ARCHS` like `make app` (e.g. `make install ARCHS="arm64 x86_64"`).

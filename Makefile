@@ -4,6 +4,10 @@ APP := build/Hush.app
 # version.txt is the single source of truth for the version; release-please bumps it.
 VERSION := $(shell cat version.txt)
 BUILD_NUMBER := $(shell git rev-list --count HEAD 2>/dev/null || echo 1)
+# "release" only in the release workflow; anything else marks the app as a local build (a DEV
+# badge in the popover and "local build" in Settings > About).
+CHANNEL ?= dev
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)$(shell git diff --quiet HEAD 2>/dev/null || echo -dirty)
 
 # Release builds pass ARCHS="arm64 x86_64" for a universal binary.
 ARCHS ?= arm64
@@ -105,6 +109,8 @@ app: require-xcode
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	plutil -replace CFBundleShortVersionString -string "$(VERSION)" $(APP)/Contents/Info.plist
 	plutil -replace CFBundleVersion -string "$(BUILD_NUMBER)" $(APP)/Contents/Info.plist
+	plutil -replace HushBuildChannel -string "$(CHANNEL)" $(APP)/Contents/Info.plist
+	plutil -replace HushBuildCommit -string "$(GIT_COMMIT)" $(APP)/Contents/Info.plist
 	plutil -lint $(APP)/Contents/Info.plist
 	cp Resources/Hush.icns $(APP)/Contents/Resources/Hush.icns
 	codesign --force --sign "$(SIGN_IDENTITY)" $(SIGN_FLAGS) --entitlements Resources/Hush.entitlements $(APP)

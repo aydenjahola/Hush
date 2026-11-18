@@ -170,8 +170,15 @@ jobs:
           echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
       - name: Build universal DMG
-        # SIGN_IDENTITY is "-" (ad-hoc) unless the import step set a Developer ID.
-        run: make dmg ARCHS="arm64 x86_64" SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+        # SIGN_IDENTITY is "-" (ad-hoc) unless the import step set a Developer ID. CHANNEL=release
+        # drops the DEV badge that marks local builds.
+        run: |
+          make dmg ARCHS="arm64 x86_64" CHANNEL=release SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+          channel="$(plutil -extract HushBuildChannel raw build/Hush.app/Contents/Info.plist)"
+          if [ "$channel" != "release" ]; then
+            echo "::error::Hush.app is marked as a '$channel' build, not release"
+            exit 1
+          fi
 
       - name: Sign DMG
         if: env.HAS_SIGNING == 'true'

@@ -62,6 +62,8 @@ package struct MixerPopover: View {
             })
     }
 
+    private var build: BuildInfo { BuildInfo.current }
+
     private var appearance: MixerAppearance { MixerAppearance(store.preferences.appearance) }
 
     private var header: some View {
@@ -70,6 +72,9 @@ package struct MixerPopover: View {
                 .font(.headline)
                 .fixedSize()
                 .layoutPriority(1)
+            if build.isLocal {
+                LocalBuildBadge(commit: build.commit)
+            }
             Spacer()
             OutputPicker(store: store)
         }
