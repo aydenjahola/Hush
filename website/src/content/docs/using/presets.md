@@ -26,6 +26,8 @@ Names follow a few rules:
 
 Choose the preset in the quick menu's **Presets** submenu, or click **Apply** next to it in **Settings → Presets**.
 
+![The quick menu's Presets submenu: Call with a checkmark, Focus, then Save Current Levels as Preset and Manage Presets](/Hush/screenshots/presets-menu.png)
+
 Applying a preset reproduces the snapshot exactly:
 
 - every app in the preset gets its saved level and mute state;

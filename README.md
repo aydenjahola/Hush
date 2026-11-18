@@ -24,6 +24,12 @@ Hush has three layouts, chosen in Settings:
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/strips.png" alt="Hush channel strips layout"> | <img src="docs/screenshots/rows.png" alt="Hush classic rows layout"> | <img src="docs/screenshots/tiles.png" alt="Hush tiles layout"> |
 
+Switch output from the pill at the top of the mixer, or right-click the menu bar icon for the quick menu:
+
+| Output menu | Quick menu |
+|:---:|:---:|
+| <img src="docs/screenshots/output-menu.png" width="300" alt="The output pill's menu listing AirPods Pro, LG UltraFine and MacBook Pro Speakers, with a checkmark on MacBook Pro Speakers, and Sound Settings at the bottom"> | <img src="docs/screenshots/quick-menu.png" width="300" alt="The quick menu: Output, Presets, Mute All Playing Apps, Settings, Check for Updates and Quit Hush"> |
+
 ## Features
 
 - **A fader per app**, from silent up to 200% boost, with a soft limiter so boosted audio doesn't clip harshly

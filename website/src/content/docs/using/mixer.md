@@ -15,6 +15,8 @@ When nothing is playing, the mixer shows **Nothing is playing**. If an update is
 
 Right-click the Hush icon in the menu bar, click it with two fingers on a trackpad, or Control-click it, to open a short menu without opening the mixer:
 
+![The quick menu: Output, Presets, Mute All Playing Apps, Settings, Check for Updates and Quit Hush](/Hush/screenshots/quick-menu.png)
+
 - **Output:** the same list of output devices as the [output pill](#output-device), with a checkmark on the current one, and **Sound Settings…** at the bottom.
 - **Presets:** your saved [presets](/Hush/using/presets/), with a checkmark on the one the current levels match, then **Save Current Levels as Preset…** and **Manage Presets…**. With no presets saved, it shows **No Presets**.
 - **Mute All Playing Apps:** mutes every app that's playing right now, except [hidden apps](#hide-an-app). Each app keeps its level, so unmuting brings it back where it was. Once every playing app is muted, the item reads **Unmute All** instead, which unmutes every muted app, including ones that aren't playing or running at the moment. It's greyed out when there's nothing to mute or unmute, or when Hush doesn't have permission.
@@ -111,6 +113,8 @@ With many apps, scroll the row of strips sideways (the edges fade to show there'
 ## Output device
 
 Click the pill at the top right of the mixer to choose where your Mac plays sound. The menu lists every output device, each with an icon for how it's connected: built-in speakers or headphones, Bluetooth, USB, HDMI or DisplayPort, AirPlay, or a virtual device such as BlackHole. The current output has a checkmark.
+
+![The output menu listing AirPods Pro, LG UltraFine and MacBook Pro Speakers, with a checkmark on MacBook Pro Speakers, and Sound Settings at the bottom](/Hush/screenshots/output-menu.png)
 
 Choosing a device changes your Mac's output, exactly like picking it in Control Center or **System Settings → Sound**. Every app follows, not just the ones Hush adjusts, and apps you've adjusted keep their levels. The list updates by itself as you connect or disconnect devices.
 
