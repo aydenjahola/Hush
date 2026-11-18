@@ -130,9 +130,10 @@ private final class MinimalOutputSource: OutputDeviceSource {
         #expect(OutputTransport.other.symbolName == "hifispeaker.fill")
     }
 
-    @Test func accessibilityLabelNamesTheDeviceAndTheMenu() {
-        #expect(String(localized: L10n.outputDevice(named: "AirPods Pro")) == "Output: AirPods Pro, menu")
-        #expect(String(localized: L10n.outputDevice(named: nil)) == "Output: none, menu")
+    /// VoiceOver adds "pop-up button" itself, so the label is just the device.
+    @Test func accessibilityLabelNamesTheDevice() {
+        #expect(String(localized: L10n.outputDevice(named: "AirPods Pro")) == "Output: AirPods Pro")
+        #expect(String(localized: L10n.outputDevice(named: nil)) == "Output: none")
         #expect(String(localized: L10n.soundSettings) == "Sound Settings…")
     }
 
@@ -151,6 +152,30 @@ private final class MinimalOutputSource: OutputDeviceSource {
         h.output.selectionError = FakeError()
         h.store.selectOutput(airPods)
         #expect(try renderedHeight(h.store) > plain)
+    }
+
+    @Test func currentDeviceIsAlwaysInTheMenu() {
+        // Listed: no duplicate.
+        #expect(OutputMenuItems.items(devices: [airPods, speakers], current: speakers).map(\.id) == [2, 1])
+        // Missing from the list (not enumerable, or the list hasn't caught up): appended so it's checked.
+        #expect(OutputMenuItems.items(devices: [airPods, blackHole], current: speakers).map(\.id) == [2, 3, 1])
+        #expect(OutputMenuItems.items(devices: [], current: speakers).map(\.id) == [1])
+        #expect(OutputMenuItems.items(devices: [airPods], current: nil).map(\.id) == [2])
+    }
+
+    @Test func longDeviceNameTruncatesAndLeavesTheTitleRoom() {
+        let long = String(repeating: "Very Long Bluetooth Speaker Name ", count: 4)
+        let pill = NSHostingView(rootView: OutputPill(name: long))
+        let short = NSHostingView(rootView: OutputPill(name: "AirPods Pro"))
+        #expect(pill.fittingSize.width < OutputPill.maxNameWidth + 60)
+        #expect(short.fittingSize.width < pill.fittingSize.width)
+
+        let h = Harness()
+        h.output.emit(OutputDevice(id: 9, uid: "long", name: long, transport: .bluetooth))
+        let header = NSHostingView(rootView: MixerPopover(store: h.store, updates: UpdateHarness().checker))
+        header.frame = CGRect(x: 0, y: 0, width: 340, height: 600)
+        header.layoutSubtreeIfNeeded()
+        #expect(header.fittingSize.width <= 340)
     }
 
     @Test func menuItemsRender() {

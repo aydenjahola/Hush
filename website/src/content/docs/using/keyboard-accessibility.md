@@ -31,7 +31,7 @@ Every control has a spoken label:
 | Element | VoiceOver reads |
 |---|---|
 | Menu bar icon | "Hush", or "Hush, update available" when there's a new version |
-| Output pill | "Output: *device name*, menu". Open it with VoiceOver's press command to pick an [output device](/Hush/using/mixer/#output-device). |
+| Output pill | "Output: *device name*, pop-up button". Open it with VoiceOver's press command to pick an [output device](/Hush/using/mixer/#output-device). |
 | Fader, slider or tile | "*App* volume", with the value "*62* percent". It's adjustable: use VoiceOver's increment and decrement commands to change it in 5% steps. Every layout reads the same. |
 | Mute button | "Mute *App*", or "Unmute *App*" when muted |
 | Warning badge | "Warning:" followed by the problem, for example "Hush couldn't control this app's audio, so it's playing normally." |

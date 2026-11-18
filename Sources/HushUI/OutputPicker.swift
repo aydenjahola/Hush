@@ -36,19 +36,26 @@ struct OutputPicker: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
-        .fixedSize()
         .accessibilityLabel(Text(L10n.outputDevice(named: store.outputDevice?.name)))
     }
 }
 
 /// The glass pill: speaker, device name and a small chevron.
 struct OutputPill: View {
+    /// Longer device names truncate, so the header title always has room.
+    static let maxNameWidth: CGFloat = 160
+
     let name: String?
 
     var body: some View {
         Label {
             HStack(spacing: 4) {
-                if let name { Text(verbatim: name) } else { Text(L10n.noOutput) }
+                Group {
+                    if let name { Text(verbatim: name) } else { Text(L10n.noOutput) }
+                }
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: Self.maxNameWidth, alignment: .leading)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
                     .accessibilityHidden(true)
@@ -66,15 +73,15 @@ struct OutputPill: View {
     }
 }
 
-/// One checkable item per device. If the source lists nothing (it can't enumerate devices), the
-/// current output still appears, checked.
+/// One checkable item per device. The current output is always there and checked, even if the
+/// source can't list devices or its list hasn't caught up yet.
 struct OutputMenuItems: View {
     let devices: [OutputDevice]
     let current: OutputDevice?
     let select: (OutputDevice) -> Void
 
     var body: some View {
-        ForEach(items) { device in
+        ForEach(Self.items(devices: devices, current: current)) { device in
             Toggle(
                 isOn: Binding(
                     get: { device.id == current?.id },
@@ -89,7 +96,8 @@ struct OutputMenuItems: View {
         }
     }
 
-    private var items: [OutputDevice] {
-        if devices.isEmpty, let current { [current] } else { devices }
+    static func items(devices: [OutputDevice], current: OutputDevice?) -> [OutputDevice] {
+        guard let current, !devices.contains(where: { $0.id == current.id }) else { return devices }
+        return devices + [current]
     }
 }

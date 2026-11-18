@@ -104,11 +104,11 @@
 
 "Open the download in your browser" = "Open the download in your browser";
 
-/* VoiceOver label of the output device menu in the popover header. %@ is the device name. */
-"Output: %@, menu" = "Output: %@, menu";
+/* VoiceOver label of the output device menu in the popover header (VoiceOver adds "pop-up button"). %@ is the device name. */
+"Output: %@" = "Output: %@";
 
 /* VoiceOver label of the output device menu when there is no output device. */
-"Output: none, menu" = "Output: none, menu";
+"Output: none" = "Output: none";
 
 "Playing & recently adjusted first" = "Playing & recently adjusted first";
 

@@ -40,7 +40,7 @@ package enum L10n {
 
     package static let noOutput = resource("No Output")
     package static func outputDevice(named name: String?) -> LocalizedStringResource {
-        if let name { resource("Output: \(name), menu") } else { resource("Output: none, menu") }
+        if let name { resource("Output: \(name)") } else { resource("Output: none") }
     }
     package static let soundSettings = resource("Sound Settings…")
     package static func outputSwitchFailed(_ device: String) -> LocalizedStringResource {
