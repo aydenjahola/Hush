@@ -1,7 +1,7 @@
 import Foundation
 
 extension Bundle {
-    /// HushUI's resource bundle (the String Catalog). In the packaged app SwiftPM's resource bundle
+    /// HushUI's resource bundle (the en.lproj strings). In the packaged app SwiftPM's resource bundle
     /// is copied into `Contents/Resources`; its generated accessor only looks next to the app
     /// bundle, so look there first and fall back to `Bundle.module` (tests, `swift run`).
     nonisolated static let hushUI: Bundle = {
@@ -15,9 +15,15 @@ extension Bundle {
 }
 
 /// Every user-facing string in Hush, as a `LocalizedStringResource` backed by
-/// `Resources/Localizable.xcstrings`. SwiftUI views take these directly; use `String(localized:)`
-/// where a plain string is required (notifications, AppKit). Strings with arguments are whole
-/// sentences with format placeholders ("Mute %@"), so translators can reorder them.
+/// `Resources/en.lproj/Localizable.strings` (plurals in `Localizable.stringsdict`). SwiftUI views
+/// take these directly; use `String(localized:)` where a plain string is required (notifications,
+/// AppKit). Strings with arguments are whole sentences with format placeholders ("Mute %@"), so
+/// translators can reorder them.
+///
+/// Classic .strings/.stringsdict rather than a String Catalog: SwiftPM's native build system
+/// (the default up to Swift 6.3, i.e. Xcode 26) copies an .xcstrings file into the bundle verbatim
+/// instead of compiling it, so every lookup fell back to the raw key. Only the Swift Build backend
+/// (default from Swift 6.4, Xcode 27) compiles catalogs. These files work on both.
 package enum L10n {
     private static func resource(_ key: String.LocalizationValue) -> LocalizedStringResource {
         LocalizedStringResource(key, bundle: .atURL(Bundle.hushUI.bundleURL))
