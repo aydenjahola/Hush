@@ -20,6 +20,7 @@ extension MixerStore {
     func outputDevicesDidChange(_ devices: [OutputDevice]) {
         guard devices != outputDevices else { return }
         outputDevices = devices
+        retryStalledEngines()  // a device that wasn't ready after a wake may be now
     }
 
     private func showOutputSelectionError(_ message: String) {

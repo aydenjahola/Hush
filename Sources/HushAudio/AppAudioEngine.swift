@@ -13,6 +13,9 @@ final class EngineSharedState: Sendable {
     let replaying: Atomic<Bool>
     /// Set by the IOProc on every cycle (one relaxed store); lets the main thread see that IO is flowing.
     let hasRun = Atomic<Bool>(false)
+    /// Incremented by the IOProc on every cycle (one relaxed wrapping add). Never reset, so the
+    /// main thread can compare two readings to tell whether IO is still flowing.
+    let ioCycles = Atomic<UInt32>(0)
 
     /// `appliedGainBits` is the replay's current gain: a meter-only engine starts at 0, so it has
     /// nothing to fade out.
@@ -67,6 +70,17 @@ package final class AppAudioEngine: AudioEngineHandle {
 
     /// Whether the current aggregate's IOProc has run since the last (re)build (for integration tests).
     var ioProcHasRun: Bool { state.hasRun.load(ordering: .acquiring) }
+
+    package var ioCycleCount: UInt32 { state.ioCycles.load(ordering: .relaxed) }
+
+    package func isAttached(toOutputDeviceID outputDeviceID: AudioObjectID) -> Bool? {
+        guard aggregateID != kAudioObjectUnknown else { return false }
+        guard
+            let active = try? CoreAudioProperty.array(
+                aggregateID, kAudioAggregateDevicePropertyActiveSubDeviceList, filler: AudioObjectID(0))
+        else { return nil }
+        return active.contains(outputDeviceID)
+    }
 
     package func start() throws {
         guard tapID == kAudioObjectUnknown else { return }
@@ -334,6 +348,7 @@ package final class AppAudioEngine: AudioEngineHandle {
     nonisolated static func makeIOBlock(state: EngineSharedState, tapBufferOffset: Int) -> AudioDeviceIOBlock {
         return { _, inputData, _, outputData, _ in
             state.hasRun.store(true, ordering: .relaxed)
+            state.ioCycles.wrappingAdd(1, ordering: .relaxed)
             let input = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
             let output = UnsafeMutableAudioBufferListPointer(outputData)
             let peak: Float

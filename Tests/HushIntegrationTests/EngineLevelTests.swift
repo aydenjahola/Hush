@@ -31,6 +31,36 @@ extension CoreAudioIntegration {
         }
 
         @Test(
+            "A running engine's IO cycle count advances and its aggregate lists the output; both stop with the engine",
+            .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
+        func ioCycleCountTracksTheIOProc() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
+            let output = try TestOutput.resolve()
+            let (tone, object) = try await ToneProcess.launch(deviceUID: output.device.uid, level: output.quietLevel)
+            defer { tone.terminate() }
+
+            let engine = AppAudioEngine(
+                appID: "tone", processObjectIDs: [object], mode: .meterOnly, initialGain: 1,
+                outputDeviceID: output.device.id)
+            defer { engine.stop() }
+            try engine.start()
+            let start = engine.ioCycleCount
+            let advanced = await waitUntil(timeout: .seconds(1), interval: .milliseconds(10)) {
+                engine.ioCycleCount != start
+            }
+            #expect(advanced, "the count stayed at \(start) for 1 s on a running engine")
+            #expect(
+                engine.isAttached(toOutputDeviceID: output.device.id) == true,
+                "the aggregate's active sub-device list should contain the output (\(output.device.id))")
+
+            engine.stop()
+            let stopped = engine.ioCycleCount
+            try await Task.sleep(for: .milliseconds(100))
+            #expect(engine.ioCycleCount == stopped, "a stopped engine reads as stalled")
+            #expect(engine.isAttached(toOutputDeviceID: output.device.id) == false)
+        }
+
+        @Test(
             "Gain 0.25 (50%) scales the engine's output peak to a quarter",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func gainScalesOutputPeak() async throws {
