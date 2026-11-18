@@ -55,12 +55,14 @@ jobs:
     needs: release-please
     # On dispatch release-please is skipped, so `!cancelled()` stops that skip from
     # skipping this job too. On push, a failed release-please leaves release_created empty.
+    # Dispatch only from main, so the workflow that publishes is the reviewed one.
     if: >-
       !cancelled() && (
-        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
         needs.release-please.outputs.release_created == 'true'
       )
     runs-on: macos-26
+    timeout-minutes: 45
     permissions:
       # Drafts are only visible to, and editable by, a token with write access.
       contents: write
@@ -271,7 +273,7 @@ jobs:
   # reads the latest *published* release) shows the new version. A skipped or failed
   # build-dmg skips this. The explicit `if` is needed because on dispatch release-please is
   # skipped, and a skipped ancestor would otherwise skip this job. The github-pages
-  # environment only deploys from main, so a dispatch from another branch skips it too.
+  # environment only deploys from main (build-dmg already skips dispatches from elsewhere).
   # Pages deploys need these permissions granted by the caller.
   pages:
     needs: build-dmg

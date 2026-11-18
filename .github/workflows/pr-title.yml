@@ -25,10 +25,12 @@ jobs:
           # Through env, never interpolated into the script: titles are untrusted input.
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: .+'
-          if [[ "$TITLE" =~ $PATTERN ]]; then
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .+'
+          # GitHub's "Revert" button titles PRs like: Revert "feat: add X"
+          REVERT='^Revert ".+"$'
+          if [[ "$TITLE" =~ $PATTERN || "$TITLE" =~ $REVERT ]]; then
             echo "OK: $TITLE"
           else
-            echo "::error::PR title \"$TITLE\" isn't a Conventional Commit. Use 'type(scope): summary', for example 'fix(audio): keep the tap alive after sleep'. Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert. Add ! before the colon for a breaking change."
+            echo "::error::PR title \"$TITLE\" isn't a Conventional Commit. Use 'type(scope): summary', for example 'fix(audio): keep the tap alive after sleep'. Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert. Add ! before the colon for a breaking change. GitHub's default 'Revert \"…\"' titles are accepted too."
             exit 1
           fi

@@ -19,10 +19,10 @@ The flow is **draft → DMG uploaded → published**. It works this way because 
 Pull requests are **squash-merged**, and the squash commit uses the pull request title as its message. release-please reads those messages on `main` to choose the next version and write `CHANGELOG.md`, so the **pull request title** must be a Conventional Commit. The commits inside the branch can be anything. The **PR title** check (`.github/workflows/pr-title.yml`) fails a pull request whose title doesn't match:
 
 ```text
-^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: .+
+^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .+
 ```
 
-For example `fix(audio): keep the tap alive after sleep`. release-please's own pull requests (`chore(main): release 0.2.0`) already match.
+For example `fix(audio): keep the tap alive after sleep`. GitHub's default revert titles (`Revert "feat: add X"`) are accepted too. release-please's own pull requests (`chore(main): release 0.2.0`) already match.
 
 The check skips pull requests opened by bots (author type `Bot` or a login ending in `[bot]`, such as Imgbot and Dependabot). Their titles still become the squash commit, so when you merge one, change the title to a Conventional Commit (for example `chore: optimize images`), or accept that it won't appear in the changelog.
 
@@ -84,7 +84,7 @@ Releases are ad-hoc signed by default, and users follow the Gatekeeper steps on 
 A failed build leaves the release as a draft with the tag in place. Nothing is public, so you can fix it:
 
 - **A flaky failure** (a runner hiccup, a notarization timeout): open the failed run and choose **Re-run failed jobs**. Uploads replace any files an earlier attempt left on the draft. Don't choose **Re-run all jobs**: release-please has already created the release, so it won't report a new one and the build is skipped.
-- **The run is too old to re-run, or you want a fresh run**: go to **Actions → Release → Run workflow**, keep the branch as `main` and enter the tag, for example `v0.2.0`. This skips release-please, then checks out that tag, builds, uploads and publishes the draft.
+- **The run is too old to re-run, or you want a fresh run**: go to **Actions → Release → Run workflow**, keep the branch as `main` and enter the tag, for example `v0.2.0`. The build only runs when dispatched from `main`; from any other branch it's skipped. This skips release-please, then checks out that tag, builds, uploads and publishes the draft.
 - **The code at the tag is broken** (the tests fail, say): that version can't ship. Delete the draft but **keep the tag**, because release-please finds the previous version from it. Then merge the fix to `main` as a `fix:` pull request. release-please opens the next patch release pull request as usual.
 
 The manual run refuses a release that's already published.
