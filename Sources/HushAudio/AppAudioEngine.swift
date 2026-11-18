@@ -8,10 +8,13 @@ final class EngineSharedState: Sendable {
     let targetGainBits: Atomic<UInt32>
     let appliedGainBits: Atomic<UInt32>
     let peakBits = Atomic<UInt32>(0)
+    /// True: replay the tap with gain (`.control`). False: only measure it (`.meterOnly`).
+    let replaying: Atomic<Bool>
 
-    init(gain: Float) {
+    init(gain: Float, mode: EngineMode) {
         targetGainBits = Atomic(gain.bitPattern)
         appliedGainBits = Atomic(gain.bitPattern)
+        replaying = Atomic(mode == .control)
     }
 }
 
@@ -19,15 +22,21 @@ final class EngineSharedState: Sendable {
 ///
 /// `.control`: the app is muted at the source (`.mutedWhenTapped`) and replayed with gain.
 /// `.meterOnly`: the app plays normally (`.unmuted`); output buffers are zero-filled and only the level is measured.
+///
+/// Process-list and mode changes are applied in place by setting `kAudioTapPropertyDescription`
+/// on the live tap (AudioHardware.h: "This property can be used to modify and set the description
+/// of an existing tap."). Rebuilding instead would destroy a `.mutedWhenTapped` tap, which lets the
+/// app through at full level until the replacement's IO is running, even with make-before-break.
 @MainActor
 public final class AppAudioEngine: AudioEngineHandle {
-    public let mode: EngineMode
-    public let processObjectIDs: [AudioObjectID]
+    public private(set) var mode: EngineMode
+    public private(set) var processObjectIDs: [AudioObjectID]
 
     private let appID: String
     private let state: EngineSharedState
     private var outputDeviceID: AudioObjectID
     private var tapID = AudioObjectID(kAudioObjectUnknown)
+    private var tapUUID = UUID()
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
 
@@ -36,8 +45,11 @@ public final class AppAudioEngine: AudioEngineHandle {
         self.processObjectIDs = processObjectIDs
         self.mode = mode
         self.outputDeviceID = outputDeviceID
-        self.state = EngineSharedState(gain: initialGain)
+        self.state = EngineSharedState(gain: initialGain, mode: mode)
     }
+
+    /// The live tap object, or `kAudioObjectUnknown` when stopped (for integration tests).
+    var tapObjectID: AudioObjectID { tapID }
 
     public func start() throws {
         guard tapID == kAudioObjectUnknown else { return }
@@ -80,12 +92,88 @@ public final class AppAudioEngine: AudioEngineHandle {
         try start()
     }
 
-    private func build() throws {
-        let description = CATapDescription(stereoMixdownOfProcesses: processObjectIDs)
-        description.uuid = UUID()
+    public func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws {
+        guard processObjectIDs != self.processObjectIDs else { return }
+        if tapID != kAudioObjectUnknown {
+            try applyTapDescription(makeDescription(processes: processObjectIDs, mode: mode))
+        }
+        self.processObjectIDs = processObjectIDs
+    }
+
+    public func switchMode(to newMode: EngineMode, gain: Float) throws {
+        guard newMode != mode else {
+            if newMode == .control { setGain(gain) }
+            return
+        }
+        if newMode == .control {
+            state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
+            state.appliedGainBits.store(gain.bitPattern, ordering: .relaxed)
+        }
+        guard tapID != kAudioObjectUnknown else {
+            mode = newMode
+            state.replaying.store(newMode == .control, ordering: .releasing)
+            return
+        }
+        switch newMode {
+        case .control:
+            // Replay first, then mute the source. Until coreaudiod applies the mute, the app plays
+            // both directly and through the replay; that overlap comes before the level drops. The
+            // other order leaves a gap of silence between the mute and the first replayed buffer.
+            state.replaying.store(true, ordering: .releasing)
+            do {
+                try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .control))
+            } catch {
+                state.replaying.store(false, ordering: .releasing)
+                throw error
+            }
+        case .meterOnly:
+            // Stop replaying first, then unmute: a brief gap rather than the source and the
+            // replay playing together, so the app is never louder than the level it's going to.
+            state.replaying.store(false, ordering: .releasing)
+            do {
+                try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .meterOnly))
+            } catch {
+                state.replaying.store(true, ordering: .releasing)
+                throw error
+            }
+        }
+        mode = newMode
+    }
+
+    private func makeDescription(processes: [AudioObjectID], mode: EngineMode) -> CATapDescription {
+        let description = CATapDescription(stereoMixdownOfProcesses: processes)
+        description.uuid = tapUUID  // the aggregate's tap list refers to the tap by this UID
         description.name = "Hush – \(appID)"
         description.isPrivate = true
         description.muteBehavior = mode == .control ? .mutedWhenTapped : .unmuted
+        return description
+    }
+
+    private func applyTapDescription(_ description: CATapDescription) throws {
+        var propertyAddress = CoreAudioProperty.address(kAudioTapPropertyDescription)
+        var settable: DarwinBoolean = false
+        try CoreAudioProperty.check(
+            AudioObjectIsPropertySettable(tapID, &propertyAddress, &settable),
+            "Checking kAudioTapPropertyDescription")
+        guard settable.boolValue else {
+            throw CoreAudioError(
+                operation: "Setting kAudioTapPropertyDescription (not settable)",
+                status: OSStatus(kAudioHardwareUnsupportedOperationError))
+        }
+        var reference = Unmanaged.passUnretained(description)
+        try withExtendedLifetime(description) {
+            try CoreAudioProperty.check(
+                AudioObjectSetPropertyData(
+                    tapID, &propertyAddress, 0, nil,
+                    UInt32(MemoryLayout<Unmanaged<CATapDescription>>.size), &reference),
+                "Setting kAudioTapPropertyDescription")
+        }
+    }
+
+    private func build() throws {
+        tapUUID = UUID()
+        let description = makeDescription(processes: processObjectIDs, mode: mode)
+        state.replaying.store(mode == .control, ordering: .releasing)
 
         var newTap = AudioObjectID(kAudioObjectUnknown)
         try CoreAudioProperty.check(AudioHardwareCreateProcessTap(description, &newTap), "AudioHardwareCreateProcessTap")
@@ -118,7 +206,7 @@ public final class AppAudioEngine: AudioEngineHandle {
         try CoreAudioProperty.check(
             AudioDeviceCreateIOProcIDWithBlock(
                 &newProc, newAggregate, nil,
-                Self.makeIOBlock(state: state, mode: mode, tapBufferOffset: tapBufferOffset)),
+                Self.makeIOBlock(state: state, tapBufferOffset: tapBufferOffset)),
             "AudioDeviceCreateIOProcIDWithBlock")
         ioProcID = newProc
 
@@ -143,18 +231,18 @@ public final class AppAudioEngine: AudioEngineHandle {
     }
 
     /// Realtime: no allocation, locks, logging, Objective-C or async inside the returned block.
-    nonisolated private static func makeIOBlock(state: EngineSharedState, mode: EngineMode, tapBufferOffset: Int) -> AudioDeviceIOBlock {
+    nonisolated private static func makeIOBlock(state: EngineSharedState, tapBufferOffset: Int) -> AudioDeviceIOBlock {
         return { _, inputData, _, outputData, _ in
             let input = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
             let output = UnsafeMutableAudioBufferListPointer(outputData)
             let peak: Float
-            switch mode {
-            case .control:
+            // Read once per cycle, so a mode switch lands on a buffer boundary.
+            if state.replaying.load(ordering: .acquiring) {
                 let target = Float(bitPattern: state.targetGainBits.load(ordering: .relaxed))
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
                 peak = BufferRouting.render(input: input, output: output, startGain: applied, endGain: target, firstInputBuffer: tapBufferOffset)
                 state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
-            case .meterOnly:
+            } else {
                 peak = BufferRouting.peak(of: input, firstInputBuffer: tapBufferOffset)
                 BufferRouting.silence(output)
             }

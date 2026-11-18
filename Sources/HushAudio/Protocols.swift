@@ -28,6 +28,14 @@ public protocol AudioEngineHandle: AnyObject {
     /// Returns the peak level seen since the previous call, then resets it.
     func currentPeak() -> Float
     func rebuild(outputDeviceID: AudioObjectID) throws
+    /// Retargets the running tap at a new process list in place (same tap, aggregate and IOProc),
+    /// so processes already tapped stay muted throughout. Throws if the change can't be applied;
+    /// the engine is then unchanged and the caller can rebuild instead.
+    func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws
+    /// Converts the running engine between `.meterOnly` and `.control` in place. `gain` is the
+    /// control gain (ignored for `.meterOnly`). Throws if the change can't be applied; the engine
+    /// is then unchanged and the caller can rebuild instead.
+    func switchMode(to mode: EngineMode, gain: Float) throws
 }
 
 @MainActor
