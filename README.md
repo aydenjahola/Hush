@@ -27,10 +27,10 @@ The documentation covers [installing](https://aydenjahola.github.io/Hush/getting
 - **A fader per app**, from silent up to 200% boost, with a soft limiter so boosted audio doesn't clip harshly
 - **Mute** any app with one click
 - **Live level meters**, which you can turn off
-- **Three layouts:** channel strips, Control Center-style classic rows, or tiles you drag anywhere
-- **Appearance options:** comfortable or compact size, percentages on or off, playing-first or alphabetical order, amber or your system accent colour, and a speaker or fader-glyph menu bar icon
+- **Three layouts:** channel strips (scroll a fader to change it), Control Center-style classic rows, or tiles you drag anywhere (in rows and tiles, scroll scrolls the list; hold Option to scroll the volume)
+- **Appearance options:** comfortable or compact size, percentages on or off, playing-first or alphabetical order, amber or your system accent colour for the fills (boost is always amber), and a speaker or fader-glyph menu bar icon
 - **Remembers** each app's level across restarts
-- Apps you haven't touched aren't processed at all (except to measure them for the level meters while the popover is open, if meters are on)
+- Apps you haven't touched aren't processed at all (except to measure them for the level meters while the mixer is open, if meters are on)
 - **Follows your output device** when you switch headphones or speakers
 - **Tells you when a new version is available**
 - **No driver, no admin password**

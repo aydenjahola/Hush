@@ -83,7 +83,7 @@ private struct TileSurface: View {
                 if appearance.showMeters {
                     LevelGlow(meter: meter, isActive: strip.meterIsActive, increasedContrast: contrast == .increased)
                 }
-                (level.map { $0.opacity(muted ? 0.1 : (contrast == .increased ? 0.4 : 0.28)) }
+                (level.flatMap { muted ? nil : $0.opacity(contrast == .increased ? 0.4 : 0.28) }
                     ?? Color.primary.opacity(muted ? 0.06 : (contrast == .increased ? 0.24 : 0.13)))
                     .frame(width: width * scale.fraction(min(value, 100)))
                 if value > 100 {

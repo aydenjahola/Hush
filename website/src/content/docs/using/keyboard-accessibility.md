@@ -19,8 +19,8 @@ Hush doesn't have a global keyboard shortcut for opening the mixer.
 
 ## Mouse and trackpad
 
-- Scroll over a fader, slider or tile to change it in 5% steps. Scrolling up always raises the level, whatever your natural-scrolling setting. In classic rows and tiles, scroll over the names or the space between apps to scroll the list instead.
-- Double-click a fader's knob (or anywhere on a tile), or Option-click it, to reset the app to 100%.
+- In channel strips, scroll over a fader to change it in 5% steps. In classic rows and tiles a plain scroll moves the list; hold **Option** and scroll over an app to change its volume instead. Scrolling up always raises the level, whatever your natural-scrolling setting.
+- Double-click a fader's knob (or anywhere on a tile), or Option-click it in any layout, to reset the app to 100%.
 - In the tiles layout, click an app's icon to mute or unmute it.
 
 ## VoiceOver

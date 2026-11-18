@@ -64,10 +64,12 @@ On by default. Turn it off to hide each app's percentage. A muted app still read
 
 ### Accent colour
 
-The colour used above 100%: the boost part of each fader, the boost zone on classic-row sliders and boosted percentages.
+The colour of the normal part of each volume control: fader and slider fills up to 100%, and the fill of a tile.
 
-- **Amber** (the default).
+- **Amber** (the default): the normal fill stays white (black in light mode).
 - **System accent:** your accent colour from **System Settings → Appearance**. In light mode Hush darkens it, and darkens it further with **Increase contrast**, so pale accents such as yellow stay readable.
+
+Boost (above 100%) is always amber, in every layout and with either choice: the boost part of faders and sliders, the boost fill on tiles, and boosted percentages. That keeps it from clashing with the red used for Muted when your accent is red.
 
 ### Menu bar icon
 
@@ -156,7 +158,7 @@ It looks like this:
 
 - Each app is listed by its bundle ID, or by its executable name if it doesn't have one.
 - `percent` is clamped to between 0 and your maximum boost when the file is read.
-- The `appearance` section holds the [Appearance](#appearance) options. Every key is optional: a missing or unrecognised value uses its default, so files from older versions of Hush load unchanged.
+- The `appearance` section holds the [Appearance](#appearance) options. Every key is optional: a missing or unrecognised value uses its default, so files from older versions of Hush load unchanged. The reverse holds too: if a newer Hush wrote a value this version doesn't know, it falls back to the default after a downgrade, and the newer value is lost the next time settings are saved.
 - The `updates` section remembers the update checker's state: whether automatic checks are on, the version you skipped, when "Later" ends and when Hush last checked. It may be missing or partly filled in.
 - Hush rewrites the file after every change, so quit Hush before editing it by hand.
 - If the file can't be read, for example because it isn't valid JSON or comes from a newer version of Hush, Hush moves it aside as `settings.corrupt-<number>.json` in the same folder and starts with default settings. Your old file isn't deleted.

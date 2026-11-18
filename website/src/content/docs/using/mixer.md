@@ -21,7 +21,7 @@ If an app is missing, see [Troubleshooting](/Hush/help/troubleshooting/#an-app-i
 
 ## Layouts
 
-Choose a layout under **Appearance** in [Settings](/Hush/using/settings/#appearance). All three show the same apps with the same controls: percentage, level meter, volume slider, icon (with the warning badge when something's wrong), name and mute button. The keyboard, scroll-wheel and VoiceOver controls are the same too.
+Choose a layout under **Appearance** in [Settings](/Hush/using/settings/#appearance). All three show the same apps with the same controls: percentage, level meter, volume slider, icon (with the warning badge when something's wrong), name and mute button. The keyboard and VoiceOver controls are the same too, and so is scrolling to change the volume, except that classic rows and tiles need Option held (a plain scroll moves their list).
 
 - **Channel strips** (the default): a column per app with a vertical fader, side by side like a mixing desk. With many apps, scroll the row sideways.
 - **Classic rows:** a dense row per app, like Control Center: icon, name, a horizontal slider with a thin level meter under it, percentage and mute button.
@@ -37,7 +37,7 @@ In the channel-strip layout, each strip has, from top to bottom:
 
 | Part | What it shows |
 |---|---|
-| Percent | The app's level, like `62%`. It turns amber above 100% and reads **Muted** in red when the app is muted. |
+| Percent | The app's level, like `62%`. It turns amber above 100% (primary colour on tiles, where the fill behind it is amber) and reads **Muted** in red when the app is muted. |
 | Level meter | A thin bar next to the fader showing how loud the app is right now. |
 | Fader | The app's volume, from 0% at the bottom to your maximum boost at the top. |
 | Icon | The app's icon, greyed out when muted. A warning triangle on it means Hush couldn't control the app. See [Troubleshooting](/Hush/help/troubleshooting/#a-warning-triangle-appears-on-an-apps-icon). |
@@ -49,11 +49,11 @@ Classic rows and tiles show the same parts in one line. Apps that aren't playing
 ## Change an app's volume
 
 - **Drag** the fader knob, or click anywhere on the fader to jump there. In the tiles layout, drag or click anywhere on the tile.
-- **Scroll** over the fader or tile with a mouse wheel or trackpad. Each step is 5%.
-- **Double-click** the knob (or anywhere on a tile), or **Option-click** the fader, to put the app back at 100%.
+- **Scroll** over a channel strip's fader with a mouse wheel or trackpad. Each step is 5%. In classic rows and tiles a plain scroll scrolls the list, so hold **Option** and scroll over the app you want to change.
+- **Double-click** the knob (or anywhere on a tile), or **Option-click** the fader, slider or tile in any layout, to put the app back at 100%.
 - **Arrow keys:** with the fader focused, press **↑** or **↓** (or **→** / **←**) to move 5%. See [Keyboard and accessibility](/Hush/using/keyboard-accessibility/).
 
-When the maximum boost is above 100%, a small tick marks 100% on the fader, and the knob snaps to 100% when you drag within 3% of it. The fader fills white (black in light mode) up to 100% and amber above it, or your system accent colour if you chose it under **Accent colour** in [Settings](/Hush/using/settings/#accent-colour). Classic-row sliders also tint the stretch above 100% faintly, so you can see where boosting starts.
+When the maximum boost is above 100%, a small tick marks 100% on the fader, and the knob snaps to 100% when you drag within 3% of it. The fader fills white (black in light mode) up to 100% and amber above it. If you chose the system accent under **Accent colour** in [Settings](/Hush/using/settings/#accent-colour), the part up to 100% takes that colour instead; boost stays amber. Classic-row sliders also tint the stretch above 100% very faintly, so you can see where boosting starts. Tiles draw a thin line at the volume position.
 
 ### How the percentages work
 

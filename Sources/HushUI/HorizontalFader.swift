@@ -33,7 +33,7 @@ struct HorizontalFader: View {
                 if maxValue > 100 {
                     // The boost zone, faintly tinted so it reads as "past normal" before it's used.
                     Capsule()
-                        .fill(boost.opacity(contrast == .increased ? 0.22 : (colorScheme == .dark ? 0.2 : 0.07)))
+                        .fill(boost.opacity(contrast == .increased ? 0.22 : (colorScheme == .dark ? 0.14 : 0.07)))
                         .frame(width: width - unityX, height: 4)
                         .offset(x: unityX)
                     if value > 100 {
