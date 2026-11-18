@@ -213,13 +213,18 @@ public final class AudioProcessMonitor: AudioProcessSource {
     private func resolvePending() {
         for objectID in objectIDs where info[objectID] == nil {
             guard let attempts = infoAttempts[objectID], attempts < Self.maxRetries else { continue }
-            guard let pid = hal.pid(of: objectID), let bundleID = try? hal.bundleID(of: objectID) else {
+            // Not `try?`: it would flatten a legitimately nil bundle ID (CLI tools) into a failure.
+            let bundleID: String?
+            do {
+                guard let pid = hal.pid(of: objectID) else { throw CoreAudioError(operation: "Reading PID", status: 0) }
+                bundleID = try hal.bundleID(of: objectID)
+                info[objectID] = ObjectInfo(pid: pid, bundleID: bundleID)
+            } catch {
                 infoAttempts[objectID] = attempts + 1
-                logger.debug("Couldn't read process object \(objectID) (attempt \(attempts + 1))")
+                logger.debug("Couldn't read process object \(objectID) (attempt \(attempts + 1)): \(String(describing: error), privacy: .public)")
                 continue
             }
             infoAttempts[objectID] = nil
-            info[objectID] = ObjectInfo(pid: pid, bundleID: bundleID)
             running[objectID] = hal.isRunningOutput(objectID)
             listenerAttempts[objectID] = 0
         }

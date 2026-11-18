@@ -270,6 +270,17 @@ final class MonitorHarness {
         #expect(h.retries.pending.isEmpty)
     }
 
+    @Test func processWithoutABundleIDIsListedRightAway() {
+        // CLI tools (afplay, HushToneGenerator) have no bundle ID: that's a value, not a failed read.
+        let h = MonitorHarness()
+        h.hal.add(10, pid: 100, playing: true)
+        h.hal.bundleIDs[10] = nil
+        h.apps.names[100] = "afplay"
+        h.start()
+        #expect(h.latest.map(\.id) == ["afplay"])
+        #expect(h.retries.pending.isEmpty, "nothing to retry")
+    }
+
     @Test func failedBundleIDReadIsRetriedInsteadOfCachingNoBundle() {
         let h = MonitorHarness()
         h.hal.add(10, pid: 100)
