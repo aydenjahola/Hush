@@ -202,6 +202,48 @@ struct OfflineError: Error {}
         #expect(h.notifier.posted.count == 1)
     }
 
+    @Test func sendsTheLastETagAndTreatsNotModifiedAsSuccess() async {
+        let h = UpdateHarness()
+        h.fake.response = .release(makeRelease("0.2.0"), etag: #"W/"v1""#)
+        await h.checker.checkAutomatically()
+
+        h.clock.advance(Self.day)
+        h.fake.response = .notModified
+        await h.checker.checkNow()
+        #expect(h.fake.receivedETags == [nil, #"W/"v1""#])
+        #expect(h.checker.pendingUpdate?.version == SemanticVersion("0.2.0"))
+        #expect(h.checker.checkStatus == .available(SemanticVersion("0.2.0")!))
+        #expect(h.persister.settings.lastUpdateCheck == h.clock.now)
+        #expect(h.notifier.posted.count == 1)
+    }
+
+    @Test func notModifiedWhileUpToDateStaysUpToDate() async {
+        let h = UpdateHarness()
+        h.fake.response = .release(makeRelease("0.1.0"), etag: "e1")
+        await h.checker.checkNow()
+        h.fake.response = .notModified
+        await h.checker.checkNow()
+        #expect(h.checker.checkStatus == .upToDate)
+    }
+
+    @Test func rateLimitDelaysTheNextAttempt() async {
+        let h = UpdateHarness()
+        h.fake.response = .failure(ReleaseFetchError.rateLimited(retryAfter: 7_200))
+        h.sleepLimit = 2
+        h.checker.start()
+        await h.checker.scheduleTask?.value
+        #expect(h.sleeps == [.seconds(30), .seconds(7_200)])
+    }
+
+    @Test func rateLimitDelayIsCappedAtADay() async {
+        let h = UpdateHarness()
+        h.fake.response = .failure(ReleaseFetchError.rateLimited(retryAfter: 10 * Self.day))
+        h.sleepLimit = 2
+        h.checker.start()
+        await h.checker.scheduleTask?.value
+        #expect(h.sleeps == [.seconds(30), .seconds(Self.day)])
+    }
+
     @Test func manualCheckReportsEachOutcome() async {
         let h = UpdateHarness()
         h.fake.response = .failure(OfflineError())

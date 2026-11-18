@@ -20,11 +20,18 @@ func dmgURL(_ version: String) -> URL {
 
 final class FakeReleaseFetcher: ReleaseFetching {
     enum Response {
-        case release(GitHubRelease?)
+        case release(GitHubRelease?, etag: String? = nil)
+        case notModified
         case failure(any Error & Sendable)
     }
 
-    private let state = Mutex<(response: Response, calls: Int)>((.release(nil), 0))
+    private struct State {
+        var response: Response = .release(nil)
+        var calls = 0
+        var receivedETags: [String?] = []
+    }
+
+    private let state = Mutex(State())
 
     var response: Response {
         get { state.withLock { $0.response } }
@@ -32,14 +39,17 @@ final class FakeReleaseFetcher: ReleaseFetching {
     }
 
     var calls: Int { state.withLock { $0.calls } }
+    var receivedETags: [String?] { state.withLock { $0.receivedETags } }
 
-    func latestRelease() async throws -> GitHubRelease? {
+    func latestRelease(ifNoneMatch etag: String?) async throws -> ReleaseFetchResult {
         let response = state.withLock { state in
             state.calls += 1
+            state.receivedETags.append(etag)
             return state.response
         }
         switch response {
-        case .release(let release): return release
+        case .release(let release, let etag): return .release(release, etag: etag)
+        case .notModified: return .notModified
         case .failure(let error): throw error
         }
     }
@@ -53,10 +63,10 @@ actor GatedReleaseFetcher: ReleaseFetching {
 
     init(release: GitHubRelease?) { self.release = release }
 
-    func latestRelease() async throws -> GitHubRelease? {
+    func latestRelease(ifNoneMatch etag: String?) async throws -> ReleaseFetchResult {
         started += 1
         await withCheckedContinuation { waiters.append($0) }
-        return release
+        return .release(release, etag: nil)
     }
 
     func open() {

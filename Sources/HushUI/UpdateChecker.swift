@@ -8,10 +8,24 @@ public enum UpdateAction: String, Sendable, CaseIterable {
     case download, later, skip
 }
 
+public enum ReleaseFetchResult: Equatable, Sendable {
+    /// The latest release (nil when the repository has none yet) and its ETag, if any.
+    case release(GitHubRelease?, etag: String?)
+    /// 304: unchanged since the ETag sent with the request.
+    case notModified
+}
+
+public enum ReleaseFetchError: Error, Equatable {
+    case notHTTP
+    /// Anything but 200, 304, 404 or a rate limit.
+    case status(Int)
+    /// 429, or 403 with a Retry-After / rate-limit reset; `retryAfter` is capped at 24 h.
+    case rateLimited(retryAfter: TimeInterval?)
+}
+
 /// Fetches the latest published release. Injected so tests never touch the network.
 public protocol ReleaseFetching: Sendable {
-    /// The latest release, or nil when the repository has none yet.
-    func latestRelease() async throws -> GitHubRelease?
+    func latestRelease(ifNoneMatch etag: String?) async throws -> ReleaseFetchResult
 }
 
 /// Posts the "update available" notification. Injected so tests never touch UserNotifications.
@@ -75,6 +89,11 @@ public final class UpdateChecker {
     /// This session's last check attempt, successful or not; failures wait for the next cycle.
     @ObservationIgnored private var lastAttempt: Date?
     @ObservationIgnored private var consecutiveFailures = 0
+    /// Earliest next attempt the server asked for after a rate limit.
+    @ObservationIgnored private var retryNotBefore: Date?
+    /// ETag of the last 200 response. Kept in memory only: a 304 is only meaningful while
+    /// `latestUpdate` still holds what that response said.
+    @ObservationIgnored private var etag: String?
     @ObservationIgnored private var inFlight: Task<Outcome, Never>?
     /// The sleeping schedule loop (exposed for tests).
     @ObservationIgnored private(set) var scheduleTask: Task<Void, Never>?
@@ -158,20 +177,30 @@ public final class UpdateChecker {
             logger.debug("Skipping update check: this build has no version")
             return .failed
         }
-        let release: GitHubRelease?
+        let result: ReleaseFetchResult
         do {
-            release = try await fetcher.latestRelease()
+            result = try await fetcher.latestRelease(ifNoneMatch: etag)
         } catch {
             consecutiveFailures += 1
+            if case ReleaseFetchError.rateLimited(let retryAfter) = error, let retryAfter {
+                retryNotBefore = now().addingTimeInterval(min(retryAfter, 24 * 60 * 60))
+            }
             logger.debug("Update check failed (\(self.consecutiveFailures, privacy: .public) in a row): \(String(describing: error), privacy: .public)")
             return .failed
         }
         consecutiveFailures = 0
+        retryNotBefore = nil
         settings.lastUpdateCheck = now()
-        if let release, UpdatePolicy.isIgnored(release) {
-            logger.debug("Ignoring release \(release.tagName, privacy: .public): draft, prerelease or unparseable tag")
-        } else {
-            latestUpdate = release.flatMap { UpdatePolicy.availableUpdate(in: $0, current: currentVersion) }
+        switch result {
+        case .notModified:
+            logger.debug("Latest release unchanged (304)")
+        case .release(let release, let newETag):
+            etag = newETag
+            if let release, UpdatePolicy.isIgnored(release) {
+                logger.debug("Ignoring release \(release.tagName, privacy: .public): draft, prerelease or unparseable tag")
+            } else {
+                latestUpdate = release.flatMap { UpdatePolicy.availableUpdate(in: $0, current: currentVersion) }
+            }
         }
         persist()
         refresh()
@@ -258,7 +287,8 @@ public final class UpdateChecker {
     private func nextWake() -> (wake: Date, due: Date)? {
         let current = now()
         let due = schedule.nextCheck(
-            lastAttempt: lastAttempt, consecutiveFailures: consecutiveFailures, launchedAt: launchedAt, now: current)
+            lastAttempt: lastAttempt, consecutiveFailures: consecutiveFailures, notBefore: retryNotBefore,
+            launchedAt: launchedAt, now: current)
         var wake: Date? = settings.automaticUpdateChecks ? due : nil
         if let snoozedUntil = settings.snoozedUntil, snoozedUntil > current {
             wake = min(wake ?? snoozedUntil, snoozedUntil)
