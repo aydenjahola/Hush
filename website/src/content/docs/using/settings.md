@@ -1,6 +1,6 @@
 ---
 title: Settings
-description: Launch at login, maximum boost, showing idle apps, the keyboard shortcut, the mixer's layout and appearance, hidden apps, resetting levels, update checks, and where Hush keeps its settings.
+description: Launch at login, maximum boost, showing idle apps, the keyboard shortcut, the mixer's layout and appearance, hidden apps, presets, resetting levels, update checks, and where Hush keeps its settings.
 ---
 
 To open Settings, click the gear button in the bottom-right corner of the mixer. The Settings window comes to the front even if another app is active.
@@ -97,6 +97,16 @@ Boost (above 100%) is always amber, in every layout and with either choice: the 
 
 Both follow the menu bar's light, dark or tinted appearance and show the update dot when a new version is available.
 
+## Presets
+
+The presets you've saved, each with its name and how many apps it holds. A checkmark marks the preset the current levels match. See [Presets](/Hush/using/presets/) for how they work.
+
+- **Apply** sets every app in the preset to its saved level and puts every other app back at 100% and unmuted.
+- The **…** button, or a right-click on the preset, offers **Rename…** and **Delete…**. Hush asks before deleting.
+- **Save Current Levels as Preset…** asks for a name and saves the current levels. If the name is already used, Hush asks whether to replace that preset. You can keep up to 20 presets.
+
+Apply and Save are greyed out until Hush has Audio Recording permission.
+
 ## Levels
 
 ### Hidden apps
@@ -183,6 +193,7 @@ It looks like this:
 - `percent` is clamped to between 0 and your maximum boost when the file is read.
 - The `appearance` section holds the [Appearance](#appearance) options. Every key is optional: a missing or unrecognised value uses its default, so files from older versions of Hush load unchanged. The reverse holds too: if a newer Hush wrote a value this version doesn't know, it falls back to the default after a downgrade, and the newer value is lost the next time settings are saved.
 - `globalShortcut` appears only once you've set a [keyboard shortcut](#keyboard-shortcut), for example `{ "keyCode" : 4, "modifiers" : ["option", "command"] }`. `keyCode` is the macOS virtual key code (a physical key, so the shortcut survives a keyboard layout change). If it's missing or can't be read, there's no shortcut.
+- The `presets` list holds your [presets](/Hush/using/presets/), in order: each has an `id`, a `name`, and an `apps` map with each app's `displayName`, `percent` and `isMuted`. It's missing when you have no presets. A preset that can't be read is skipped, and the rest of the file still loads.
 - The `updates` section remembers the update checker's state: whether automatic checks are on, the version you skipped, when "Later" ends and when Hush last checked. It may be missing or partly filled in.
 - `hiddenApps`, present only once you've [hidden an app](#hidden-apps), lists each hidden app's `bundleID` (or executable name) and `displayName`, such as `{ "bundleID" : "com.apple.Safari", "displayName" : "Safari" }`. If it can't be read, Hush ignores it and keeps the rest of the file.
 - Hush rewrites the file after every change, so quit Hush before editing it by hand.

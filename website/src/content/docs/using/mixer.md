@@ -16,6 +16,7 @@ When nothing is playing, the mixer shows **Nothing is playing**. If an update is
 Right-click the Hush icon in the menu bar, click it with two fingers on a trackpad, or Control-click it, to open a short menu without opening the mixer:
 
 - **Output:** the same list of output devices as the [output pill](#output-device), with a checkmark on the current one, and **Sound Settings…** at the bottom.
+- **Presets:** your saved [presets](/Hush/using/presets/), with a checkmark on the one the current levels match, then **Save Current Levels as Preset…** and **Manage Presets…**. With no presets saved, it shows **No Presets**.
 - **Mute All Playing Apps:** mutes every app that's playing right now, except [hidden apps](#hide-an-app). Each app keeps its level, so unmuting brings it back where it was. Once every playing app is muted, the item reads **Unmute All** instead, which unmutes every muted app, including ones that aren't playing or running at the moment. It's greyed out when there's nothing to mute or unmute, or when Hush doesn't have permission.
 - **Settings…** opens [Settings](/Hush/using/settings/).
 - **Check for Updates…** checks for a new version straight away, like **Check Now** in [Settings](/Hush/using/settings/#updates).

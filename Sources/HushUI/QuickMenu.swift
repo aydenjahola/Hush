@@ -1,5 +1,6 @@
 import AppKit
 import HushAudio
+import HushCore
 
 /// The quick menu's bulk mute item: which way it goes and whether it can be used.
 package struct BulkMuteAction: Equatable, Sendable {
@@ -23,14 +24,38 @@ package struct QuickMenuModel: Equatable {
         package var isCurrent: Bool
     }
 
+    package struct PresetItem: Equatable {
+        package var id: Preset.ID
+        package var name: String
+        /// The current levels match this preset exactly.
+        package var isActive: Bool
+
+        package init(id: Preset.ID, name: String, isActive: Bool) {
+            self.id = id
+            self.name = name
+            self.isActive = isActive
+        }
+    }
+
     package var outputs: [Output]
     package var bulkMute: BulkMuteAction
     package var canCheckForUpdates: Bool
+    package var presets: [PresetItem]
+    /// False without Audio Recording permission: presets can't be applied or saved then.
+    package var presetsEnabled: Bool
 
-    package init(outputs: [Output], bulkMute: BulkMuteAction, canCheckForUpdates: Bool) {
+    package init(
+        outputs: [Output],
+        bulkMute: BulkMuteAction,
+        canCheckForUpdates: Bool,
+        presets: [PresetItem] = [],
+        presetsEnabled: Bool = true
+    ) {
         self.outputs = outputs
         self.bulkMute = bulkMute
         self.canCheckForUpdates = canCheckForUpdates
+        self.presets = presets
+        self.presetsEnabled = presetsEnabled
     }
 
     /// The model for the current store and update state. Outputs use the same list (and the
@@ -42,6 +67,9 @@ package struct QuickMenuModel: Equatable {
         }
         self.bulkMute = store.bulkMute
         self.canCheckForUpdates = updates.checkStatus != .checking
+        let active = store.activePresetID
+        self.presets = store.presets.map { PresetItem(id: $0.id, name: $0.name, isActive: $0.id == active) }
+        self.presetsEnabled = store.controlsEnabled
     }
 }
 
@@ -54,6 +82,11 @@ package struct QuickMenuActions {
     package var openSettings: () -> Void
     package var checkForUpdates: () -> Void
     package var quit: () -> Void
+    package var applyPreset: (Preset.ID) -> Void
+    /// Asks for a name and saves the current levels (the app opens Settings with the save sheet).
+    package var savePreset: () -> Void
+    /// Opens Settings on the Presets section.
+    package var managePresets: () -> Void
 
     package init(
         selectOutput: @escaping (OutputDevice) -> Void,
@@ -62,7 +95,10 @@ package struct QuickMenuActions {
         unmuteAll: @escaping () -> Void,
         openSettings: @escaping () -> Void,
         checkForUpdates: @escaping () -> Void,
-        quit: @escaping () -> Void
+        quit: @escaping () -> Void,
+        applyPreset: @escaping (Preset.ID) -> Void = { _ in },
+        savePreset: @escaping () -> Void = {},
+        managePresets: @escaping () -> Void = {}
     ) {
         self.selectOutput = selectOutput
         self.openSoundSettings = openSoundSettings
@@ -71,11 +107,14 @@ package struct QuickMenuActions {
         self.openSettings = openSettings
         self.checkForUpdates = checkForUpdates
         self.quit = quit
+        self.applyPreset = applyPreset
+        self.savePreset = savePreset
+        self.managePresets = managePresets
     }
 }
 
 /// Builds the menu that opens on a right-click (or two-finger or Control-click) of the menu bar
-/// icon: Output ▸, Mute All Playing Apps / Unmute All, Settings…, Check for Updates…, Quit Hush.
+/// icon: Output ▸, Presets ▸, Mute All Playing Apps / Unmute All, Settings…, Check for Updates…, Quit Hush.
 package enum QuickMenu {
     /// System Settings → Sound, the same page as the output pill's "Sound Settings…".
     package static var soundSettingsURL: URL { OutputPicker.soundSettingsURL }
@@ -91,6 +130,10 @@ package enum QuickMenu {
         let output = NSMenuItem(title: String(localized: L10n.output), action: nil, keyEquivalent: "")
         output.image = symbol("hifispeaker.fill")
         output.submenu = outputSubmenu(model.outputs, actions: actions)
+
+        let presets = NSMenuItem(title: String(localized: L10n.presets), action: nil, keyEquivalent: "")
+        presets.image = symbol("slider.horizontal.3")
+        presets.submenu = presetsSubmenu(model.presets, enabled: model.presetsEnabled, actions: actions)
 
         let bulk: NSMenuItem
         switch model.bulkMute.kind {
@@ -110,7 +153,7 @@ package enum QuickMenu {
         checkForUpdates.isEnabled = model.canCheckForUpdates
         let quit = ActionMenuItem.make(title: String(localized: L10n.quit), keyEquivalent: "q", handler: actions.quit)
 
-        return [output, bulk, .separator(), settings, checkForUpdates, .separator(), quit]
+        return [output, presets, bulk, .separator(), settings, checkForUpdates, .separator(), quit]
     }
 
     private static func outputSubmenu(_ outputs: [QuickMenuModel.Output], actions: QuickMenuActions) -> NSMenu {
@@ -126,6 +169,34 @@ package enum QuickMenu {
         if !outputs.isEmpty { menu.addItem(.separator()) }
         menu.addItem(
             ActionMenuItem.make(title: String(localized: L10n.soundSettings), handler: actions.openSoundSettings))
+        return menu
+    }
+
+    /// The saved presets (the active one checked), then Save and Manage. With no presets, a
+    /// disabled "No Presets" stands in for the list.
+    private static func presetsSubmenu(
+        _ presets: [QuickMenuModel.PresetItem], enabled: Bool, actions: QuickMenuActions
+    ) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        if presets.isEmpty {
+            let none = NSMenuItem(title: String(localized: L10n.noPresets), action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        }
+        for preset in presets {
+            let id = preset.id
+            let item = ActionMenuItem.make(title: preset.name) { actions.applyPreset(id) }
+            item.state = preset.isActive ? .on : .off
+            item.isEnabled = enabled
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        let save = ActionMenuItem.make(
+            title: String(localized: L10n.saveCurrentLevelsAsPreset), handler: actions.savePreset)
+        save.isEnabled = enabled
+        menu.addItem(save)
+        menu.addItem(ActionMenuItem.make(title: String(localized: L10n.managePresets), handler: actions.managePresets))
         return menu
     }
 

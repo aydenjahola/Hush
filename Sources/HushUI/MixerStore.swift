@@ -37,6 +37,8 @@ package final class MixerStore {
     package internal(set) var isPopoverVisible = false
     /// Apps hidden from the mixer, sorted by name. Shown again from Settings.
     package private(set) var hiddenApps: [HiddenApp]
+    /// Saved presets; see MixerStore+Presets. Saved in the same write as the levels.
+    package internal(set) var presetLibrary: PresetLibrary
 
     package var controlsEnabled: Bool { permission == .authorized }
     package var playingCount: Int { apps.filter(\.isPlaying).count }
@@ -83,12 +85,12 @@ package final class MixerStore {
     @ObservationIgnored var stallRetryTask: Task<Void, Never>?
     @ObservationIgnored private let permissionSource: any AudioCapturePermissionSource
     @ObservationIgnored private let persister: any SettingsPersisting
-    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored let now: () -> Date
     @ObservationIgnored let installedApp: @MainActor (String) -> InstalledAppInfo?
     @ObservationIgnored var installedAppCache: [String: InstalledAppInfo?] = [:]
     @ObservationIgnored var engines: [String: any AudioEngineHandle] = [:]
     @ObservationIgnored var order: [String] = []
-    @ObservationIgnored private let saver: DebouncedSaver
+    @ObservationIgnored let saver: DebouncedSaver
     @ObservationIgnored var meterTask: Task<Void, Never>?
     @ObservationIgnored let meterBank = MeterBank()
     /// Last value pushed to `processSource.setPolling`.
@@ -130,6 +132,7 @@ package final class MixerStore {
         let hiddenApps = document.hiddenApps?.normalized() ?? []
         self.hiddenApps = hiddenApps
         self.settings = HiddenAppsPlan.visibleSettings(document.apps, hidden: hiddenApps.ids)
+        self.presetLibrary = PresetLibrary(presets: document.presets ?? [])
         saver.perform = { [weak self] in self?.persistNow() }
     }
 
@@ -339,10 +342,12 @@ package final class MixerStore {
         let preferences = preferences
         let apps = settings
         let hiddenApps = hiddenApps
+        let presets = presetLibrary.presets
         persister.update { document in
             document.preferences = preferences
             document.apps = apps
             document.hiddenApps = hiddenApps.isEmpty ? nil : hiddenApps
+            document.presets = presets.isEmpty ? nil : presets
         }
     }
 
@@ -407,7 +412,7 @@ package final class MixerStore {
         settingsDidChange()
     }
 
-    private func settingsDidChange() {
+    func settingsDidChange() {
         saver.schedule()
         reconcile()
         rebuildStrips()

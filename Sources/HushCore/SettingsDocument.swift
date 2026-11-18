@@ -20,13 +20,18 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
     package var globalShortcut: GlobalShortcut?
     /// Apps hidden from the mixer. Added after version 1 shipped; nil (absent on disk) means none.
     package var hiddenApps: [HiddenApp]?
+    /// Saved volume presets, in order; nil (the default) when there are none, so files without
+    /// presets don't change. Added after version 1 shipped and optional on disk. The mixer owns
+    /// it and writes it in the same save as `apps`.
+    package var presets: [Preset]?
 
     package init(
         preferences: Preferences = Preferences(),
         apps: [String: AppVolumeSetting] = [:],
         updates: UpdateSettings = UpdateSettings(),
         globalShortcut: GlobalShortcut? = nil,
-        hiddenApps: [HiddenApp]? = nil
+        hiddenApps: [HiddenApp]? = nil,
+        presets: [Preset]? = nil
     ) {
         self.version = Self.currentVersion
         self.preferences = preferences
@@ -34,10 +39,11 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         self.updates = updates
         self.globalShortcut = globalShortcut
         self.hiddenApps = hiddenApps
+        self.presets = presets
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, preferences, apps, updates, globalShortcut, hiddenApps
+        case version, preferences, apps, updates, globalShortcut, hiddenApps, presets
     }
 
     package init(from decoder: any Decoder) throws {
@@ -50,6 +56,30 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         globalShortcut = (try? container.decodeIfPresent(GlobalShortcut.self, forKey: .globalShortcut)) ?? nil
         // A malformed list is dropped rather than discarding the whole file.
         hiddenApps = (try? container.decodeIfPresent([HiddenApp].self, forKey: .hiddenApps)) ?? nil
+        // A malformed preset is dropped rather than discarding the other presets or the whole
+        // file, and a presets value that isn't a list is dropped too.
+        presets = (try? container.decodeIfPresent(LossyList<Preset>.self, forKey: .presets))?.elements
+    }
+
+    /// Decodes a JSON array, skipping elements that don't decode.
+    private struct LossyList<Element: Decodable>: Decodable {
+        var elements: [Element] = []
+
+        init(from decoder: any Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            while !container.isAtEnd {
+                if let element = try? container.decode(Element.self) {
+                    elements.append(element)
+                } else if (try? container.decode(Skipped.self)) == nil {
+                    break  // Couldn't step past the bad element; keep what decoded so far.
+                }
+            }
+        }
+
+        /// Decodes any value without reading it, to step past an element that didn't decode.
+        private struct Skipped: Decodable {
+            init(from decoder: any Decoder) throws {}
+        }
     }
 
     private struct VersionProbe: Decodable {
@@ -75,7 +105,8 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
 
     /// Clamps every app to the current maximum boost and drops default entries. Hidden apps are
     /// listed once each, sorted, and never keep a level (they always play at 100%); an empty
-    /// hidden list is stored as absent.
+    /// hidden list is stored as absent. Presets follow `PresetLibrary`'s rules (and become nil
+    /// when none are left); their levels keep their saved percent and are clamped only when applied.
     package func normalized() -> SettingsDocument {
         let maxPercent = preferences.maxBoostPercent.rawValue
         let hidden = hiddenApps?.normalized() ?? []
@@ -88,6 +119,10 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         }
         .filter { !hiddenIDs.contains($0.key) }
         copy.hiddenApps = hidden.isEmpty ? nil : hidden
+        copy.presets = presets.flatMap { presets in
+            let kept = PresetLibrary(presets: presets).presets
+            return kept.isEmpty ? nil : kept
+        }
         return copy
     }
 }

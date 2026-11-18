@@ -269,3 +269,86 @@
 
 /* A key in a keyboard shortcut that has no printable name. %lld is its key code. */
 "Key %lld" = "Key %lld";
+
+/* Presets: named snapshots of every app's level. */
+
+/* Title of the Presets submenu in the quick menu and of the Presets section in Settings. */
+"Presets" = "Presets";
+
+/* Disabled item in the quick menu's Presets submenu when no presets have been saved. */
+"No Presets" = "No Presets";
+
+/* Quick menu item and Settings button: asks for a name and saves every app's current level under it. */
+"Save Current Levels as Preset…" = "Save Current Levels as Preset…";
+
+/* Quick menu item: opens Settings on the Presets section. */
+"Manage Presets…" = "Manage Presets…";
+
+/* Footer of Settings > Presets explaining what applying a preset does. */
+"Applying a preset sets every app it holds to its saved level and puts every other app back at 100% and unmuted." = "Applying a preset sets every app it holds to its saved level and puts every other app back at 100% and unmuted.";
+
+/* Settings > Presets when no presets have been saved. */
+"No presets yet." = "No presets yet.";
+
+/* Settings > Presets, under a preset's name, for a preset saved with every app at the default level. */
+"Every app at 100%" = "Every app at 100%";
+
+/* VoiceOver label and tooltip of the checkmark next to the preset the current levels match. */
+"Active" = "Active";
+
+/* Settings > Presets button: applies the preset's levels. */
+"Apply" = "Apply";
+
+/* Settings > Presets menu item: renames the preset. */
+"Rename…" = "Rename…";
+
+/* Settings > Presets menu item: deletes the preset after asking. */
+"Delete…" = "Delete…";
+
+/* VoiceOver label of the "…" menu button on a preset row in Settings. */
+"Preset actions" = "Preset actions";
+
+/* Title of the confirmation before deleting a preset. %@ is the preset's name. */
+"Delete the preset “%@”?" = "Delete the preset “%@”?";
+
+/* Message of the confirmation before deleting a preset. */
+"Your current levels don't change." = "Your current levels don't change.";
+
+/* Button that deletes a preset in the delete confirmation. */
+"Delete" = "Delete";
+
+/* Title of the sheet that names a new preset. */
+"Save Current Levels as Preset" = "Save Current Levels as Preset";
+
+/* Title of the sheet that renames a preset. */
+"Rename Preset" = "Rename Preset";
+
+/* Label of the text field for a preset's name. */
+"Name" = "Name";
+
+/* Button that saves a new preset in the naming sheet. */
+"Save" = "Save";
+
+/* Button that renames a preset in the naming sheet. */
+"Rename" = "Rename";
+
+/* Button that closes the preset naming sheet or a confirmation without changing anything. */
+"Cancel" = "Cancel";
+
+/* Shown under the name field when renaming to a name another preset has. %@ is that name. */
+"A preset named “%@” already exists." = "A preset named “%@” already exists.";
+
+/* Shown under the name field when saving with the name of an existing preset. %@ is that preset's name. */
+"Saving replaces the preset “%@”." = "Saving replaces the preset “%@”.";
+
+/* Shown under the name field when the most presets are already saved. %lld is the limit (20). */
+"You can keep up to %lld presets. Delete one to save another." = "You can keep up to %lld presets. Delete one to save another.";
+
+/* Title of the confirmation before saving over an existing preset. %@ is the preset's name. */
+"Replace the preset “%@”?" = "Replace the preset “%@”?";
+
+/* Message of the confirmation before saving over an existing preset. */
+"It will hold the current levels instead of its saved ones." = "It will hold the current levels instead of its saved ones.";
+
+/* Button that saves over an existing preset in the replace confirmation. */
+"Replace" = "Replace";

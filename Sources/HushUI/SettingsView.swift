@@ -7,11 +7,15 @@ package struct SettingsView: View {
     @Bindable var updates: UpdateChecker
 
     @State private var launchAtLogin = LaunchAtLoginModel()
-    @State private var confirmingReset = false
+    let navigator: SettingsNavigator
 
-    package init(store: MixerStore, updates: UpdateChecker) {
+    @State private var confirmingReset = false
+    @State private var presetSheet: PresetSheet?
+
+    package init(store: MixerStore, updates: UpdateChecker, navigator: SettingsNavigator) {
         self.store = store
         self.updates = updates
+        self.navigator = navigator
     }
 
     package var body: some View {
@@ -45,6 +49,8 @@ package struct SettingsView: View {
             }
 
             AppearanceSettingsSection(store: store)
+
+            PresetsSettingsSection(store: store, sheet: $presetSheet)
 
             Section(L10n.levels) {
                 HiddenAppsList(store: store)
@@ -80,6 +86,7 @@ package struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 420)
+        .modifier(PresetsNavigation(store: store, navigator: navigator, sheet: $presetSheet))
         .onAppear { launchAtLogin.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchAtLogin.refresh()
