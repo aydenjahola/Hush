@@ -61,11 +61,11 @@ struct AppearancePreview: View {
         }
     }
 
-    private var accessibilityDescription: LocalizedStringKey {
+    private var accessibilityDescription: LocalizedStringResource {
         switch appearance.layout {
-        case .channelStrips: "Preview of the channel strips layout"
-        case .classicRows: "Preview of the classic rows layout"
-        case .tiles: "Preview of the tiles layout"
+        case .channelStrips: L10n.previewChannelStrips
+        case .classicRows: L10n.previewClassicRows
+        case .tiles: L10n.previewTiles
         }
     }
 }

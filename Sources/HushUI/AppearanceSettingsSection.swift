@@ -6,55 +6,53 @@ import SwiftUI
 struct AppearanceSettingsSection: View {
     @Bindable var store: MixerStore
 
-    static let recordingIndicatorNote: LocalizedStringKey = "The purple dot in the menu bar is macOS's audio-recording indicator. It appears while Hush is adjusting an app's volume and, with meters on, while the mixer is open."
-
-    var body: some View {
-        Section("Appearance") {
+        var body: some View {
+        Section(L10n.appearance) {
             AppearancePreview(appearance: MixerAppearance(store.preferences.appearance), maxPercent: store.maxPercent)
                 .padding(.vertical, 4)
 
-            Picker("Layout", selection: $store.layout) {
-                Text("Channel strips").tag(MixerLayout.channelStrips)
-                Text("Classic rows").tag(MixerLayout.classicRows)
-                Text("Tiles").tag(MixerLayout.tiles)
+            Picker(L10n.layout, selection: $store.layout) {
+                Text(L10n.channelStrips).tag(MixerLayout.channelStrips)
+                Text(L10n.classicRows).tag(MixerLayout.classicRows)
+                Text(L10n.tiles).tag(MixerLayout.tiles)
             }
             .pickerStyle(.segmented)
 
-            Picker("Size", selection: $store.density) {
-                Text("Comfortable").tag(MixerDensity.comfortable)
-                Text("Compact").tag(MixerDensity.compact)
+            Picker(L10n.size, selection: $store.density) {
+                Text(L10n.comfortable).tag(MixerDensity.comfortable)
+                Text(L10n.compact).tag(MixerDensity.compact)
             }
             .pickerStyle(.segmented)
 
             VStack(alignment: .leading, spacing: 4) {
-                Toggle("Show level meters", isOn: $store.showLevelMeters)
-                Text(Self.recordingIndicatorNote)
+                Toggle(L10n.showLevelMeters, isOn: $store.showLevelMeters)
+                Text(L10n.recordingIndicatorNote)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Toggle("Show percentages", isOn: $store.showPercentages)
+            Toggle(L10n.showPercentages, isOn: $store.showPercentages)
 
-            Picker("Sort apps", selection: $store.sortMode) {
-                Text("Playing & recently adjusted first").tag(StripSortMode.activity)
-                Text("Alphabetical").tag(StripSortMode.alphabetical)
+            Picker(L10n.sortApps, selection: $store.sortMode) {
+                Text(L10n.sortActivity).tag(StripSortMode.activity)
+                Text(L10n.sortAlphabetical).tag(StripSortMode.alphabetical)
             }
 
-            Picker("Accent colour", selection: $store.accent) {
-                Text("Amber").tag(AccentChoice.amber)
-                Text("System accent").tag(AccentChoice.system)
+            Picker(L10n.accentColour, selection: $store.accent) {
+                Text(L10n.amber).tag(AccentChoice.amber)
+                Text(L10n.systemAccent).tag(AccentChoice.system)
             }
 
-            Picker("Menu bar icon", selection: $store.menuBarIconStyle) {
+            Picker(L10n.menuBarIcon, selection: $store.menuBarIconStyle) {
                 Label {
-                    Text("Speaker")
+                    Text(L10n.speaker)
                 } icon: {
                     Image(nsImage: MenuBarIcon.image(style: .speaker, attenuated: false, badged: false))
                 }
                 .tag(MenuBarIconStyle.speaker)
                 Label {
-                    Text("Fader glyph")
+                    Text(L10n.faderGlyph)
                 } icon: {
                     Image(nsImage: MenuBarIcon.image(style: .fader, attenuated: false, badged: false))
                 }

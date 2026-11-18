@@ -25,6 +25,6 @@ struct MuteButton: View {
         .buttonStyle(.plain)
         .focusable(!isPreview)
         .allowsHitTesting(!isPreview)
-        .accessibilityLabel(isMuted ? Text("Unmute \(appName)") : Text("Mute \(appName)"))
+        .accessibilityLabel(Text(isMuted ? L10n.unmute(appName) : L10n.mute(appName)))
     }
 }

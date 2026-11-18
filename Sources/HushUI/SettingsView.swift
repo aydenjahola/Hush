@@ -18,40 +18,40 @@ package struct SettingsView: View {
 
     package var body: some View {
         Form {
-            Section("General") {
-                Toggle("Launch at login", isOn: $launchAtLogin)
+            Section(L10n.general) {
+                Toggle(L10n.launchAtLogin, isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                 if let launchError {
                     Text(launchError)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Picker("Maximum boost", selection: $store.maxBoost) {
+                Picker(L10n.maximumBoost, selection: $store.maxBoost) {
                     ForEach(BoostLimit.allCases) { limit in
-                        Text("\(limit.rawValue)%").tag(limit)
+                        Text(L10n.percent(limit.rawValue)).tag(limit)
                     }
                 }
                 .pickerStyle(.segmented)
-                Toggle("Show apps that aren't playing", isOn: $store.showInactiveApps)
+                Toggle(L10n.showInactiveApps, isOn: $store.showInactiveApps)
             }
 
             AppearanceSettingsSection(store: store)
 
-            Section("Levels") {
-                Button("Reset All Levels…", role: .destructive) {
+            Section(L10n.levels) {
+                Button(L10n.resetAllLevelsButton, role: .destructive) {
                     confirmingReset = true
                 }
-                .confirmationDialog("Reset all app levels?", isPresented: $confirmingReset) {
-                    Button("Reset All Levels", role: .destructive) { store.resetAllLevels() }
+                .confirmationDialog(L10n.resetAllLevelsTitle, isPresented: $confirmingReset) {
+                    Button(L10n.resetAllLevels, role: .destructive) { store.resetAllLevels() }
                 } message: {
-                    Text("Every app goes back to 100% and unmuted.")
+                    Text(L10n.resetAllLevelsMessage)
                 }
             }
 
-            Section("Updates") {
-                Toggle("Check for updates automatically", isOn: $updates.automaticChecks)
+            Section(L10n.updates) {
+                Toggle(L10n.checkAutomatically, isOn: $updates.automaticChecks)
                 HStack(spacing: 8) {
-                    Button("Check Now") {
+                    Button(L10n.checkNow) {
                         Task { await updates.checkNow() }
                     }
                     .disabled(updates.checkStatus == .checking)
@@ -60,10 +60,10 @@ package struct SettingsView: View {
                 }
             }
 
-            Section("About") {
-                LabeledContent("Version", value: Self.version)
-                Link("Source code on GitHub", destination: URL(string: "https://github.com/aydenjahola/Hush")!)
-                Text("Hush is free software, released under the GNU General Public License v3.0. It comes with ABSOLUTELY NO WARRANTY.")
+            Section(L10n.about) {
+                LabeledContent(L10n.version, value: Self.version)
+                Link(L10n.sourceCode, destination: URL(string: "https://github.com/aydenjahola/Hush")!)
+                Text(L10n.licence)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -78,23 +78,23 @@ package struct SettingsView: View {
         switch updates.checkStatus {
         case .idle:
             if let lastCheck = updates.lastUpdateCheck {
-                statusText("Last checked \(lastCheck.formatted(.relative(presentation: .named)))")
+                statusText(L10n.lastChecked(lastCheck.formatted(.relative(presentation: .named))))
             }
         case .checking:
             ProgressView().controlSize(.small)
-            statusText("Checking…")
+            statusText(L10n.checking)
         case .upToDate:
-            statusText("Hush is up to date")
+            statusText(L10n.upToDate)
         case .available(let version):
-            statusText("Hush \(version.description) is available")
-            Button("Download") { updates.download() }
+            statusText(L10n.updateAvailable(version.description))
+            Button(L10n.download) { updates.download() }
                 .buttonStyle(.link)
         case .failed:
-            statusText("Couldn't check for updates")
+            statusText(L10n.checkFailed)
         }
     }
 
-    private func statusText(_ text: String) -> some View {
+    private func statusText(_ text: LocalizedStringResource) -> some View {
         Text(text)
             .font(.callout)
             .foregroundStyle(.secondary)

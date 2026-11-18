@@ -10,16 +10,16 @@ struct UpdateBanner: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Hush \(version.description) is available", systemImage: "arrow.down.circle.fill")
+            Label(L10n.updateAvailable(version.description), systemImage: "arrow.down.circle.fill")
                 .font(.callout.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {
-                Button("Download", action: onDownload)
+                Button(L10n.download, action: onDownload)
                     .buttonStyle(.borderedProminent)
-                    .help("Open the download in your browser")
-                Button("Later", action: onLater)
-                    .help("Remind me tomorrow")
-                Button("Skip This Version", action: onSkip)
+                    .help(L10n.downloadHelp)
+                Button(L10n.later, action: onLater)
+                    .help(L10n.laterHelp)
+                Button(L10n.skipThisVersion, action: onSkip)
             }
             .controlSize(.small)
         }

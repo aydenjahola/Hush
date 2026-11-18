@@ -6,10 +6,10 @@ struct PermissionBanner: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Hush needs Audio Recording access to control app volumes.", systemImage: "lock.shield")
+            Label(L10n.permissionNeeded, systemImage: "lock.shield")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Open System Settings") {
+            Button(L10n.openSystemSettings) {
                 NSWorkspace.shared.open(Self.settingsURL)
             }
             .controlSize(.small)

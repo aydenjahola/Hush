@@ -25,7 +25,7 @@ struct VolumeTile: View {
                 StripIcon(strip: strip, size: compact ? 18 : 22)
                     .contentShape(Rectangle())
                     .onTapGesture { if isEnabled { actions.toggleMute() } }
-                    .help(strip.setting.isMuted ? Text("Click to unmute") : Text("Click to mute"))
+                    .help(Text(strip.setting.isMuted ? L10n.clickToUnmute : L10n.clickToMute))
                 Text(strip.displayName)
                     .font(compact ? .caption : .callout)
                     .lineLimit(1)

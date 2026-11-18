@@ -58,17 +58,21 @@ package struct MixerPopover: View {
 
     private var header: some View {
         HStack {
-            Text("Hush")
+            Text(L10n.appName)
                 .font(.headline)
             Spacer()
-            Label(store.outputDevice?.name ?? "No Output", systemImage: "hifispeaker.fill")
+            Label {
+                if let name = store.outputDevice?.name { Text(verbatim: name) } else { Text(L10n.noOutput) }
+            } icon: {
+                Image(systemName: "hifispeaker.fill")
+            }
                 .labelStyle(.titleAndIcon)
                 .font(.caption.weight(.medium))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .glassEffect(.regular, in: .capsule)
-                .accessibilityLabel(Text("Output: \(store.outputDevice?.name ?? "none")"))
+                .accessibilityLabel(Text(L10n.outputDevice(named: store.outputDevice?.name)))
         }
     }
 
@@ -102,7 +106,7 @@ package struct MixerPopover: View {
         VStack(spacing: 8) {
             Image(systemName: "speaker.zzz")
                 .font(.system(size: 28, weight: .light))
-            Text("Nothing is playing")
+            Text(L10n.nothingIsPlaying)
                 .font(.callout)
         }
         .foregroundStyle(.secondary)
@@ -112,7 +116,7 @@ package struct MixerPopover: View {
 
     private var footer: some View {
         HStack {
-            Text(playingSummary)
+            Text(L10n.playingSummary(count: store.playingCount))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -123,19 +127,11 @@ package struct MixerPopover: View {
             }
             .buttonStyle(.borderless)
             .simultaneousGesture(TapGesture().onEnded { NSApp.activate() })
-            .help("Settings")
-            .accessibilityLabel("Settings")
+            .help(L10n.settings)
+            .accessibilityLabel(Text(L10n.settings))
             .contextMenu {
-                Button("Quit Hush") { NSApp.terminate(nil) }
+                Button(L10n.quit) { NSApp.terminate(nil) }
             }
-        }
-    }
-
-    private var playingSummary: String {
-        switch store.playingCount {
-        case 0: "No apps playing"
-        case 1: "1 app playing"
-        case let count: "\(count) apps playing"
         }
     }
 }

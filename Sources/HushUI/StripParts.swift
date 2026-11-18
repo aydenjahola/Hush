@@ -32,7 +32,7 @@ struct StripIcon: View {
                         .font(.system(size: size > 24 ? 11 : 9))
                         .offset(x: 4, y: -4)
                         .help(Text(verbatim: error))
-                        .accessibilityLabel("Warning: \(error)")
+                        .accessibilityLabel(Text(L10n.warning(error)))
                 }
             }
             .accessibilityHidden(strip.engineError == nil)
@@ -51,11 +51,11 @@ struct StripPercentLabel: View {
 
     var body: some View {
         if strip.setting.isMuted {
-            Text("Muted")
+            Text(L10n.muted)
                 .font(font)
                 .foregroundStyle(Palette.mutedRed)
         } else {
-            Text("\(strip.setting.percent)%")
+            Text(L10n.percent(strip.setting.percent))
                 .font(font)
                 .monospacedDigit()
                 .foregroundStyle(strip.setting.percent > 100 && !boostInPrimary

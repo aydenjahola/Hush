@@ -30,7 +30,7 @@ XCODE_MESSAGE := Hush needs Xcode 26+ to build. Install Xcode, then run: sudo xc
 INSTALL_DIR ?= /Applications
 BUNDLE_ID := io.github.aydenjahola.Hush
 
-.PHONY: require-xcode build test integration-test app dmg install icon run clean
+.PHONY: require-xcode build test format lint integration-test app dmg install icon run clean
 
 # Fails unless the developer directory is inside an Xcode app whose version is 26 or later.
 require-xcode:
@@ -54,6 +54,14 @@ build: require-xcode
 
 test: require-xcode
 	swift test
+
+# swift-format (bundled with Xcode 26) with the checked-in .swift-format. `make format` rewrites
+# files in place; `make lint` fails on any finding, as CI does.
+format: require-xcode
+	swift format format --in-place --recursive Sources Tests Package.swift
+
+lint: require-xcode
+	swift format lint --strict --recursive Sources Tests Package.swift
 
 # Real Core Audio tests (taps, aggregates, BlackHole loopback). Needs Audio Recording permission
 # for the app running this (Terminal/VS Code), requested once if undetermined (never under CI);
@@ -91,6 +99,8 @@ app: require-xcode
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp "$$($(SWIFT_BUILD) --show-bin-path)/Hush" $(APP)/Contents/MacOS/Hush
+	# SwiftPM's resource bundle (the String Catalog); HushUI finds it in Contents/Resources.
+	ditto "$$($(SWIFT_BUILD) --show-bin-path)/Hush_HushUI.bundle" $(APP)/Contents/Resources/Hush_HushUI.bundle
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	plutil -replace CFBundleShortVersionString -string "$(VERSION)" $(APP)/Contents/Info.plist
 	plutil -replace CFBundleVersion -string "$(BUILD_NUMBER)" $(APP)/Contents/Info.plist

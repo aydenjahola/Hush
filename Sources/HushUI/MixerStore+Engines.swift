@@ -123,10 +123,10 @@ extension MixerStore {
 
     private func recordFailure(_ error: any Error, for id: String, mode: EngineMode) {
         let summary = switch mode {
-        case .control: "Hush couldn't control this app's audio, so it's playing normally."
-        case .meterOnly: "Hush couldn't read this app's level."
+        case .control: String(localized: L10n.controlFailed)
+        case .meterOnly: String(localized: L10n.meterFailed)
         }
-        engineErrors[id] = "\(summary) (\(error))"
+        engineErrors[id] = String(localized: L10n.failureDetail(summary, "\(error)"))
         if mode == .meterOnly { meterOnlyErrorIDs.insert(id) } else { meterOnlyErrorIDs.remove(id) }
         logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
     }

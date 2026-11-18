@@ -65,7 +65,7 @@ struct HushApp: App {
                 style: store.preferences.appearance.menuBarIcon,
                 attenuated: store.isAnyAppAttenuated,
                 badged: updates.hasPendingUpdate))
-                .accessibilityLabel(updates.hasPendingUpdate ? "Hush, update available" : "Hush")
+                .accessibilityLabel(Text(L10n.menuBarLabel(updateAvailable: updates.hasPendingUpdate)))
         }
         .menuBarExtraStyle(.window)
 

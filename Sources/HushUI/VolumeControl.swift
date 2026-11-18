@@ -48,8 +48,8 @@ struct VolumeControlBehavior: ViewModifier {
                 if isEnabled { nudge(steps * FaderScale.step) }
             })
             .accessibilityElement()
-            .accessibilityLabel("\(appName) volume")
-            .accessibilityValue("\(value) percent")
+            .accessibilityLabel(Text(L10n.volumeLabel(appName)))
+            .accessibilityValue(Text(L10n.volumeValue(value)))
             .accessibilityAdjustableAction { direction in
                 guard isEnabled else { return }
                 switch direction {

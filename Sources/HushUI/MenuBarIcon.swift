@@ -36,7 +36,7 @@ package enum MenuBarIcon {
 
     private static func render(symbolName: String, badged: Bool) -> NSImage {
         let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
-        guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Hush")?
+        guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: String(localized: L10n.appName))?
             .withSymbolConfiguration(configuration)
         else { return NSImage() }
         // A little room on the trailing side so the dot only clips the symbol's outer edge.
@@ -91,7 +91,7 @@ package enum MenuBarIcon {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = badged ? "Hush, update available" : "Hush"
+        image.accessibilityDescription = String(localized: L10n.menuBarLabel(updateAvailable: badged))
         return image
     }
 

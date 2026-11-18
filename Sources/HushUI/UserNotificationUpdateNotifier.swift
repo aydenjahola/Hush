@@ -12,11 +12,11 @@ package final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, U
 
     static var category: UNNotificationCategory {
         let actions = [
-            (UpdateAction.download, "Download"),
-            (UpdateAction.later, "Later"),
-            (UpdateAction.skip, "Skip This Version"),
+            (UpdateAction.download, L10n.download),
+            (UpdateAction.later, L10n.later),
+            (UpdateAction.skip, L10n.skipThisVersion),
         ].map { action, title in
-            UNNotificationAction(identifier: actionPrefix + action.rawValue, title: title, options: [])
+            UNNotificationAction(identifier: actionPrefix + action.rawValue, title: String(localized: title), options: [])
         }
         return UNNotificationCategory(identifier: categoryIdentifier, actions: actions, intentIdentifiers: [])
     }
@@ -51,8 +51,8 @@ package final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, U
 
     static func content(for update: AvailableUpdate) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = "Hush \(update.version) is available"
-        content.body = "Download it from GitHub when you're ready."
+        content.title = String(localized: L10n.updateAvailable(update.version.description))
+        content.body = String(localized: L10n.notificationBody)
         content.categoryIdentifier = categoryIdentifier
         content.userInfo = ["version": update.version.description, "url": update.downloadURL.absoluteString]
         return content
