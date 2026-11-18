@@ -1,22 +1,39 @@
-# Hush
+<p align="center"><img src="website/public/logo-512.png" width="128" alt="Hush icon"></p>
 
-Per-app volume control for macOS, in your menu bar.
+<h1 align="center">Hush</h1>
+
+<p align="center">Per-app volume control for macOS, in your menu bar.</p>
+
+<p align="center">
+  <a href="https://github.com/aydenjahola/Hush/actions/workflows/ci.yml"><img src="https://github.com/aydenjahola/Hush/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/aydenjahola/Hush/releases/latest"><img src="https://img.shields.io/github/v/release/aydenjahola/Hush" alt="Latest release"></a>
+  <a href="https://github.com/aydenjahola/Hush/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
+</p>
 
 Turn Spotify down, boost a quiet call, mute a noisy tab: Hush gives every app that's playing audio its own fader, mute button and level meter. It uses Core Audio process taps, so there's **no audio driver to install** and no admin password.
 
 **[Download the latest release](https://github.com/aydenjahola/Hush/releases/latest)** · macOS 26 or later · **[Website and documentation](https://aydenjahola.github.io/Hush/)**
 
-The documentation covers [installing](https://aydenjahola.github.io/Hush/getting-started/install/) (including uninstalling), [using the mixer](https://aydenjahola.github.io/Hush/using/mixer/), [troubleshooting](https://aydenjahola.github.io/Hush/help/troubleshooting/), [building from source](https://aydenjahola.github.io/Hush/contributing/build-from-source/), [releasing](https://aydenjahola.github.io/Hush/contributing/releasing/) and [how Hush works](https://aydenjahola.github.io/Hush/contributing/architecture/). The same information is summarised below.
+The documentation covers [installing](https://aydenjahola.github.io/Hush/getting-started/install/) (including uninstalling), [using the mixer](https://aydenjahola.github.io/Hush/using/mixer/), [settings](https://aydenjahola.github.io/Hush/using/settings/), [troubleshooting](https://aydenjahola.github.io/Hush/help/troubleshooting/), [building from source](https://aydenjahola.github.io/Hush/contributing/build-from-source/), [releasing](https://aydenjahola.github.io/Hush/contributing/releasing/) and [how Hush works](https://aydenjahola.github.io/Hush/contributing/architecture/). The essentials are below.
+
+<!-- Screenshots: replace each comment with a real capture once it exists.
+<p align="center"><img src="website/public/screenshot-strips.png" width="340" alt="Hush mixer, channel strips layout"></p>
+<p align="center"><img src="website/public/screenshot-rows.png" width="340" alt="Hush mixer, classic rows layout"></p>
+<p align="center"><img src="website/public/screenshot-tiles.png" width="340" alt="Hush mixer, tiles layout"></p>
+-->
 
 ## Features
 
-- A fader per app, from silent up to 200% boost, with a soft limiter so boosted audio doesn't clip harshly
-- Mute any app with one click
-- Live level meters
-- Remembers each app's level across restarts
-- Apps you haven't touched aren't processed at all (except for level meters while the popover is open)
-- Follows your output device when you switch headphones or speakers
-- Tells you when a new version is available
+- **A fader per app**, from silent up to 200% boost, with a soft limiter so boosted audio doesn't clip harshly
+- **Mute** any app with one click
+- **Live level meters**, which you can turn off
+- **Three layouts:** channel strips, Control Center-style classic rows, or tiles you drag anywhere
+- **Appearance options:** comfortable or compact size, percentages on or off, playing-first or alphabetical order, amber or your system accent colour, and a speaker or fader-glyph menu bar icon
+- **Remembers** each app's level across restarts
+- Apps you haven't touched aren't processed at all (except to measure them for the level meters while the popover is open, if meters are on)
+- **Follows your output device** when you switch headphones or speakers
+- **Tells you when a new version is available**
+- **No driver, no admin password**
 
 ## Privacy
 
@@ -28,6 +45,8 @@ Hush doesn't collect or send any data about you or your audio. The only network 
 - Audio Recording permission (Hush asks on first launch)
 
 ## Install
+
+Full guide: [Install Hush](https://aydenjahola.github.io/Hush/getting-started/install/).
 
 1. Download `Hush.dmg` from the [latest release](https://github.com/aydenjahola/Hush/releases/latest).
 2. Open it and drag **Hush** onto **Applications**.
@@ -42,6 +61,8 @@ Each DMG has a matching `.sha256` file (`Hush.dmg.sha256`, `Hush-x.y.z.dmg.sha25
 
 ## Uninstall
 
+Also in the [install guide](https://aydenjahola.github.io/Hush/getting-started/install/#uninstall-hush).
+
 1. If you turned on "Launch at login", turn it off in Hush's Settings, or remove Hush from System Settings → General → Login Items.
 2. Quit Hush (right-click the gear in the popover → Quit Hush).
 3. Delete `/Applications/Hush.app`.
@@ -49,6 +70,8 @@ Each DMG has a matching `.sha256` file (`Hush.dmg.sha256`, `Hush-x.y.z.dmg.sha25
 5. Reset its Audio Recording permission: `tccutil reset AudioCapture io.github.aydenjahola.Hush`
 
 ## Build from source
+
+Full guide: [Build from source](https://aydenjahola.github.io/Hush/contributing/build-from-source/).
 
 Building from source needs **Xcode 26 or later**; the Command Line Tools alone aren't enough. (To just use Hush, download the DMG above: you don't need Xcode.) Select Xcode once:
 
