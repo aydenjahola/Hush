@@ -2,6 +2,7 @@ import CoreAudio
 import Foundation
 import HushCore
 import Synchronization
+import os
 
 /// Lock-free state shared between the main thread and the realtime IOProc.
 final class EngineSharedState: Sendable {
@@ -10,6 +11,8 @@ final class EngineSharedState: Sendable {
     let peakBits = Atomic<UInt32>(0)
     /// True: replay the tap with gain (`.control`). False: only measure it (`.meterOnly`).
     let replaying: Atomic<Bool>
+    /// Set by the IOProc on every cycle (one relaxed store); lets the main thread see that IO is flowing.
+    let hasRun = Atomic<Bool>(false)
 
     /// `appliedGainBits` is the replay's current gain: a meter-only engine starts at 0, so it has
     /// nothing to fade out.
@@ -41,6 +44,7 @@ package final class AppAudioEngine: AudioEngineHandle {
     private var tapUUID = UUID()
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
+    private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
 
     package init(
         appID: String, processObjectIDs: [AudioObjectID], mode: EngineMode, initialGain: Float,
@@ -64,6 +68,33 @@ package final class AppAudioEngine: AudioEngineHandle {
             stop()
             throw error
         }
+    }
+
+    /// Takes over an app that is already playing: the caller has started this engine meter-only
+    /// (unmuted tap, no replay). Waits (at most `firstRunLimit`) for the IOProc to run, then switches
+    /// in place, which starts the replay before muting the source. Muting a source at tap creation
+    /// instead leaves the app silent for however long `AudioDeviceStart` takes (400 ms measured).
+    package func takeOver(gain: Float) throws {
+        let ran = try Self.takeOver(state: state, switchToControl: { try switchMode(to: .control, gain: gain) })
+        if !ran { logger.debug("IOProc hadn't run within \(Self.firstRunLimit)s for \(self.appID, privacy: .public)") }
+    }
+
+    nonisolated static let firstRunLimit: TimeInterval = 0.2
+
+    /// Waits for the first IOProc run (bounded), then calls `switchToControl` either way.
+    /// Returns whether the IOProc had run.
+    nonisolated static func takeOver(
+        state: EngineSharedState,
+        limit: TimeInterval = firstRunLimit,
+        sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
+        now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        switchToControl: () throws -> Void
+    ) throws -> Bool {
+        let deadline = now() + limit
+        while !state.hasRun.load(ordering: .acquiring) && now() < deadline { sleep(0.002) }
+        let ran = state.hasRun.load(ordering: .acquiring)
+        try switchToControl()
+        return ran
     }
 
     package func stop() {
@@ -249,6 +280,7 @@ package final class AppAudioEngine: AudioEngineHandle {
     /// Realtime: no allocation, locks, logging, Objective-C or async inside the returned block.
     nonisolated static func makeIOBlock(state: EngineSharedState, tapBufferOffset: Int) -> AudioDeviceIOBlock {
         return { _, inputData, _, outputData, _ in
+            state.hasRun.store(true, ordering: .relaxed)
             let input = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
             let output = UnsafeMutableAudioBufferListPointer(outputData)
             let peak: Float
@@ -289,13 +321,24 @@ package final class AppAudioEngineFactory: AudioEngineFactory {
         initialGain: Float,
         outputDeviceID: AudioObjectID
     ) throws -> any AudioEngineHandle {
+        // A `.control` engine is built meter-only (unmuted tap, no replay) and switched in place once
+        // its IOProc runs, the same path as a popover-open switch: the source is muted only when
+        // the replay is already live, whatever `AudioDeviceStart` costs.
         let engine = AppAudioEngine(
             appID: appID,
             processObjectIDs: processObjectIDs,
-            mode: mode,
+            mode: mode == .control ? .meterOnly : mode,
             initialGain: initialGain,
             outputDeviceID: outputDeviceID)
         try engine.start()
+        if mode == .control {
+            do {
+                try engine.takeOver(gain: initialGain)
+            } catch {
+                engine.stop()
+                throw error
+            }
+        }
         return engine
     }
 }

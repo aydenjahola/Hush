@@ -216,9 +216,13 @@ extension CoreAudioIntegration {
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
             let mark = rig.capture.frameCount
-            let engine = rig.makeEngine(.control, gain: VolumeCurve.gain(percent: 50))
+            // What MixerStore does on the first setPercent with no engine yet: the factory builds the
+            // engine meter-only and switches it in place once its IOProc runs.
+            let engine = try AppAudioEngineFactory().makeEngine(
+                appID: "tone", processObjectIDs: [rig.toneObject], mode: .control,
+                initialGain: VolumeCurve.gain(percent: 50), outputDeviceID: rig.blackHole.id)
             defer { engine.stop() }
-            try engine.start()  // what MixerStore does on the first setPercent with no engine yet
+            #expect(engine.mode == .control)
 
             let check = try await swapCheck(
                 rig, after: mark, "first adjust (new control engine) at 0.25", zeroRunAllowance: takeoverAllowance)

@@ -72,4 +72,43 @@ import Testing
         let first = cycle(block)
         #expect(first.allSatisfy { $0 != 0 }, "every replayed sample of a non-zero input is non-zero")
     }
+
+    @Test func ioBlockSetsHasRun() {
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        let before = state.hasRun.load(ordering: .relaxed)
+        _ = cycle(AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0))
+        let after = state.hasRun.load(ordering: .relaxed)
+        #expect(!before)
+        #expect(after)
+    }
+
+    @Test func takeOverSwitchesOnlyAfterTheIOProcRan() throws {
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        var clock = 0.0
+        var sleeps = 0
+        var switchedAfterRun: Bool?
+        let ran = try AppAudioEngine.takeOver(
+            state: state,
+            sleep: {
+                clock += $0; sleeps += 1; if sleeps == 3 { state.hasRun.store(true, ordering: .relaxed) }
+            },
+            now: { clock },
+            switchToControl: { switchedAfterRun = state.hasRun.load(ordering: .relaxed) })
+        #expect(ran)
+        #expect(sleeps == 3, "stops waiting as soon as the IOProc has run")
+        #expect(switchedAfterRun == true)
+        let replaying = state.replaying.load(ordering: .relaxed)
+        #expect(!replaying, "the fresh engine is meter-only until the switch")
+    }
+
+    @Test func takeOverFallsBackToSwitchingAfterTheLimit() throws {
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        var clock = 0.0
+        var switched = false
+        let ran = try AppAudioEngine.takeOver(
+            state: state, limit: 0.2, sleep: { clock += $0 }, now: { clock }, switchToControl: { switched = true })
+        #expect(!ran)
+        #expect(switched, "switches anyway")
+        #expect(clock >= 0.2 && clock < 0.21, "waits about the limit, no longer")
+    }
 }
