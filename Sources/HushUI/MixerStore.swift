@@ -28,7 +28,12 @@ package final class MixerStore {
     @ObservationIgnored package internal(set) var meterLevels: [String: Float] = [:]
     package internal(set) var preferences: Preferences
     package private(set) var permission: AudioCapturePermissionStatus = .undetermined
+    /// The system default output, as last reported by the output source (never set optimistically).
     package internal(set) var outputDevice: OutputDevice?
+    /// Every output device the user can switch to from the header menu.
+    package internal(set) var outputDevices: [OutputDevice] = []
+    /// A short-lived message after choosing an output failed; cleared after a few seconds or on the next success.
+    package internal(set) var outputSelectionError: String?
     package internal(set) var isPopoverVisible = false
 
     package var controlsEnabled: Bool { permission == .authorized }
@@ -50,7 +55,10 @@ package final class MixerStore {
     @ObservationIgnored var meterOnlyErrorIDs: Set<String> = []
 
     @ObservationIgnored let processSource: any AudioProcessSource
-    @ObservationIgnored private let outputSource: any OutputDeviceSource
+    @ObservationIgnored let outputSource: any OutputDeviceSource
+    /// How long `outputSelectionError` stays up.
+    @ObservationIgnored let outputErrorDuration: Duration
+    @ObservationIgnored var outputErrorTask: Task<Void, Never>?
     @ObservationIgnored let engineFactory: any AudioEngineFactory
     @ObservationIgnored private let permissionSource: any AudioCapturePermissionSource
     @ObservationIgnored private let persister: any SettingsPersisting
@@ -75,6 +83,7 @@ package final class MixerStore {
         permissionSource: any AudioCapturePermissionSource,
         persister: any SettingsPersisting,
         saveDelay: Duration = .milliseconds(500),
+        outputErrorDuration: Duration = .seconds(4),
         now: @escaping () -> Date = Date.init,
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = InstalledAppInfo.lookUp(bundleID:)
     ) {
@@ -84,6 +93,7 @@ package final class MixerStore {
         self.permissionSource = permissionSource
         self.persister = persister
         self.saver = DebouncedSaver(delay: saveDelay)
+        self.outputErrorDuration = outputErrorDuration
         self.now = now
         self.installedApp = installedApp
         let document = persister.load()
@@ -95,6 +105,7 @@ package final class MixerStore {
     package func start() {
         permission = permissionSource.currentStatus()
         outputSource.start { [weak self] device in self?.outputDidChange(device) }
+        outputSource.observeDevices { [weak self] devices in self?.outputDevicesDidChange(devices) }
         processSource.start { [weak self] apps in self?.appsDidChange(apps) }
         if permission == .undetermined {
             permissionRequest = Task { [weak self] in

@@ -18,6 +18,9 @@ package struct MixerPopover: View {
     package var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            if let message = store.outputSelectionError {
+                outputError(message)
+            }
             if let update = updates.pendingUpdate {
                 UpdateBanner(
                     version: update.version,
@@ -43,6 +46,7 @@ package struct MixerPopover: View {
         .environment(\.mixerAppearance, appearance)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.strips.map(\.id))
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: updates.pendingUpdate?.version)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.outputSelectionError)
         .background(
             WindowVisibilityObserver { visible in
                 if visible {
@@ -61,19 +65,22 @@ package struct MixerPopover: View {
             Text(L10n.appName)
                 .font(.headline)
             Spacer()
-            Label {
-                if let name = store.outputDevice?.name { Text(verbatim: name) } else { Text(L10n.noOutput) }
-            } icon: {
-                Image(systemName: "hifispeaker.fill")
-            }
-            .labelStyle(.titleAndIcon)
-            .font(.caption.weight(.medium))
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .glassEffect(.regular, in: .capsule)
-            .accessibilityLabel(Text(L10n.outputDevice(named: store.outputDevice?.name)))
+            OutputPicker(store: store)
         }
+    }
+
+    /// Why choosing an output failed, under the header for a few seconds.
+    private func outputError(_ message: String) -> some View {
+        Label {
+            Text(verbatim: message)
+        } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .symbolRenderingMode(.multicolor)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .transition(.opacity)
     }
 
     private var stripRow: some View {
