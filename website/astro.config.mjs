@@ -13,6 +13,12 @@ export default defineConfig({
       favicon: '/favicon-32.png',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/aydenjahola/Hush' }],
       editLink: { baseUrl: 'https://github.com/aydenjahola/Hush/edit/main/website/' },
+      head: [
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: 'https://aydenjahola.github.io/Hush/logo-512.png' },
+        },
+      ],
       customCss: ['./src/styles/theme.css'],
       plugins: [starlightLinksValidator()],
       sidebar: [

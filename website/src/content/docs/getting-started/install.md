@@ -40,10 +40,6 @@ Hush isn't signed with a paid Apple Developer ID or notarized by Apple. The firs
 3. Scroll down to **Security**. You'll see a message that Hush was blocked. Click **Open Anyway**.
 4. Confirm with your password or Touch ID, then click **Open Anyway** in the dialog that follows.
 
-:::note
-On older versions of macOS you could right-click the app and choose **Open** to skip this check. Since macOS 15 that no longer works, so use **Open Anyway** or the Terminal command below.
-:::
-
 ### Option 2: Remove the quarantine flag in Terminal
 
 macOS marks files downloaded from the internet as quarantined. Removing the mark lets Hush open normally:
@@ -71,11 +67,12 @@ Your saved levels and settings are kept. Every build of Hush has a new ad-hoc si
 
 ## Uninstall Hush
 
-1. Quit Hush: right-click the gear in the mixer and choose **Quit Hush**.
-2. Drag **Hush** from Applications to the Trash.
-3. Delete your saved levels and settings by removing the folder `~/Library/Application Support/Hush`. In Finder, choose **Go → Go to Folder…** and paste the path, or run `rm -r ~/Library/Application\ Support/Hush` in Terminal.
-4. If you turned on **Launch at login**, remove Hush from **System Settings → General → Login Items**.
-5. Remove Hush from the audio recording permission list:
+1. If you turned on **Launch at login**, turn it off in Hush's [Settings](/Hush/using/settings/).
+2. Quit Hush: right-click the gear in the mixer and choose **Quit Hush**.
+3. Drag **Hush** from Applications to the Trash.
+4. Delete your saved levels and settings by removing the folder `~/Library/Application Support/Hush`. In Finder, choose **Go → Go to Folder…** and paste the path, or run `rm -r ~/Library/Application\ Support/Hush` in Terminal.
+5. Check **System Settings → General → Login Items**. If Hush is still listed, remove it.
+6. Remove Hush from the audio recording permission list:
 
    ```sh
    tccutil reset AudioCapture io.github.aydenjahola.Hush

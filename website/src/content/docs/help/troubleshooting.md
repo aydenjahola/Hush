@@ -5,7 +5,7 @@ description: Fixes for the most common problems with Hush, and how to collect lo
 
 ## Hush won't open: "Hush" Not Opened
 
-Hush isn't notarized by Apple, so macOS blocks it the first time. Approve it once with **Open Anyway** in **System Settings → Privacy & Security**, or remove the quarantine flag with `xattr -dr com.apple.quarantine /Applications/Hush.app`. Right-click → Open doesn't work any more on macOS 15 and later. Both options are explained in [Install Hush](/Hush/getting-started/install/#open-hush-for-the-first-time).
+Hush isn't notarized by Apple, so macOS blocks it the first time. Approve it once with **Open Anyway** in **System Settings → Privacy & Security**, or remove the quarantine flag with `xattr -dr com.apple.quarantine /Applications/Hush.app`. Both options are explained in [Install Hush](/Hush/getting-started/install/#open-hush-for-the-first-time).
 
 ## The controls are greyed out and there's a banner
 

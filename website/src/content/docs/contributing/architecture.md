@@ -56,10 +56,6 @@ An engine is also replaced when the app's set of process object IDs changes, for
 
 A control engine exists only while the app is playing. Hush learns that an app has started playing from Core Audio and from a polling backstop (see [Finding apps](#finding-apps-audioprocessmonitor)), and only then creates the tap. That's why the first instant of a new sound can play at normal volume: it can last up to about a second, and usually much less. See [Known limitations](/Hush/help/known-limitations/).
 
-:::note
-A mute tap that nothing reads doesn't actually silence the app, so Hush mutes with a normal control engine at gain 0 rather than a special no-IO tap.
-:::
-
 If creating an engine fails, the store records a short message for that app, which shows as a warning badge on its strip, and doesn't retry until something relevant changes: the app's level or mute, the output device, the app quitting, or **Reset All Levels**.
 
 ## The engine: `AppAudioEngine`
