@@ -30,7 +30,7 @@ XCODE_MESSAGE := Hush needs Xcode 26+ to build. Install Xcode, then run: sudo xc
 INSTALL_DIR ?= /Applications
 BUNDLE_ID := io.github.aydenjahola.Hush
 
-.PHONY: require-xcode build test app dmg install icon run clean
+.PHONY: require-xcode build test integration-test app dmg install icon run clean
 
 # Fails unless the developer directory is inside an Xcode app whose version is 26 or later.
 require-xcode:
@@ -54,6 +54,13 @@ build: require-xcode
 
 test: require-xcode
 	swift test
+
+# Real Core Audio tests (taps, aggregates, BlackHole loopback). Needs Audio Recording permission
+# for the app running this (Terminal/VS Code); Group B also needs BlackHole 2ch. See docs/manual-test.md.
+# Tests that can't run are reported as skipped with the reason.
+integration-test: require-xcode
+	swift build --product HushToneGenerator
+	HUSH_INTEGRATION=1 swift test --no-parallel --filter HushIntegrationTests
 
 app: require-xcode
 	$(SWIFT_BUILD)
