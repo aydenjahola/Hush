@@ -36,6 +36,8 @@ public protocol UpdateNotifying: AnyObject {
     /// Asks for permission to notify (prompting only the first time). Returns whether it's granted.
     func requestAuthorization() async -> Bool
     func post(_ update: AvailableUpdate) async
+    /// Removes Hush's update notifications from Notification Center.
+    func removeDelivered()
 }
 
 /// Notify-only update checker: asks GitHub for the latest release about 30 s after launch and then
@@ -226,12 +228,13 @@ public final class UpdateChecker {
     /// Opens the DMG (or the release page) in the browser. Hush never downloads or replaces itself.
     public func download() {
         guard let update = pendingUpdate ?? latestUpdate else { return }
-        openURL(UpdatePolicy.isTrusted(update.downloadURL) ? update.downloadURL : UpdatePolicy.releasesPageURL)
+        open(update.downloadURL)
     }
 
     /// Hides the banner, badge and notification for 24 hours.
     public func remindLater() {
         settings.snoozedUntil = now().addingTimeInterval(Self.snoozeInterval)
+        checkStatus = .idle
         persist()
         refresh()
         if isStarted { reschedule() }
@@ -251,20 +254,33 @@ public final class UpdateChecker {
         }
     }
 
+    /// Never lowers the skipped version: a Skip from an older, stale notification keeps the newer skip.
     private func skip(_ version: String) {
-        settings.skippedVersion = version
+        guard let skipped = SemanticVersion(version) else { return }
+        if let existing = settings.skippedVersion.flatMap(SemanticVersion.init), existing >= skipped {
+            // Keep the newer skip.
+        } else {
+            settings.skippedVersion = skipped.description
+        }
+        checkStatus = .idle
+        notifier.removeDelivered()
         persist()
         refresh()
+    }
+
+    /// Opens only trusted Hush release URLs (falling back to the releases page) and clears the notification.
+    private func open(_ url: URL?) {
+        openURL(url.flatMap { UpdatePolicy.isTrusted($0) ? $0 : nil } ?? UpdatePolicy.releasesPageURL)
+        notifier.removeDelivered()
     }
 
     private func handleNotificationAction(_ action: UpdateAction, version: String, url: URL?) {
         switch action {
         case .download:
-            openURL(url.flatMap { UpdatePolicy.isTrusted($0) ? $0 : nil } ?? UpdatePolicy.releasesPageURL)
+            open(url)
         case .later:
             remindLater()
         case .skip:
-            guard SemanticVersion(version) != nil else { return }
             skip(version)
         }
     }

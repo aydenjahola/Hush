@@ -90,6 +90,9 @@ final class FakeNotifier: UpdateNotifying {
     func post(_ update: AvailableUpdate) async {
         posted.append(update.version)
     }
+
+    private(set) var removals = 0
+    func removeDelivered() { removals += 1 }
 }
 
 final class FakeUpdatePersister: UpdateSettingsPersisting {

@@ -185,6 +185,47 @@ struct OfflineError: Error {}
         #expect(h.persister.settings.skippedVersion == "0.2.0")
     }
 
+    @Test func skipFromAStaleNotificationNeverLowersTheSkippedVersion() async throws {
+        let h = UpdateHarness(settings: UpdateSettings(skippedVersion: "0.3.0"))
+        h.checker.start()
+        h.checker.stop()
+        let onAction = try #require(h.notifier.onAction)
+        onAction(.skip, "0.2.0", nil)
+        #expect(h.persister.settings.skippedVersion == "0.3.0")
+        onAction(.skip, "0.4.0", nil)
+        #expect(h.persister.settings.skippedVersion == "0.4.0")
+    }
+
+    @Test func skipAndDownloadClearDeliveredNotifications() async throws {
+        let h = UpdateHarness()
+        h.fake.response = .release(makeRelease("0.2.0"))
+        await h.checker.checkAutomatically()
+        h.checker.download()
+        #expect(h.notifier.removals == 1)
+        h.checker.skipThisVersion()
+        #expect(h.notifier.removals == 2)
+
+        h.checker.start()
+        h.checker.stop()
+        let onAction = try #require(h.notifier.onAction)
+        onAction(.download, "0.2.0", dmgURL("0.2.0"))
+        onAction(.skip, "0.2.0", nil)
+        #expect(h.notifier.removals == 4)
+    }
+
+    @Test func laterAndSkipResetTheCheckNowStatus() async {
+        let h = UpdateHarness()
+        h.fake.response = .release(makeRelease("0.2.0"))
+        await h.checker.checkNow()
+        #expect(h.checker.checkStatus == .available(SemanticVersion("0.2.0")!))
+        h.checker.remindLater()
+        #expect(h.checker.checkStatus == .idle)
+
+        await h.checker.checkNow()
+        h.checker.skipThisVersion()
+        #expect(h.checker.checkStatus == .idle)
+    }
+
     // MARK: Failures
 
     @Test func failureIsSilentAndKeepsTheLastState() async {

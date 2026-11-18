@@ -77,4 +77,5 @@ private final class NoUpdateNotifications: UpdateNotifying {
     var onAction: (@MainActor (UpdateAction, String, URL?) -> Void)?
     func requestAuthorization() async -> Bool { false }
     func post(_ update: AvailableUpdate) async {}
+    func removeDelivered() {}
 }

@@ -48,6 +48,11 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying {
         try? await center.add(request)
     }
 
+    /// Update notifications are the only ones Hush posts, so this clears them all.
+    public func removeDelivered() {
+        center.removeAllDeliveredNotifications()
+    }
+
     static func content(for update: AvailableUpdate) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = "Hush \(update.version) is available"
@@ -57,7 +62,9 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying {
         return content
     }
 
+    /// Clicking the notification itself counts as Download.
     nonisolated static func action(for identifier: String) -> UpdateAction? {
+        if identifier == UNNotificationDefaultActionIdentifier { return .download }
         guard identifier.hasPrefix(actionPrefix) else { return nil }
         return UpdateAction(rawValue: String(identifier.dropFirst(actionPrefix.count)))
     }

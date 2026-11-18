@@ -28,8 +28,11 @@ import UserNotifications
                 [.download, .later, .skip])
     }
 
-    @Test func unknownAndSystemActionsMapToNothing() {
-        #expect(UserNotificationUpdateNotifier.action(for: UNNotificationDefaultActionIdentifier) == nil)
+    @Test func clickingTheNotificationDownloads() {
+        #expect(UserNotificationUpdateNotifier.action(for: UNNotificationDefaultActionIdentifier) == .download)
+    }
+
+    @Test func unknownAndDismissActionsMapToNothing() {
         #expect(UserNotificationUpdateNotifier.action(for: UNNotificationDismissActionIdentifier) == nil)
         #expect(UserNotificationUpdateNotifier.action(for: "something.else") == nil)
     }
