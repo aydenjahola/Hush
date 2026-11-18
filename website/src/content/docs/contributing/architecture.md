@@ -88,7 +88,9 @@ The main thread and the IOProc share three atomics: the target gain, the gain ap
 
 ### Output device changes
 
-`DefaultOutputMonitor` listens for changes to the default output device. When it changes, `MixerStore` asks every engine to `rebuild(outputDeviceID:)`, which tears down the tap and aggregate and builds them again on the new device. While that happens, the tap is briefly gone and apps play at their normal level. If a rebuild fails, that engine is torn down and its strip shows a warning.
+`DefaultOutputMonitor` listens for changes to the default output device. When the device's UID changes, `MixerStore` rebuilds every engine on the new device (`beginRebuild` on all of them, then `finishRebuild`), which tears down each tap and aggregate and builds them again. While that happens, the tap is briefly gone and apps play at their normal level. If a rebuild fails, that engine is torn down and its strip shows a warning.
+
+A change that keeps the device's object ID, such as a rename or a new data source, only reconciles. The same device coming back under a new object ID with the same UID, which can happen across sleep, doesn't rebuild either: the aggregates name their sub-device by UID. Instead, `MixerStore` runs a health check, and it does the same when the Mac wakes (`NSWorkspace.didWakeNotification`). It notes each engine's IO cycle count (incremented by the IOProc on every cycle), waits 300 ms, and rebuilds only the engines whose count hasn't moved. Engines that are still running are never touched, so they don't blip.
 
 ## Finding apps: `AudioProcessMonitor`
 
