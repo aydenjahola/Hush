@@ -90,6 +90,10 @@ package enum L10n {
 
     package static let general = resource("General")
     package static let launchAtLogin = resource("Launch at login")
+    package static let launchAtLoginApprovalHint = resource("Allow Hush in System Settings → General → Login Items.")
+    package static let launchAtLoginUnavailableHelp = resource(
+        "Launch at login needs Hush to run as an installed app.")
+    package static let openLoginItems = resource("Open Login Items")
     package static let maximumBoost = resource("Maximum boost")
     package static let showInactiveApps = resource("Show apps that aren't playing")
     package static let levels = resource("Levels")
@@ -171,7 +175,8 @@ package enum L10n {
             playingSummary(count: 2), output, muteAllPlaying, unmuteAll, settingsEllipsis, checkForUpdates,
             muted, percent(50), mute("x"), unmute("x"), volumeLabel("x"), volumeValue(50), warning("x"),
             clickToMute, clickToUnmute, permissionNeeded, openSystemSettings, updateAvailable("x"), download, later,
-            skipThisVersion, downloadHelp, laterHelp, general, launchAtLogin, maximumBoost, showInactiveApps, levels,
+            skipThisVersion, downloadHelp, laterHelp, general, launchAtLogin, launchAtLoginApprovalHint,
+            launchAtLoginUnavailableHelp, openLoginItems, maximumBoost, showInactiveApps, levels,
             resetAllLevelsButton, resetAllLevelsTitle, resetAllLevels, resetAllLevelsMessage, updates,
             checkAutomatically, checkNow, about, version, localVersion("x", commit: "y"),
             localVersion("x", commit: nil),
