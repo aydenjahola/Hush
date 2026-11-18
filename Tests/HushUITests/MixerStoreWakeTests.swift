@@ -302,7 +302,7 @@ import Testing
     @Test func aFailedStallRebuildIsRetriedAfterTheDelay() throws {
         let (h, _) = try failedStallRebuild()
 
-        h.store.retryStalledEngines()  // what the retry task does when its delay ends
+        h.store.retryStalledEngines(afterTimer: true)  // what the retry task does when its delay ends
 
         let retried = try #require(h.factory.live("a"))
         #expect(retried.mode == .control)
@@ -327,17 +327,46 @@ import Testing
         #expect(h.factory.live("a")?.mode == .control)
     }
 
-    @Test func aRetryIsOnlyOnce() throws {
+    @Test func aFailedTimedRetryStaysRetryableUntilTheNextDeviceEvent() throws {
         let (h, _) = try failedStallRebuild()
         h.factory.error = FakeError()
 
-        h.store.retryStalledEngines()
+        h.store.retryStalledEngines(afterTimer: true)
         #expect(h.store.strips.first?.engineError != nil)
+        #expect(h.store.stallRetryIDs == ["a"], "still retryable")
+        #expect(h.store.stallRetryTask == nil, "no further timer")
         h.factory.error = nil
         h.output.emitDevices([speakers, usb])
 
-        #expect(
-            h.factory.live("a") == nil, "the second failure is an ordinary one, kept until something relevant changes")
+        #expect(h.factory.live("a")?.mode == .control, "the device-list change retried it")
+        #expect(h.store.strips.first?.engineError == nil)
+    }
+
+    @Test func aFailedEventRetryIsAnOrdinaryFailure() throws {
+        let (h, _) = try failedStallRebuild()
+        h.factory.error = FakeError()
+        h.store.retryStalledEngines(afterTimer: true)
+
+        h.output.emitDevices([speakers, usb])  // the event-triggered retry fails too
+        #expect(h.store.stallRetryIDs.isEmpty)
+        h.factory.error = nil
+        h.output.emitDevices([speakers])
+
+        #expect(h.factory.live("a") == nil, "kept until something relevant changes, like other failures")
+        #expect(h.store.strips.first?.engineError != nil)
+    }
+
+    @Test func aFailedEventRetryAfterAnOutputChangeIsOrdinary() throws {
+        let (h, _) = try failedStallRebuild()
+        h.factory.error = FakeError()
+
+        h.output.emit(OutputDevice(id: 1, uid: speakers.uid, name: "Speakers (renamed)"))
+        #expect(h.store.stallRetryIDs.isEmpty)
+        #expect(h.store.stallRetryTask == nil)
+        h.factory.error = nil
+        h.output.emitDevices([speakers, usb])
+
+        #expect(h.factory.live("a") == nil)
     }
 
     @Test func otherFailuresAreNotRetriedOnADeviceListChange() throws {

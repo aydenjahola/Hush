@@ -99,7 +99,7 @@ The check works in two stages:
 
 Devices often take longer than 300 ms to resume IO after a wake, so a single early check would rebuild healthy engines and bring the blip back. Engines that are healthy at either stage are never touched.
 
-A stall rebuild can fail because the device isn't ready yet. Such a failure doesn't wait for the user like other engine failures do. It's cleared, and the engine built again, on the next output or device-list change, or once after 3 seconds.
+A stall rebuild can fail because the device isn't ready yet. Such a failure doesn't wait for the user like other engine failures do. Hush retries it once after 3 seconds. If that retry fails too, the engine stays retryable until the next output or device-list change, which retries it once more. Only a failure of that last retry is treated like any other engine failure.
 
 ## Finding apps: `AudioProcessMonitor`
 

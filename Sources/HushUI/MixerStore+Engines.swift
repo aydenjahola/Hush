@@ -163,11 +163,10 @@ extension MixerStore {
         }
         guard confirming else {
             healthReadings = readings(of: suspects)
-            if suspects.isEmpty { healthCheckTask = nil }
+            if suspects.isEmpty { cancelHealthCheck() }
             return !suspects.isEmpty
         }
-        healthCheckTask = nil
-        healthReadings = [:]
+        cancelHealthCheck()
         guard !suspects.isEmpty else { return false }
         logger.notice(
             "Rebuilding \(suspects.count) stalled engine(s): \(suspects.sorted().joined(separator: ", "), privacy: .public)"
@@ -189,8 +188,9 @@ extension MixerStore {
     }
 
     /// A stall rebuild can fail because the device isn't ready yet after a wake. Unlike other
-    /// failures, these don't wait for the user: they're cleared (so `reconcile` tries again) on
-    /// the next output or device-list change, or once after `stallRetryDelay`, whichever is first.
+    /// failures, these don't wait for the user. They're retried once after `stallRetryDelay`,
+    /// and if that fails too they stay retryable until the next output or device-list change,
+    /// which retries them once more. Only a failure of that event-triggered retry is ordinary.
     private func scheduleStallRetry(for ids: [String]) {
         stallRetryIDs.formUnion(ids)
         stallRetryTask?.cancel()
@@ -198,15 +198,20 @@ extension MixerStore {
         stallRetryTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
-            self?.retryStalledEngines()
+            self?.retryStalledEngines(afterTimer: true)
         }
     }
 
     /// Clears the errors left by failed stall rebuilds and reconciles, which builds those
-    /// engines again. A failure this time is an ordinary one.
-    func retryStalledEngines() {
+    /// engines again. After the timer (`afterTimer`), apps that fail again stay retryable, with
+    /// no further timer, for the next device event; after an event, a failure is ordinary.
+    func retryStalledEngines(afterTimer: Bool = false) {
+        let ids = stallRetryIDs
         guard clearStallRetries() else { return }
         reconcile()
+        if afterTimer {
+            stallRetryIDs = ids.filter { engineErrors[$0] != nil }
+        }
         rebuildStrips()
     }
 
