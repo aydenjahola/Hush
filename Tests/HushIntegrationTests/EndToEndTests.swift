@@ -11,6 +11,7 @@ import Testing
 @MainActor
 final class LoopbackRig {
     static let toneLevel = -12.0
+    static var expectedBaseline: Float { sineRMS(peakDB: toneLevel) }
 
     let blackHole: OutputDevice
     let capture: BlackHoleCapture
@@ -37,6 +38,12 @@ final class LoopbackRig {
         do {
             _ = try await capture.record(.milliseconds(200))  // settle
             baseline = rms(try await capture.record(.milliseconds(300)))
+            // Every later check is relative to this, so a silent or wrong baseline would let
+            // "attenuated" and "muted" pass vacuously.
+            let expected = dBFS(Self.expectedBaseline)
+            guard abs(dBFS(baseline) - expected) <= 3 else {
+                throw IntegrationError("The unprocessed tone captured at \(dBFS(baseline)) dBFS RMS, expected \(expected) dBFS ± 3 dB. Is BlackHole's loopback working, and is something else playing into it?")
+            }
         } catch {
             tearDown()
             throw error
@@ -54,7 +61,19 @@ final class LoopbackRig {
 
     /// Waits until the recent capture level is within `tolerance` dB of `target`.
     func waitForLevel(_ target: Float, tolerance: Float = 1.5, timeout: Duration = .seconds(1)) async -> Bool {
-        await waitUntil(timeout: timeout) { abs(dBFS(self.capture.recentRMS(.milliseconds(50))) - dBFS(target)) <= tolerance }
+        await waitUntil(timeout: timeout) {
+            // An unavailable readback counts as "not there yet", never as a level.
+            guard let level = try? self.capture.recentRMS(.milliseconds(50)) else { return false }
+            return abs(dBFS(level) - dBFS(target)) <= tolerance
+        }
+    }
+
+    /// Waits until the recent capture is below `silenceDB`. An unavailable readback isn't silence.
+    func waitForSilence(timeout: Duration) async -> Bool {
+        await waitUntil(timeout: timeout, interval: .milliseconds(5)) {
+            guard let level = try? self.capture.recentRMS(.milliseconds(20)) else { return false }
+            return dBFS(level) < silenceDB
+        }
     }
 
     /// Samples from `mark` to `mark + duration`, waiting for them to arrive.
@@ -63,7 +82,7 @@ final class LoopbackRig {
         guard await waitUntil(timeout: duration + .seconds(2), { self.capture.frameCount >= end }) else {
             throw IntegrationError("BlackHole capture stalled")
         }
-        return capture.samples(from: mark, to: end)
+        return try capture.samples(from: mark, to: end)
     }
 }
 
@@ -83,7 +102,7 @@ extension CoreAudioIntegration {
             IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
-            let expected = sineRMS(peakDB: LoopbackRig.toneLevel)
+            let expected = LoopbackRig.expectedBaseline
             #expect(abs(dBFS(rig.baseline) - dBFS(expected)) <= 1.5,
                     "captured \(dBFS(rig.baseline)) dBFS RMS, expected \(dBFS(expected)) dBFS ± 1.5 dB")
         }
@@ -98,17 +117,23 @@ extension CoreAudioIntegration {
             let engine = rig.makeEngine(.control, gain: 0)
             defer { engine.stop() }
 
+            // Timed from just before start(): tap and aggregate creation count against the 300 ms.
             let startBegan = ContinuousClock.now
             try engine.start()
             let startTook = ContinuousClock.now - startBegan
+            #expect(startTook < .seconds(1), "start() took \(startTook)")
 
-            let silenced = await waitUntil(timeout: .milliseconds(300), interval: .milliseconds(5)) {
-                dBFS(rig.capture.recentRMS(.milliseconds(20))) < silenceDB
-            }
-            #expect(silenced, "still \(dBFS(rig.capture.recentRMS(.milliseconds(20)))) dBFS 300 ms after start() returned (start() took \(startTook)); the app isn't muted")
+            let remaining = max(.milliseconds(300) - (ContinuousClock.now - startBegan), .zero)
+            let silenced = await rig.waitForSilence(timeout: remaining)
+            #expect(silenced, "still \(rig.capture.recentLevel(.milliseconds(20))) 300 ms after calling start() (start() took \(startTook)); the app isn't muted")
 
             let held = rms(try await rig.capture.record(.milliseconds(500)))
             #expect(dBFS(held) < silenceDB, "mute didn't hold: \(dBFS(held)) dBFS over the next 500 ms")
+
+            // Positive control: the silence was the engine's doing, not a dead tone or capture.
+            engine.stop()
+            #expect(await rig.waitForLevel(rig.baseline), "after stop() the tone didn't come back to its baseline (now \(rig.capture.recentLevel()))")
+            #expect(rig.tone.process.isRunning, "the tone process died during the test")
         }
 
         @Test(
@@ -149,7 +174,7 @@ extension CoreAudioIntegration {
             let swap = try await rig.samples(after: mark, .milliseconds(600))
             let check = SwapCheck(samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize, window: windowFrames(rig))
             // Full volume is expected until the control engine takes over; after that it must not come back.
-            let onset = try #require(check.firstWindowBelowThreshold, "the level never dropped below baseline × 0.5 during the swap")
+            let onset = try #require(check.firstWindowBelowThreshold, "the level never dropped below baseline × 0.75 during the swap")
             #expect(check.loudestWindow(from: onset) <= check.threshold,
                     "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
             #expect(check.longestZeroRun <= check.bufferFrames,
@@ -223,22 +248,24 @@ extension CoreAudioIntegration {
             store.setPercent(50, for: id)
             #expect(store.engineMode(for: id) == .control)
             #expect(await rig.waitForLevel(rig.baseline * 0.25, timeout: .milliseconds(1500)),
-                    "setPercent(50) didn't bring the capture to -12 dB (now \(dBFS(rig.capture.recentRMS(.milliseconds(50)))) dBFS, baseline \(dBFS(rig.baseline)))")
+                    "setPercent(50) didn't bring the capture to -12 dB (now \(rig.capture.recentLevel()), baseline \(dBFS(rig.baseline)) dBFS)")
 
             store.toggleMute(for: id)
-            let muted = await waitUntil(timeout: .milliseconds(300), interval: .milliseconds(5)) {
-                dBFS(rig.capture.recentRMS(.milliseconds(20))) < silenceDB
-            }
-            #expect(muted, "toggleMute didn't silence the capture within 300 ms (now \(dBFS(rig.capture.recentRMS(.milliseconds(20)))) dBFS)")
+            let muted = await rig.waitForSilence(timeout: .milliseconds(300))
+            #expect(muted, "toggleMute didn't silence the capture within 300 ms (now \(rig.capture.recentLevel(.milliseconds(20))))")
             let held = rms(try await rig.capture.record(.milliseconds(300)))
             #expect(dBFS(held) < silenceDB, "mute didn't hold: \(dBFS(held)) dBFS")
 
             store.toggleMute(for: id)
             #expect(await rig.waitForLevel(rig.baseline * 0.25), "unmuting didn't return to 50%")
 
+            // The rig guarantees an audible baseline, so this can't pass at silence.
             store.setPercent(100, for: id)
-            #expect(await rig.waitForLevel(rig.baseline, timeout: .milliseconds(1500)), "back at 100% the tone isn't at full level")
+            #expect(await rig.waitForLevel(rig.baseline, timeout: .milliseconds(1500)), "back at 100% the tone isn't at full level (now \(rig.capture.recentLevel()))")
+            let restored = rms(try await rig.capture.record(.milliseconds(300)))
+            #expect(abs(dBFS(restored) - dBFS(rig.baseline)) <= 1.5, "at 100% the capture is \(dBFS(restored)) dBFS, baseline \(dBFS(rig.baseline)) dBFS")
             #expect(store.engineCount == 0, "an app at 100% should have no engine")
+            #expect(rig.tone.process.isRunning, "the tone process died during the test")
         }
     }
 }
@@ -258,7 +285,9 @@ struct SwapCheck {
 
     init(samples: [Float], baseline: Float, bufferFrames: Int, window: Int) {
         windows = windowedRMS(samples, window: window)
-        threshold = baseline * 0.5
+        // Two briefly overlapping 50% engines legitimately sum to about 0.5× baseline; a
+        // full-level burst (1.0×) is what this catches.
+        threshold = baseline * 0.75
         longestZeroRun = HushIntegrationTests.longestZeroRun(samples)
         self.bufferFrames = bufferFrames
     }

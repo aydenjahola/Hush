@@ -25,6 +25,7 @@ final class BlackHoleCapture {
 
     func start() throws {
         guard ioProcID == nil else { return }
+        try Self.requireFloat32Input(device: device)
         let ring = self.ring
         var procID: AudioDeviceIOProcID?
         try CoreAudioProperty.check(
@@ -68,8 +69,15 @@ final class BlackHoleCapture {
     /// Total frames captured so far. Use as a mark, then read `samples(from:)`.
     var frameCount: Int { ring.frameCount }
 
-    func samples(from start: Int, to end: Int? = nil) -> [Float] {
-        ring.samples(from: start, to: end ?? ring.frameCount)
+    /// Exactly the frames `start..<end`. Throws if any of them aren't there: not captured yet, or
+    /// already overwritten. A missing readback must never look like silence.
+    func samples(from start: Int, to end: Int? = nil) throws -> [Float] {
+        let end = end ?? ring.frameCount
+        guard end > start else { throw IntegrationError("Empty capture range \(start)..<\(end)") }
+        guard let samples = ring.samples(from: start, to: end) else {
+            throw IntegrationError("Capture frames \(start)..<\(end) aren't available (captured so far: \(ring.frameCount), ring holds \(ring.capacity)): not arrived yet or overrun")
+        }
+        return samples
     }
 
     func frames(for duration: Duration) -> Int {
@@ -82,13 +90,39 @@ final class BlackHoleCapture {
         let needed = frames(for: duration)
         let arrived = await waitUntil(timeout: duration + .seconds(2)) { self.frameCount >= start + needed }
         guard arrived else { throw IntegrationError("BlackHole capture stalled (no audio arriving from its input)") }
-        return samples(from: start, to: start + needed)
+        return try samples(from: start, to: start + needed)
     }
 
-    /// RMS of the most recent `duration` of capture.
-    func recentRMS(_ duration: Duration) -> Float {
+    /// RMS of the most recent `duration` of capture. Throws if that much hasn't been captured yet.
+    func recentRMS(_ duration: Duration) throws -> Float {
         let end = frameCount
-        return rms(samples(from: max(0, end - frames(for: duration)), to: end))
+        return rms(try samples(from: end - frames(for: duration), to: end))
+    }
+
+    /// The recent level as text for failure messages.
+    func recentLevel(_ duration: Duration = .milliseconds(50)) -> String {
+        guard let level = try? recentRMS(duration) else { return "unavailable" }
+        return "\(dBFS(level)) dBFS"
+    }
+
+    /// The IOProc reads the input as Float32; anything else would be misread, so refuse it.
+    private static func requireFloat32Input(device: AudioObjectID) throws {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreams,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        try CoreAudioProperty.check(AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size), "Sizing BlackHole input streams")
+        var streams = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard let first = streams.indices.first else { throw IntegrationError("BlackHole has no input stream to capture") }
+        try CoreAudioProperty.check(AudioObjectGetPropertyData(device, &address, 0, nil, &size, &streams), "Reading BlackHole input streams")
+        let format = try CoreAudioProperty.scalar(streams[first], kAudioStreamPropertyVirtualFormat, initial: AudioStreamBasicDescription())
+        let isFloat32 = format.mFormatID == kAudioFormatLinearPCM
+            && format.mFormatFlags & kAudioFormatFlagIsFloat != 0
+            && format.mBitsPerChannel == 32
+        guard isFloat32 else {
+            throw IntegrationError("BlackHole's input virtual format isn't Float32 (format \(format.mFormatID), flags \(format.mFormatFlags), \(format.mBitsPerChannel) bits); the capture can't read it")
+        }
     }
 
     /// The capture IOProc only reads; asking the HAL not to send it output streams keeps this
@@ -125,7 +159,7 @@ final class CaptureRing: Sendable {
     }
 
     private let state: Mutex<State>
-    private let capacity: Int
+    let capacity: Int
 
     init(capacity: Int) {
         self.capacity = capacity
@@ -147,12 +181,11 @@ final class CaptureRing: Sendable {
         }
     }
 
-    func samples(from start: Int, to end: Int) -> [Float] {
+    /// The frames `start..<end`, or nil unless every one of them is still in the ring.
+    func samples(from start: Int, to end: Int) -> [Float]? {
         state.withLock { state in
-            let lower = max(start, state.written - capacity, 0)
-            let upper = min(end, state.written)
-            guard upper > lower else { return [] }
-            return (lower..<upper).map { state.storage[$0 % capacity] }
+            guard start >= 0, end > start, end <= state.written, start >= state.written - capacity else { return nil }
+            return (start..<end).map { state.storage[$0 % capacity] }
         }
     }
 }

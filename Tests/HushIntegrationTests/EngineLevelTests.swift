@@ -49,12 +49,18 @@ extension CoreAudioIntegration {
             #expect(await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 })
 
             let full = median(await collectPeaks(engine, for: .milliseconds(400)))
+            try #require(full > 0, "no peaks at 100%")
             engine.setGain(VolumeCurve.gain(percent: 50))
-            try await Task.sleep(for: .milliseconds(100))  // let the one-buffer gain ramp finish
+            // Wait for the one-buffer gain ramp to land, then measure over a full window.
+            _ = engine.currentPeak()
+            let settled = await waitUntil(timeout: .seconds(1), interval: .milliseconds(20)) {
+                let peak = engine.currentPeak()
+                return peak > 0 && abs(peak / full - 0.25) <= 0.025
+            }
             let half = median(await collectPeaks(engine, for: .milliseconds(400)))
 
-            try #require(full > 0, "no peaks at 100%")
             let ratio = half / full
+            #expect(settled, "the 50% peak never came within 0.25 ± 0.025 of the 100% peak within 1 s")
             #expect(abs(ratio - 0.25) <= 0.025, "50% peak / 100% peak = \(ratio), expected 0.25 ± 0.025 (full \(full), half \(half))")
         }
 
