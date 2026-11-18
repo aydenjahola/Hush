@@ -72,4 +72,45 @@ import Testing
             try SettingsDocument.decode(from: Data(json.utf8))
         }
     }
+
+    // MARK: Update settings (additive, optional fields in version 1)
+
+    @Test func versionOneFileWithoutUpdateFieldsLoadsWithDefaults() throws {
+        let json = """
+        {
+          "version": 1,
+          "preferences": { "maxBoostPercent": 150, "showInactiveApps": true },
+          "apps": {}
+        }
+        """
+        let document = try SettingsDocument.decode(from: Data(json.utf8))
+        #expect(document.version == 1)
+        #expect(document.preferences == Preferences(maxBoostPercent: .percent150, showInactiveApps: true))
+        #expect(document.updates == UpdateSettings())
+        #expect(document.updates.automaticUpdateChecks)
+        #expect(document.updates.skippedVersion == nil)
+        #expect(document.updates.snoozedUntil == nil)
+        #expect(document.updates.lastUpdateCheck == nil)
+    }
+
+    @Test func partialUpdateFieldsKeepDefaultsForTheRest() throws {
+        let json = #"{"version": 1, "preferences": {}, "apps": {}, "updates": {"skippedVersion": "0.3.0"}}"#
+        let document = try SettingsDocument.decode(from: Data(json.utf8))
+        #expect(document.updates.skippedVersion == "0.3.0")
+        #expect(document.updates.automaticUpdateChecks)
+    }
+
+    @Test func updateSettingsRoundTrip() throws {
+        var document = SettingsDocument()
+        document.updates = UpdateSettings(
+            automaticUpdateChecks: false,
+            skippedVersion: "0.2.0",
+            snoozedUntil: date,
+            lastUpdateCheck: date.addingTimeInterval(-60),
+            notifiedVersion: "0.2.0")
+        let data = try document.encoded()
+        #expect(String(decoding: data, as: UTF8.self).contains("\"automaticUpdateChecks\" : false"))
+        #expect(try SettingsDocument.decode(from: data) == document)
+        #expect(try SettingsDocument.decode(from: data).version == 1)
+    }
 }
