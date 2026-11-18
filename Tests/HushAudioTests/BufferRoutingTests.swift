@@ -103,4 +103,37 @@ import Testing
         #expect(output.samples(0) == [0, 0])
         #expect(peak == 0)
     }
+
+    // MARK: Zero runs (#50 diagnostics)
+
+    @Test func zeroRunReadsTheFirstChannelOnly() {
+        // Interleaved stereo: left is 0.1, 0, 0, 0.1; right is never zero.
+        let input = TestBufferList([(2, [0.1, 0.5, 0, 0.5, 0, 0.5, 0.1, 0.5])])
+        let run = BufferRouting.zeroRun(in: input.list)
+        #expect(run.longest == 2)
+        #expect(run.trailing == 0)
+        #expect(!run.allZero)
+    }
+
+    @Test func zeroRunCarriesAcrossBuffers() {
+        let first = TestBufferList([(1, [0.1, 0, 0])])
+        let second = TestBufferList([(1, [0, 0, 0.1, 0])])
+        let a = BufferRouting.zeroRun(in: first.list)
+        #expect(a.trailing == 2)
+        let b = BufferRouting.zeroRun(in: second.list, carrying: a.trailing)
+        #expect(b.longest == 4, "two zeros carried plus two more")
+        #expect(b.trailing == 1)
+    }
+
+    @Test func zeroRunOfASilentBufferExtendsTheCarriedRun() {
+        let input = TestBufferList([(1, [0, 0, 0])])
+        let run = BufferRouting.zeroRun(in: input.list, carrying: 5)
+        #expect(run == (trailing: 8, longest: 8, allZero: true))
+    }
+
+    @Test func zeroRunSkipsTheDevicesOwnInputBuffers() {
+        let input = TestBufferList([(1, [0, 0]), (1, [0.3, 0.3])])
+        #expect(BufferRouting.zeroRun(in: input.list, firstInputBuffer: 1).longest == 0)
+        #expect(BufferRouting.zeroRun(in: input.list, firstInputBuffer: 2).allZero, "no tap buffer counts as silent")
+    }
 }
