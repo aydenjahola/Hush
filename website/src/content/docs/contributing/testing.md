@@ -68,6 +68,7 @@ Leave the Mac alone while the tests run (about a minute). Other audio from the t
 
 - **build-and-test** runs `swift format lint --strict` (the same as `make lint`), a build with `-Xswiftc -warnings-as-errors`, `swift test` and `make app` on a macOS 26 runner. The integration tests show as skipped. Warnings only fail CI; `Package.swift` has no `unsafeFlags`.
 - **integration** is experimental and can't fail the build. It installs BlackHole, tries to grant Audio Recording with `scripts/ci-grant-audio-capture.sh` (only possible when SIP is off), runs `ALLOW_SKIP=1 make integration-test`, and reports how many tests passed and were skipped. It becomes required once it proves reliable.
+  On this runner (`GITHUB_ACTIONS=true`) the meter-only → control swap checks allow the level to reach 2× baseline for up to about 20 ms: the virtual machine's HAL can apply the tap's mute after the replay has started, a timing effect not seen on real hardware, where the 1.15× limit still applies.
 - **website** runs on pull requests that change `website/`. It runs `npm ci`, `npm test` and `npm run build`, and the build fails on any broken internal docs link.
 
 ## Manual checklist

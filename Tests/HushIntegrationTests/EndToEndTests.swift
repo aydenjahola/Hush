@@ -178,13 +178,14 @@ extension CoreAudioIntegration {
                 check.sustainedOnset,
                 "the level never stayed attenuated (below baseline × 0.75, above silence) for 3 windows during the swap"
             )
+            // An onset at window 0 would leave the check before it with an empty range (#11).
+            try #require(
+                onset > 0, "the level was already attenuated in the first window: the check before it is empty")
             #expect(
                 check.loudestWindow(from: onset) <= check.threshold,
                 "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
-            #expect(
-                check.loudestWindow(in: 0..<onset) <= meterToControlLimit(rig),
-                "before the level dropped it reached \(check.loudestWindow(in: 0..<onset)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay"
-            )
+            expectTakeoverOverlap(
+                check, in: 0..<onset, rig, "the capture before the level dropped", "the mute landed after the replay")
             #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't settle at -12 dB after the swap")
         }
 
@@ -199,10 +200,7 @@ extension CoreAudioIntegration {
             let gain = VolumeCurve.gain(percent: 99)
             let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
             defer { engine.stop() }
-            #expect(
-                check.loudestWindow(from: 0) <= meterToControlLimit(rig),
-                "the swap reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay"
-            )
+            expectTakeoverOverlap(check, rig, "the swap", "the mute landed after the replay")
             // Positive control: an unmuted source plus the replay would settle near +6 dB.
             #expect(
                 await rig.waitForLevel(rig.baseline * gain),
@@ -228,9 +226,7 @@ extension CoreAudioIntegration {
             let check = try await swapCheck(
                 rig, after: mark, "first adjust (new control engine) at 0.25",
                 zeroRunAllowance: takeoverAllowance(rig))
-            #expect(
-                check.loudestWindow(from: 0) <= meterToControlLimit(rig),
-                "the takeover reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
+            expectTakeoverOverlap(check, rig, "the takeover")
             #expect(
                 await rig.waitForLevel(rig.baseline * 0.25),
                 "the level didn't settle at -12 dB (now \(rig.capture.recentLevel()))")
@@ -258,9 +254,7 @@ extension CoreAudioIntegration {
             #expect(engine.mode == .control)
             let check = try await swapCheck(
                 rig, after: mark, "output rebuild of a control engine", zeroRunAllowance: takeoverAllowance(rig))
-            #expect(
-                check.loudestWindow(from: 0) <= meterToControlLimit(rig),
-                "the rebuild reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
+            expectTakeoverOverlap(check, rig, "the rebuild")
             // 1 s is plenty on hardware. On the GitHub Actions VM the rebuilt aggregate (the old one
             // destroyed and a new one started on the same device) has been seen still silent after
             // it, so CI waits longer. The wait stays bounded: an engine that never resumes still
@@ -316,6 +310,42 @@ extension CoreAudioIntegration {
         /// is cut, a buffer is dropped, then the replay fades in). 1.15× leaves headroom for a
         /// partial crossfade; source plus a full-gain replay (a real bump) fails.
         private func meterToControlLimit(_ rig: LoopbackRig) -> Float { rig.baseline * 1.15 }
+
+        /// CI-only overlap allowance (issue #38): on the GitHub Actions VM (`GITHUB_ACTIONS=true`)
+        /// the HAL can apply the tap's new `.mutedWhenTapped` behaviour after the replay has
+        /// started, so the app and the replay briefly play together (measured: 1.98× baseline for
+        /// 15 ms). That's a timing effect of the virtualised coreaudiod, not seen on real hardware.
+        /// There the level may reach 2.0× baseline, but for no more than about 20 ms above
+        /// `meterToControlLimit`, so a replay that never mutes its source still fails. Real
+        /// hardware, `CI=1` included, keeps `meterToControlLimit`.
+        private static let ciOverlapPeak: Float = 2.0
+        private static let ciOverlapDuration: Double = 20  // ms
+
+        /// The overlap check of a meter-only → control takeover over `range` (windows): at most
+        /// `meterToControlLimit`, or the CI-only allowance above on GitHub Actions.
+        private func expectTakeoverOverlap(
+            _ check: SwapCheck, in range: Range<Int>? = nil, _ rig: LoopbackRig, _ what: String,
+            _ meaning: String? = nil
+        ) {
+            let range = range ?? 0..<check.windows.count
+            let loudest = check.loudestWindow(in: range)
+            let strict = meterToControlLimit(rig)
+            let suffix = meaning.map { ": \($0)" } ?? ""
+            guard IntegrationEnvironment.isGitHubActions else {
+                #expect(loudest <= strict, "\(what) reached \(loudest) RMS (limit \(strict))\(suffix)")
+                return
+            }
+            let peak = rig.baseline * Self.ciOverlapPeak
+            let windowMS = Double(windowFrames(rig)) / rig.capture.sampleRate * 1000
+            let overMS = Double(check.windowCount(above: strict, in: range)) * windowMS
+            print(
+                "[ci-tolerance] GITHUB_ACTIONS=true: \(what) may reach \(Self.ciOverlapPeak)× baseline for up to \(Self.ciOverlapDuration) ms (1.15× on hardware); it was above 1.15× for \(String(format: "%.1f", overMS)) ms"
+            )
+            #expect(loudest <= peak, "\(what) reached \(loudest) RMS (CI limit \(peak))\(suffix)")
+            #expect(
+                overMS <= Self.ciOverlapDuration,
+                "\(what) stayed above \(strict) RMS for \(overMS) ms (CI limit \(Self.ciOverlapDuration) ms)\(suffix)")
+        }
 
         /// Known limitation, accepted by the owner: when a tap starts muting a process that's already
         /// playing (meter-only → control, or a fresh control engine on a playing app), Core Audio
@@ -386,10 +416,13 @@ extension CoreAudioIntegration {
                 window: windowFrames(rig))
             let windowMS = Double(windowFrames(rig)) / rig.capture.sampleRate * 1000
             let above = Double(check.windowCount(above: rig.baseline * 1.05)) * windowMS
+            // Diagnostic only, not asserted: how long the output sat near silence (a dropped buffer
+            // or a slow replay), which the zero-run check can't see unless it's exact zeros.
+            let quiet = Double(check.windowCount(below: rig.baseline * 0.05)) * windowMS
             // Silence still running at the end of the window is a stall, not a gap that closed.
             let trailingZeros = swap.reversed().prefix { $0 == 0 }.count
             print(
-                "[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames)), \(trailingZeros) silent frames at the window's end"
+                "[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, \(String(format: "%.1f", quiet)) ms below 0.05× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames)), \(trailingZeros) silent frames at the window's end"
             )
             #expect(
                 check.longestZeroRun <= check.bufferFrames + zeroRunAllowance,
@@ -575,6 +608,14 @@ struct SwapCheck {
 
     func windowCount(above level: Float) -> Int {
         windows.filter { $0 > level }.count
+    }
+
+    func windowCount(above level: Float, in range: Range<Int>) -> Int {
+        windows[range.clamped(to: 0..<windows.count)].filter { $0 > level }.count
+    }
+
+    func windowCount(below level: Float) -> Int {
+        windows.filter { $0 < level }.count
     }
 }
 
