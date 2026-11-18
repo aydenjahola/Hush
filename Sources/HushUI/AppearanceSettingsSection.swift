@@ -6,7 +6,7 @@ import SwiftUI
 struct AppearanceSettingsSection: View {
     @Bindable var store: MixerStore
 
-    static let recordingIndicatorNote = "The purple dot in the menu bar is macOS's audio-recording indicator. It appears while Hush is adjusting an app's volume and, with meters on, while this popover is open."
+    static let recordingIndicatorNote: LocalizedStringKey = "The purple dot in the menu bar is macOS's audio-recording indicator. It appears while Hush is adjusting an app's volume and, with meters on, while the mixer is open."
 
     var body: some View {
         Section("Appearance") {

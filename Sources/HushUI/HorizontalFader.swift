@@ -24,7 +24,7 @@ struct HorizontalFader: View {
             let travel = max(width - knob, 1)
             let knobCenter = scale.fraction(value) * travel + knob / 2
             let unityX = scale.fraction(100) * travel + knob / 2
-            let boost = Palette.boost(appearance.accent, colorScheme, contrast)
+            let boost = Palette.boost(colorScheme, contrast)
 
             ZStack(alignment: .leading) {
                 Capsule()
@@ -33,7 +33,7 @@ struct HorizontalFader: View {
                 if maxValue > 100 {
                     // The boost zone, faintly tinted so it reads as "past normal" before it's used.
                     Capsule()
-                        .fill(boost.opacity(contrast == .increased ? 0.4 : (colorScheme == .dark ? 0.3 : 0.2)))
+                        .fill(boost.opacity(contrast == .increased ? 0.22 : (colorScheme == .dark ? 0.2 : 0.07)))
                         .frame(width: width - unityX, height: 4)
                         .offset(x: unityX)
                     if value > 100 {
@@ -41,7 +41,7 @@ struct HorizontalFader: View {
                     }
                 }
                 Capsule()
-                    .fill(Palette.neutralFill(colorScheme, contrast))
+                    .fill(Palette.level(appearance.accent, colorScheme, contrast))
                     .frame(width: min(knobCenter, unityX), height: 4)
                 if maxValue > 100 {
                     Rectangle()

@@ -21,7 +21,7 @@ struct ClassicRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(width: compact ? 70 : 78, alignment: .leading)
-                .help(strip.displayName)
+                .help(Text(verbatim: strip.displayName))
             VStack(spacing: 1) {
                 HorizontalFader(
                     value: strip.setting.percent,
@@ -34,10 +34,13 @@ struct ClassicRow: View {
                         .padding(.horizontal, compact ? 6 : 7)
                 }
             }
-            if appearance.showPercentages || strip.setting.isMuted {
-                StripPercentLabel(strip: strip)
-                    .frame(width: 40, alignment: .trailing)
+            // Always 40 pt wide, so a row that gets muted keeps its slider where it was.
+            ZStack(alignment: .trailing) {
+                if appearance.showPercentages || strip.setting.isMuted {
+                    StripPercentLabel(strip: strip)
+                }
             }
+            .frame(width: 40, alignment: .trailing)
             MuteButton(isMuted: strip.setting.isMuted, appName: strip.displayName, compact: true,
                        action: actions.toggleMute)
         }

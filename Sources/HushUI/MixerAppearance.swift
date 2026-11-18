@@ -34,6 +34,10 @@ struct MixerAppearance: Equatable {
     }
 
     var isCompact: Bool { density == .compact }
+
+    /// Strips: a plain scroll over a fader sets the volume. Rows and tiles live in a scrolling
+    /// list, so there only Option + scroll does.
+    var scrollNeedsOption: Bool { layout != .channelStrips }
 }
 
 extension EnvironmentValues {
@@ -73,10 +77,21 @@ final class InertStripActions: StripActionTarget {
 }
 
 extension Palette {
-    /// Boost (> 100%) fill and percent label for the chosen accent.
-    static func boost(_ accent: AccentChoice, _ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color {
+    /// Boost (> 100%) fill and percent label. Always amber, whatever the accent: boost keeps one
+    /// meaning, and a red system accent can't be mistaken for the red used for Muted.
+    static func boost(_ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color {
+        amber(scheme, contrast)
+    }
+
+    /// The system accent when chosen, else nil (callers then use their neutral).
+    static func systemAccentIfChosen(_ accent: AccentChoice, _ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color? {
+        accent == .system ? systemAccent(scheme, contrast) : nil
+    }
+
+    /// The normal (up to 100%) fill: white or near-black, or the system accent if chosen.
+    static func level(_ accent: AccentChoice, _ scheme: ColorScheme, _ contrast: ColorSchemeContrast) -> Color {
         switch accent {
-        case .amber: amber(scheme, contrast)
+        case .amber: neutralFill(scheme, contrast)
         case .system: systemAccent(scheme, contrast)
         }
     }

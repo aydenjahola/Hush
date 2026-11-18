@@ -49,29 +49,29 @@ public enum MenuBarIcon {
 
     /// Knob heights (0 = bottom, 1 = top) for the three faders, as in the app icon.
     static func faderLevels(attenuated: Bool) -> [CGFloat] {
-        attenuated ? [0.2, 0.5, 0.3] : [0.35, 0.7, 0.5]
+        attenuated ? [0.38, 0.6, 0.48] : [0.55, 0.95, 0.75]
     }
 
     /// The app icon's fader trio as a template glyph: faint tracks, solid level fills and knobs.
-    /// The attenuated variant has its knobs lower, like the speaker's fewer waves.
+    /// The attenuated variant has its knobs lower (short fills, not just caps), like the speaker's fewer waves.
     private static func renderFaders(attenuated: Bool, badged: Bool) -> NSImage {
-        let glyph = NSSize(width: 16, height: 14)
+        let glyph = NSSize(width: 17.5, height: 14)
         let size = NSSize(width: ceil(glyph.width + badgeRadius), height: glyph.height)
         let levels = faderLevels(attenuated: attenuated)
         return templateImage(size: size, badged: badged) {
-            let trackWidth: CGFloat = 1.25, fillWidth: CGFloat = 2, knob = NSSize(width: 5.5, height: 3)
+            let trackWidth: CGFloat = 1.5, fillWidth: CGFloat = 2.25, knob = NSSize(width: 4.5, height: 3.5)
             let top: CGFloat = 1.5, bottom = glyph.height - 1.5
             for (index, level) in levels.enumerated() {
-                let centerX = 3 + CGFloat(index) * 5
+                let centerX = 3 + CGFloat(index) * 5.75
                 let knobY = bottom - level * (bottom - top)
                 let track = NSRect(x: centerX - trackWidth / 2, y: top, width: trackWidth, height: bottom - top)
-                NSColor.black.withAlphaComponent(0.35).setFill()
+                NSColor.black.withAlphaComponent(0.45).setFill()
                 NSBezierPath(roundedRect: track, xRadius: trackWidth / 2, yRadius: trackWidth / 2).fill()
                 NSColor.black.setFill()
                 let fill = NSRect(x: centerX - fillWidth / 2, y: knobY, width: fillWidth, height: bottom - knobY)
                 NSBezierPath(roundedRect: fill, xRadius: fillWidth / 2, yRadius: fillWidth / 2).fill()
                 let cap = NSRect(x: centerX - knob.width / 2, y: knobY - knob.height / 2, width: knob.width, height: knob.height)
-                NSBezierPath(roundedRect: cap, xRadius: 1, yRadius: 1).fill()
+                NSBezierPath(roundedRect: cap, xRadius: 1.25, yRadius: 1.25).fill()
             }
         }
     }

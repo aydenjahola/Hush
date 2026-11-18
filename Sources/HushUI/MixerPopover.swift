@@ -66,7 +66,7 @@ public struct MixerPopover: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .glassEffect(.regular, in: .capsule)
-                .accessibilityLabel("Output: \(store.outputDevice?.name ?? "none")")
+                .accessibilityLabel(Text("Output: \(store.outputDevice?.name ?? "none")"))
         }
     }
 

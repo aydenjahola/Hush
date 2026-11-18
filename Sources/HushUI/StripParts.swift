@@ -30,7 +30,7 @@ struct StripIcon: View {
                         .symbolRenderingMode(.multicolor)
                         .font(.system(size: size > 24 ? 11 : 9))
                         .offset(x: 4, y: -4)
-                        .help(error)
+                        .help(Text(verbatim: error))
                         .accessibilityLabel("Warning: \(error)")
                 }
             }
@@ -38,14 +38,15 @@ struct StripIcon: View {
     }
 }
 
-/// "62%" (boost in the accent colour) or "Muted" in red.
+/// "62%" (boost in amber) or "Muted" in red. `boostInPrimary` keeps the text in the primary
+/// colour for places where amber text would sit on an amber fill (tiles).
 struct StripPercentLabel: View {
     let strip: MixerStore.Strip
     var font: Font = .caption.weight(.semibold)
+    var boostInPrimary = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
-    @Environment(\.mixerAppearance) private var appearance
 
     var body: some View {
         if strip.setting.isMuted {
@@ -56,8 +57,8 @@ struct StripPercentLabel: View {
             Text("\(strip.setting.percent)%")
                 .font(font)
                 .monospacedDigit()
-                .foregroundStyle(strip.setting.percent > 100
-                    ? Palette.boost(appearance.accent, colorScheme, contrast)
+                .foregroundStyle(strip.setting.percent > 100 && !boostInPrimary
+                    ? Palette.boost(colorScheme, contrast)
                     : Color.primary)
         }
     }

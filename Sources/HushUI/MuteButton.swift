@@ -8,6 +8,7 @@ struct MuteButton: View {
     let action: () -> Void
 
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.isMixerPreview) private var isPreview
 
     var body: some View {
         Button(action: action) {
@@ -22,6 +23,8 @@ struct MuteButton: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isMuted ? "Unmute \(appName)" : "Mute \(appName)")
+        .focusable(!isPreview)
+        .allowsHitTesting(!isPreview)
+        .accessibilityLabel(isMuted ? Text("Unmute \(appName)") : Text("Mute \(appName)"))
     }
 }

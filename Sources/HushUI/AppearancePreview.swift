@@ -61,13 +61,12 @@ struct AppearancePreview: View {
         }
     }
 
-    private var accessibilityDescription: String {
-        let name = switch appearance.layout {
-        case .channelStrips: "channel strips"
-        case .classicRows: "classic rows"
-        case .tiles: "tiles"
+    private var accessibilityDescription: LocalizedStringKey {
+        switch appearance.layout {
+        case .channelStrips: "Preview of the channel strips layout"
+        case .classicRows: "Preview of the classic rows layout"
+        case .tiles: "Preview of the tiles layout"
         }
-        return "Preview of the \(name) layout"
     }
 }
 
@@ -82,9 +81,16 @@ enum SampleStrips {
         let actions: StripActions
     }
 
-    private static var meters: [String: StripMeter] = [:]
+    /// Built once: the preview re-renders whenever a setting changes, and must not create meters,
+    /// update them or look icons up each time.
+    private static let plain = build(maxPercent: 100)
+    private static let boosted = build(maxPercent: 200)
 
     static func make(maxPercent: Int) -> [Sample] {
+        maxPercent > 100 ? boosted : plain
+    }
+
+    private static func build(maxPercent: Int) -> [Sample] {
         [
             sample("com.apple.Music", "Music", percent: 70, level: 0.5),
             sample("com.apple.Safari", "Safari", percent: min(140, maxPercent), level: 0.3),
@@ -95,9 +101,8 @@ enum SampleStrips {
     private static func sample(_ id: String, _ name: String, percent: Int, muted: Bool = false, level: Float) -> Sample {
         var setting = AppVolumeSetting(percent: percent)
         setting.isMuted = muted
-        let meter = meters[id] ?? StripMeter()
+        let meter = StripMeter()
         meter.update(level: level)
-        meters[id] = meter
         return Sample(
             strip: MixerStore.Strip(
                 id: id, displayName: name, icon: icon(id), isPlaying: true, isRunning: true,
@@ -106,13 +111,8 @@ enum SampleStrips {
             actions: StripActions(target: InertStripActions.shared, id: id))
     }
 
-    private static var icons: [String: NSImage?] = [:]
-
     private static func icon(_ bundleID: String) -> NSImage? {
-        if let cached = icons[bundleID] { return cached }
-        let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
-        let image = url.map { NSWorkspace.shared.icon(forFile: $0.path) }
-        icons[bundleID] = image
-        return image
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+            .map { NSWorkspace.shared.icon(forFile: $0.path) }
     }
 }

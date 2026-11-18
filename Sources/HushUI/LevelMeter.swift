@@ -27,9 +27,10 @@ struct LevelMeter: View {
 struct LevelGlow: View {
     let meter: StripMeter
     var isActive = true
+    var increasedContrast = false
 
     var body: some View {
-        MeterLayerView(meter: meter, style: .glow, increasedContrast: false)
+        MeterLayerView(meter: meter, style: .glow, increasedContrast: increasedContrast)
             .opacity(isActive ? 1 : 0)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -69,6 +70,13 @@ struct MeterLayerView: NSViewRepresentable {
 final class MeterNSView: NSView {
     var style: MeterStyle { didSet { if style != oldValue { updateColors(); needsLayout = true } } }
     var increasedContrast = false { didSet { if increasedContrast != oldValue { updateColors() } } }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        for layer in [track, reveal, fill] { layer.contentsScale = scale }
+        layer?.contentsScale = scale
+    }
 
     private let track = CALayer()
     private let fill = CAGradientLayer()
@@ -169,7 +177,9 @@ final class MeterNSView: NSView {
             case .glow:
                 track.backgroundColor = nil
                 let green = NSColor.systemGreen
-                fill.colors = [green.withAlphaComponent(dark ? 0.26 : 0.2), green.withAlphaComponent(0)].map(\.cgColor)
+                // Fainter than the volume fill and fading to nothing, so it never reads as a second fill.
+                let alpha: CGFloat = increasedContrast ? (dark ? 0.4 : 0.34) : (dark ? 0.15 : 0.12)
+                fill.colors = [green.withAlphaComponent(alpha), green.withAlphaComponent(0)].map(\.cgColor)
                 fill.locations = [0, 1]
                 fill.startPoint = CGPoint(x: 0, y: 0.5)
                 fill.endPoint = CGPoint(x: 1, y: 0.5)

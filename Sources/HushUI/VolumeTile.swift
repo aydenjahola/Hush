@@ -24,7 +24,7 @@ struct VolumeTile: View {
                 StripIcon(strip: strip, size: compact ? 18 : 22)
                     .contentShape(Rectangle())
                     .onTapGesture { if isEnabled { actions.toggleMute() } }
-                    .help(strip.setting.isMuted ? "Click to unmute" : "Click to mute")
+                    .help(strip.setting.isMuted ? Text("Click to unmute") : Text("Click to mute"))
                 Text(strip.displayName)
                     .font(compact ? .caption : .callout)
                     .lineLimit(1)
@@ -34,7 +34,7 @@ struct VolumeTile: View {
                 Spacer(minLength: 4)
                     .allowsHitTesting(false)
                 if appearance.showPercentages || strip.setting.isMuted {
-                    StripPercentLabel(strip: strip)
+                    StripPercentLabel(strip: strip, boostInPrimary: true)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
@@ -51,7 +51,7 @@ struct VolumeTile: View {
                 .strokeBorder(Color.primary.opacity(contrast == .increased ? 0.35 : 0.08))
                 .allowsHitTesting(false)
         }
-        .help(strip.displayName)
+        .help(Text(verbatim: strip.displayName))
         .disabled(!isEnabled)
         .opacity(strip.isPlaying ? 1 : 0.45)
     }
@@ -74,21 +74,31 @@ private struct TileSurface: View {
     var body: some View {
         let value = strip.setting.percent
         let muted = strip.setting.isMuted
-        let boost = Palette.boost(appearance.accent, colorScheme, contrast)
+        let boost = Palette.boost(colorScheme, contrast)
+        let level = Palette.systemAccentIfChosen(appearance.accent, colorScheme, contrast)
         GeometryReader { geometry in
             let width = geometry.size.width
             ZStack(alignment: .leading) {
                 Color.primary.opacity(contrast == .increased ? 0.12 : 0.05)
                 if appearance.showMeters {
-                    LevelGlow(meter: meter, isActive: strip.meterIsActive)
+                    LevelGlow(meter: meter, isActive: strip.meterIsActive, increasedContrast: contrast == .increased)
                 }
-                Color.primary.opacity(muted ? 0.06 : (contrast == .increased ? 0.24 : 0.13))
+                (level.map { $0.opacity(muted ? 0.1 : (contrast == .increased ? 0.4 : 0.28)) }
+                    ?? Color.primary.opacity(muted ? 0.06 : (contrast == .increased ? 0.24 : 0.13)))
                     .frame(width: width * scale.fraction(min(value, 100)))
                 if value > 100 {
                     // Boost: the stretch past the 100% tick, in the accent colour.
                     boost.opacity(muted ? 0.12 : (contrast == .increased ? 0.5 : 0.32))
                         .frame(width: width * (scale.fraction(value) - scale.fraction(100)))
                         .offset(x: width * scale.fraction(100))
+                }
+                if value > 0 {
+                    // The volume position: a crisp edge (at least 3:1 against the tile) so the level
+                    // reads even where the fill and the meter glow are both soft.
+                    Rectangle()
+                        .fill(Color.primary.opacity(muted ? 0.3 : (contrast == .increased ? 0.9 : 0.65)))
+                        .frame(width: 2)
+                        .offset(x: max(width * scale.fraction(value) - 2, 0))
                 }
                 if maxPercent > 100 {
                     Rectangle()

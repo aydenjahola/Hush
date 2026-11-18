@@ -125,13 +125,14 @@ import Testing
         let storeChanges = Counter()
         withObservationTracking {
             _ = h.store.strips
-            _ = h.store.meterLevels
             _ = h.store.preferences
         } onChange: { storeChanges.increment() }
         h.store.tickMeters(elapsed: 1.0 / 30.0)
 
         #expect(storeChanges.value == 0, "a tick must not re-render strips, rows or the popover")
+        // The tick really ran and published through the meter, not through the store.
         #expect(meter.fraction > 0)
+        #expect(h.store.meterBank.isSilent == false)
     }
 
     @Test func steadyLevelPublishesOnce() {
@@ -175,6 +176,17 @@ import Testing
         h.store.tickMeters(elapsed: 1.0 / 30.0)
         h.store.popoverDidDisappear()
         #expect(meter.fraction == 0)
+    }
+
+    @Test func onlyTheListLayoutsNeedOptionToScrollTheVolume() {
+        #expect(!MixerAppearance(layout: .channelStrips).scrollNeedsOption)
+        #expect(MixerAppearance(layout: .classicRows).scrollNeedsOption)
+        #expect(MixerAppearance(layout: .tiles).scrollNeedsOption)
+    }
+
+    @Test func boostIsAmberWhateverTheAccent() {
+        // `boost` takes no accent: the system accent only reaches normal fills.
+        #expect(Palette.boost(.light, .standard) == Palette.amber(.light, .standard))
     }
 
     @Test func stripActionsCompareByTargetAndApp() {

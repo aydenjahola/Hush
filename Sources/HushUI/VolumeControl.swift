@@ -26,7 +26,7 @@ struct FaderScale {
 }
 
 /// Keyboard, scroll-wheel and VoiceOver behaviour shared by every fader:
-/// arrow keys and scroll ±5%, "<App> volume" slider with value "<N> percent".
+/// arrow keys and scroll ±5% (Option + scroll in the list layouts), "<App> volume" slider with value "<N> percent".
 struct VolumeControlBehavior: ViewModifier {
     let value: Int
     let scale: FaderScale
@@ -35,6 +35,7 @@ struct VolumeControlBehavior: ViewModifier {
 
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.isMixerPreview) private var isPreview
+    @Environment(\.mixerAppearance) private var appearance
 
     func body(content: Content) -> some View {
         content
@@ -43,7 +44,7 @@ struct VolumeControlBehavior: ViewModifier {
             .onKeyPress(.downArrow) { nudge(-FaderScale.step); return .handled }
             .onKeyPress(.rightArrow) { nudge(FaderScale.step); return .handled }
             .onKeyPress(.leftArrow) { nudge(-FaderScale.step); return .handled }
-            .modifier(ScrollWheelStepper { steps in
+            .modifier(ScrollWheelStepper(requiresOption: appearance.scrollNeedsOption) { steps in
                 if isEnabled { nudge(steps * FaderScale.step) }
             })
             .accessibilityElement()

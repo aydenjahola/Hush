@@ -46,6 +46,8 @@ public final class MixerStore {
     private var apps: [AudioApp] = []
     private var settings: [String: AppVolumeSetting]
     private var engineErrors: [String: String] = [:]
+    /// Apps whose current error came from a meter-only engine, so turning meters off can clear it.
+    @ObservationIgnored private var meterOnlyErrorIDs: Set<String> = []
 
     @ObservationIgnored private let processSource: any AudioProcessSource
     @ObservationIgnored private let outputSource: any OutputDeviceSource
@@ -155,6 +157,11 @@ public final class MixerStore {
         let new = preferences.appearance
         guard new != old else { return }
         if new.sortMode != old.sortMode { order = [] }
+        if !new.showLevelMeters, old.showLevelMeters {
+            // "Couldn't read this app's level" is moot once nothing reads levels.
+            for id in meterOnlyErrorIDs { engineErrors[id] = nil }
+            meterOnlyErrorIDs = []
+        }
         if new.showLevelMeters != old.showLevelMeters, isPopoverVisible {
             if new.showLevelMeters {
                 startMeterPolling()
@@ -170,6 +177,7 @@ public final class MixerStore {
     public func resetAllLevels() {
         settings = [:]
         engineErrors = [:]
+        meterOnlyErrorIDs = []
         settingsDidChange()
     }
 
@@ -449,6 +457,7 @@ public final class MixerStore {
         case .meterOnly: "Hush couldn't read this app's level."
         }
         engineErrors[id] = "\(summary) (\(error))"
+        if mode == .meterOnly { meterOnlyErrorIDs.insert(id) } else { meterOnlyErrorIDs.remove(id) }
         logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
     }
 

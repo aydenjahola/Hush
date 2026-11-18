@@ -150,6 +150,25 @@ import Testing
         #expect(!message.contains("control"))
     }
 
+    @Test func turningMetersOffClearsAMeterOnlyWarning() {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.factory.error = FakeError()
+        h.store.popoverDidAppear()
+        #expect(h.store.strips.first?.engineError != nil)
+        h.store.showLevelMeters = false
+        #expect(h.store.strips.first?.engineError == nil)
+    }
+
+    @Test func turningMetersOffKeepsAControlWarning() {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.factory.error = FakeError()
+        h.store.setPercent(80, for: "a")
+        h.store.showLevelMeters = false
+        #expect(h.store.strips.first?.engineError != nil)
+    }
+
     @Test func engineFailureShowsWarningAndRetriesOnNextChange() {
         let h = Harness()
         h.processes.emit([makeApp("a")])

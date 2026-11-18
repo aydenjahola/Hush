@@ -18,9 +18,13 @@ struct ChannelStrip: View {
     var body: some View {
         let faderHeight: CGFloat = compact ? 104 : 130
         VStack(spacing: compact ? 5 : 8) {
-            if appearance.showPercentages || strip.setting.isMuted {
-                StripPercentLabel(strip: strip)
+            // The slot is always reserved, so a strip that gets muted doesn't push its fader down.
+            ZStack {
+                if appearance.showPercentages || strip.setting.isMuted {
+                    StripPercentLabel(strip: strip)
+                }
             }
+            .frame(height: compact ? 14 : 16)
             HStack(alignment: .bottom, spacing: 4) {
                 if appearance.showMeters {
                     LevelMeter(meter: meter, isActive: strip.meterIsActive)
@@ -40,7 +44,7 @@ struct ChannelStrip: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity)
-                .help(strip.displayName)
+                .help(Text(verbatim: strip.displayName))
             MuteButton(isMuted: strip.setting.isMuted, appName: strip.displayName, compact: compact,
                        action: actions.toggleMute)
         }
