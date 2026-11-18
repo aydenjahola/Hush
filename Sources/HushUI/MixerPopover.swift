@@ -89,6 +89,9 @@ package struct MixerPopover: View {
         .transition(.opacity)
     }
 
+    /// Space around scrolling content so keyboard focus rings aren't cut off.
+    static let focusRingRoom: CGFloat = 4
+
     private var stripRow: some View {
         ScrollView(.horizontal) {
             HStack(alignment: .top, spacing: 8) {
@@ -104,6 +107,8 @@ package struct MixerPopover: View {
             .scrollTargetLayout()
         }
         .scrollIndicators(.never)
+        // Room for the mute buttons' focus rings, which the scroll view would otherwise clip.
+        .contentMargins(Self.focusRingRoom, for: .scrollContent)
         .scrollTargetBehavior(.viewAligned)
         .onScrollGeometryChange(for: EdgeOverflow.self) { geometry in
             EdgeOverflow(
@@ -113,6 +118,8 @@ package struct MixerPopover: View {
             overflow = newValue
         }
         .mask { EdgeFadeMask(overflow: overflow) }
+        // Give the margins back, so the strips sit where they did and the popover keeps its size.
+        .padding(-Self.focusRingRoom)
     }
 
     private var emptyState: some View {
