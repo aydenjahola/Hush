@@ -41,22 +41,28 @@ Each DMG has a matching `.sha256` file (`Hush.dmg.sha256`, `Hush-x.y.z.dmg.sha25
 
 ## Build from source
 
-You need the Xcode Command Line Tools (`xcode-select --install`). Xcode itself is optional.
+Building from source needs **Xcode 26 or later**; the Command Line Tools alone aren't enough. (To just use Hush, download the DMG above: you don't need Xcode.) Select Xcode once:
 
 ```sh
-make test   # run the unit tests
-make app    # build build/Hush.app (ad-hoc signed)
-make run    # build and launch
-make install  # quit Hush, build, replace /Applications/Hush.app and relaunch it
-make dmg    # build build/Hush-<version>.dmg (add ARCHS="arm64 x86_64" for a universal binary)
-make icon   # regenerate Resources/Hush.icns from scripts/make-icon.swift
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
+or set `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` for a single command. The Makefile stops with a clear message if neither points into an Xcode app.
+
+```sh
+make test     # run the unit tests
+make app      # build build/Hush.app (ad-hoc signed)
+make run      # build and launch
+make install  # build, quit Hush, replace /Applications/Hush.app and relaunch it
+make dmg      # build build/Hush-<version>.dmg (add ARCHS="arm64 x86_64" for a universal binary)
+make icon     # regenerate Resources/Hush.icns from scripts/make-icon.swift
 ```
 
 Run `Hush.app` (via `make run`), not the bare binary from Xcode's Run button. Without the app bundle there's no bundle ID or Audio Recording usage description, so the permission prompt and the Settings window misbehave.
 
 Rebuilding changes the ad-hoc signature, so macOS may ask for Audio Recording permission again.
 
-With only the Command Line Tools installed, use `make test` rather than plain `swift test`: it passes the flag that loads the Swift Testing macro plugin, which the Command Line Tools don't load on their own.
+`make install` builds first, so a failed build leaves your installed copy alone. It accepts `ARCHS` like `make app` (e.g. `make install ARCHS="arm64 x86_64"`).
 
 ## How it works
 
