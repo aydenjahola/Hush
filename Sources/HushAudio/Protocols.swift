@@ -51,6 +51,13 @@ package protocol AudioEngineHandle: AnyObject {
     func setGain(_ gain: Float)
     /// Returns the peak level seen since the previous call, then resets it.
     func currentPeak() -> Float
+    /// How many IO cycles the engine has run, wrapping, never reset (not even by a rebuild). Two
+    /// equal readings some time apart mean its IOProc isn't running: the engine has stalled.
+    var ioCycleCount: UInt32 { get }
+    /// Whether the engine's aggregate lists `outputDeviceID` among its active sub-devices: false
+    /// if it doesn't (or the engine isn't running), nil if the list can't be read. Main actor
+    /// only; never from an IOProc.
+    func isAttached(toOutputDeviceID outputDeviceID: AudioObjectID) -> Bool?
     func rebuild(outputDeviceID: AudioObjectID) throws
     /// Two-phase `rebuild`, so several engines can overlap their start-up: begin all, then finish
     /// all. The default does the whole rebuild in `beginRebuild`.

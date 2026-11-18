@@ -51,6 +51,12 @@ package struct OutputDevice: Identifiable, Equatable, Sendable {
         self.name = name
         self.transport = transport
     }
+
+    /// Whether two reports name the same physical device: equal, non-empty UIDs. Object IDs
+    /// aren't stable (a device can come back under a new one); the UID is what aggregates use.
+    package static func isSameDevice(_ lhs: OutputDevice, _ rhs: OutputDevice) -> Bool {
+        !lhs.uid.isEmpty && lhs.uid == rhs.uid
+    }
 }
 
 /// How an output device is connected (`kAudioDevicePropertyTransportType`), refined by the

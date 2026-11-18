@@ -1,3 +1,4 @@
+import AppKit
 import CoreAudio
 import Foundation
 import HushAudio
@@ -98,6 +99,14 @@ final class FakeEngine: AudioEngineHandle {
     func setGain(_ gain: Float) { currentGain = gain }
     func currentPeak() -> Float { peak }
 
+    /// The IO cycle count only moves when a test calls `runIO()`, so an engine looks stalled
+    /// unless the test says IO ran.
+    private(set) var ioCycleCount: UInt32 = 0
+    func runIO() { ioCycleCount &+= 1 }
+    /// What `isAttached(toOutputDeviceID:)` reports.
+    var attached: Bool? = true
+    func isAttached(toOutputDeviceID outputDeviceID: AudioObjectID) -> Bool? { attached }
+
     var finishRebuildError: (any Error)?
 
     func rebuild(outputDeviceID: AudioObjectID) throws {
@@ -110,6 +119,7 @@ final class FakeEngine: AudioEngineHandle {
         log?("beginRebuild \(appID)")
         if let rebuildError { throw rebuildError }
         rebuiltDeviceIDs.append(outputDeviceID)
+        attached = true  // a rebuilt engine has a fresh aggregate on the new device
         if mode == .control {
             mode = .meterOnly
             pendingControl = true
@@ -204,6 +214,8 @@ final class Harness {
     let factory: FakeEngineFactory
     let permission: FakePermission
     let persister: FakePersister
+    /// Stands in for `NSWorkspace.shared.notificationCenter`; `simulateWake()` posts to it.
+    let wakeNotifications = NotificationCenter()
     let store: MixerStore
 
     init(
@@ -211,6 +223,7 @@ final class Harness {
         permission status: AudioCapturePermissionStatus = .authorized,
         answer: AudioCapturePermissionStatus? = nil,
         outputErrorDuration: Duration = .seconds(3600),
+        healthCheckDelay: Duration = .seconds(3600),
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = { _ in nil }
     ) {
         let processes = FakeProcessSource()
@@ -233,9 +246,18 @@ final class Harness {
             persister: persister,
             saveDelay: .seconds(3600),
             outputErrorDuration: outputErrorDuration,
+            wakeNotifications: wakeNotifications,
+            healthCheckDelay: healthCheckDelay,
+            stallConfirmDelay: healthCheckDelay,
+            stallRetryDelay: .seconds(3600),
             now: { Harness.fixedNow },
             installedApp: installedApp)
         store.start()
+    }
+
+    /// Posts a wake notification, as `NSWorkspace` does when the Mac wakes.
+    func simulateWake() {
+        wakeNotifications.post(name: NSWorkspace.didWakeNotification, object: nil)
     }
 }
 
