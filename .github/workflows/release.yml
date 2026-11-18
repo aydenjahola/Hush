@@ -169,15 +169,12 @@ jobs:
         if: always() && env.HAS_SIGNING == 'true'
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
 
-  # Redeploys the website so it shows the new version. Disabled until the website
-  # task adds .github/workflows/pages.yml with `on: workflow_call`; a `uses:` that
-  # points at a missing file fails the whole workflow, so it stays commented out.
+  # Redeploys the website so it shows the new version. A skipped build-dmg skips this too.
   # Pages deploys need these permissions granted by the caller.
-  #
-  # pages:
-  #   needs: build-dmg
-  #   permissions:
-  #     contents: read
-  #     pages: write
-  #     id-token: write
-  #   uses: ./.github/workflows/pages.yml
+  pages:
+    needs: build-dmg
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
