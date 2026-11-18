@@ -8,7 +8,7 @@ package protocol HotKeyRegistering: AnyObject {
     /// Called on the main actor each time the registered combination is pressed.
     var onPress: (@MainActor () -> Void)? { get set }
     /// Registers `shortcut` in place of any previous one. Returns false, leaving nothing
-    /// registered, when the system or another app already uses it.
+    /// registered, when it's known to be taken. That check is best effort: see `GlobalHotKey`.
     func register(_ shortcut: GlobalShortcut) -> Bool
     func unregister()
 }
@@ -16,17 +16,32 @@ package protocol HotKeyRegistering: AnyObject {
 /// A global shortcut through Carbon's `RegisterEventHotKey`. Unlike an event tap or a global
 /// `NSEvent` monitor, this needs no Accessibility or Input Monitoring permission: the system
 /// delivers only the registered combination, and only to Hush.
+///
+/// Detecting a combination that's already taken is best effort. Hush refuses one that an enabled
+/// macOS shortcut uses (from `CopySymbolicHotKeys`), and `RegisterEventHotKey` fails when another
+/// app registered the same combination exclusively. A non-exclusive registration by another app
+/// isn't reported, so the two may overlap. Hush registers non-exclusively itself.
 package final class GlobalHotKey: HotKeyRegistering {
     package var onPress: (@MainActor () -> Void)?
 
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?
+    private let symbolicHotKeys: @MainActor () -> [SymbolicHotKey]
     private let logger = Logger(subsystem: HushIdentity.bundleID, category: "shortcut")
 
     /// 'Hush', so the handler only answers to its own hot key.
     nonisolated private static let signature: OSType = 0x4875_7368
+    /// Hush registers one hot key, always with this id.
+    nonisolated private static let hotKeyID: UInt32 = 1
 
-    package init() {}
+    package convenience init() {
+        self.init(symbolicHotKeys: GlobalHotKey.enabledSymbolicHotKeys)
+    }
+
+    /// `symbolicHotKeys` lists the system's shortcuts; tests pass a fixed list.
+    init(symbolicHotKeys: @escaping @MainActor () -> [SymbolicHotKey]) {
+        self.symbolicHotKeys = symbolicHotKeys
+    }
 
     isolated deinit {
         unregister()
@@ -35,17 +50,18 @@ package final class GlobalHotKey: HotKeyRegistering {
 
     package func register(_ shortcut: GlobalShortcut) -> Bool {
         unregister()
-        guard installHandler() else { return false }
-        if Self.isReservedBySystem(shortcut, symbolicHotKeys: Self.enabledSymbolicHotKeys()) {
+        // Checked first, so a refused combination touches nothing in Carbon.
+        if Self.isReservedBySystem(shortcut, symbolicHotKeys: symbolicHotKeys()) {
             return false
         }
+        guard installHandler() else { return false }
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
             UInt32(shortcut.keyCode),
             Self.carbonModifiers(shortcut.modifiers),
-            EventHotKeyID(signature: Self.signature, id: 1),
+            EventHotKeyID(signature: Self.signature, id: Self.hotKeyID),
             GetApplicationEventTarget(),
-            0,
+            0,  // not kEventHotKeyExclusive, so Hush never blocks another app's registration
             &ref)
         guard status == noErr, let ref else {
             logger.notice("Couldn't register the global shortcut (status \(status, privacy: .public))")
@@ -63,6 +79,11 @@ package final class GlobalHotKey: HotKeyRegistering {
 
     /// Installs the hot-key event handler once, on the application's event target. Carbon calls
     /// it on the main thread.
+    ///
+    /// The handler stays installed until deinit, even while no hot key is registered. It only
+    /// answers to Hush's own hot-key ID, so it costs nothing in between. Keeping it also means
+    /// re-registering after recording or a change can't fail halfway, with a hot key but no
+    /// handler. Deinit removes it, because the handler holds an unretained pointer to `self`.
     private func installHandler() -> Bool {
         if handler != nil { return true }
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -74,7 +95,7 @@ package final class GlobalHotKey: HotKeyRegistering {
                 let status = GetEventParameter(
                     event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
                     MemoryLayout<EventHotKeyID>.size, nil, &id)
-                guard status == noErr, id.signature == GlobalHotKey.signature else {
+                guard status == noErr, id.signature == GlobalHotKey.signature, id.id == GlobalHotKey.hotKeyID else {
                     return OSStatus(eventNotHandledErr)
                 }
                 let hotKey = Unmanaged<GlobalHotKey>.fromOpaque(userData).takeUnretainedValue()

@@ -100,7 +100,11 @@ package enum L10n {
     package static let typeShortcut = resource("Type Shortcut")
     package static let noShortcut = resource("None")
     package static let clearShortcut = resource("Clear keyboard shortcut")
-    package static let shortcutRecordHint = resource("Records a key combination that opens the mixer from any app.")
+    package static let shortcutRecordHint = resource(
+        "Records a key combination that opens the mixer from any app. Press Escape while recording to cancel.")
+    package static func shortcutSaved(_ shortcut: String) -> LocalizedStringResource {
+        resource("Keyboard shortcut set to \(shortcut)")
+    }
     package static let shortcutRecordingHint = resource("Press the key combination, or Escape to cancel.")
     package static let shortcutInUse = resource("That shortcut is in use. Try another.")
     package static let shortcutNeedsModifier = resource("Include ⌥ or ⌃, or use a function key.")
@@ -189,7 +193,8 @@ package enum L10n {
             clickToMute, clickToUnmute, permissionNeeded, openSystemSettings, updateAvailable("x"), download, later,
             skipThisVersion, downloadHelp, laterHelp, general, launchAtLogin, launchAtLoginApprovalHint,
             launchAtLoginUnavailableHelp, openLoginItems, maximumBoost, keyboardShortcut,
-            recordShortcut, typeShortcut, noShortcut, clearShortcut, shortcutRecordHint, shortcutRecordingHint,
+            recordShortcut, typeShortcut, noShortcut, clearShortcut, shortcutRecordHint, shortcutSaved("x"),
+            shortcutRecordingHint,
             shortcutInUse, shortcutNeedsModifier, shortcutIsStandard, spaceKey, unknownKey(50), showInactiveApps,
             levels,
             resetAllLevelsButton, resetAllLevelsTitle, resetAllLevels, resetAllLevelsMessage, updates,

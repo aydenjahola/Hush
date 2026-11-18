@@ -21,7 +21,9 @@ If **Tab** skips the faders and buttons, turn on **Keyboard navigation** in **Sy
 
 ### Opening the mixer with a shortcut
 
-Hush has no global shortcut until you choose one, so it never takes over a key combination you use elsewhere. Set one in [Settings → General → Keyboard shortcut](/Hush/using/settings/#keyboard-shortcut). Pressing it anywhere works like clicking the Hush icon: it opens the mixer, or closes it if it's open. If macOS is hiding the Hush icon (for example, because it's turned off in **System Settings → Menu Bar**), the shortcut does nothing, because the mixer opens from the icon.
+Hush has no global shortcut until you choose one, so it never takes over a key combination you use elsewhere. Set one in [Settings → General → Keyboard shortcut](/Hush/using/settings/#keyboard-shortcut). Pressing it anywhere works like clicking the Hush icon: it opens the mixer, or closes it if it's open. The mixer opens from the icon, so while the Hush icon can't be seen the shortcut does nothing. That happens when it's turned off in **System Settings → Menu Bar**, and while the menu bar is hidden, such as in a full-screen app.
+
+Hush warns you about combinations that macOS itself uses, and ones another app has claimed exclusively. It can't detect every other app's shortcuts, so pick a combination you don't use elsewhere.
 
 The shortcut doesn't need Accessibility or Input Monitoring permission: macOS tells Hush only when that one combination is pressed, and Hush never sees your other key presses.
 

@@ -52,6 +52,12 @@ package struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
         if Self.isFunctionKey(keyCode) { return .ok }
         if modifiers.isDisjoint(with: [.command, .option, .control]) { return .needsModifier }
         if modifiers.isSubset(of: [.command, .shift]) { return .standardShortcut }
+        // ⌥⌘Esc opens Force Quit (⌥⌘⇧Esc force quits the front app), so leave it to macOS.
+        if keyCode == KeyCode.escape, modifiers.isSuperset(of: [.command, .option]),
+            modifiers.isSubset(of: [.command, .option, .shift])
+        {
+            return .standardShortcut
+        }
         return .ok
     }
 

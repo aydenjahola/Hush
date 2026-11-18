@@ -47,6 +47,15 @@ import Testing
         }
     }
 
+    @Test func forceQuitIsLeftToMacOS() {
+        let forceQuit = GlobalShortcut(keyCode: Key.escape, modifiers: [.command, .option])
+        let forceQuitFront = GlobalShortcut(keyCode: Key.escape, modifiers: [.command, .option, .shift])
+        #expect(forceQuit.validity == .standardShortcut)
+        #expect(forceQuitFront.validity == .standardShortcut)
+        #expect(GlobalShortcut(keyCode: Key.escape, modifiers: [.control, .option]).validity == .ok)
+        #expect(GlobalShortcut(keyCode: Key.escape, modifiers: [.control, .command, .option]).validity == .ok)
+    }
+
     @Test func allowedExamples() {
         let allowed = [
             GlobalShortcut(keyCode: keyH, modifiers: [.option, .command]),

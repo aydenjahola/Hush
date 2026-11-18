@@ -121,8 +121,10 @@ The optional shortcut that toggles the popover uses Carbon's `RegisterEventHotKe
 
 - `GlobalShortcut` (in `HushCore`) holds a virtual key code and modifiers, validates them (⌥ or ⌃ is required, since ⌘ and ⌘⇧ alone are left to apps; a function key may be used alone) and supplies the glyphs. `ShortcutFormatter` takes letters from the current keyboard layout with `UCKeyTranslate`.
 - It's stored as the top-level `globalShortcut` field of `settings.json`, outside `preferences`, so the mixer's debounced saves never overwrite it.
-- Registration is refused when it fails or when an enabled system shortcut (`CopySymbolicHotKeys`) already uses the combination. The previous shortcut is kept.
-- The Settings recorder uses a local `NSEvent` key-down monitor only while recording, and unregisters the shortcut meanwhile so pressing it records it. `StatusItemController.togglePopover()` is what the shortcut calls.
+- "In use" detection is best effort. Registration is refused when an enabled system shortcut (`CopySymbolicHotKeys`) already uses the combination, or when `RegisterEventHotKey` fails, which happens only against another app's exclusive registration. Non-exclusive registrations by other apps aren't detected and can overlap. Hush registers non-exclusively itself (no `kEventHotKeyExclusive`). The previous shortcut is kept.
+- A saved shortcut that the current rules don't allow stays saved but isn't registered, and Settings shows why.
+- While recording, the Settings recorder uses a local `NSEvent` key-down monitor. It only takes events for the Settings window, so the popover and menus keep their keys, and recording stops when that window resigns key. The shortcut is unregistered meanwhile, so pressing it records it.
+- `StatusItemController.togglePopover()` is what the shortcut calls. It does nothing unless the icon's window is visible, unoccluded and on a screen.
 
 ## Update notifier: `UpdateChecker`
 

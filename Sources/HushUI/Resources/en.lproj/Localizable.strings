@@ -223,7 +223,10 @@
 "Clear keyboard shortcut" = "Clear keyboard shortcut";
 
 /* VoiceOver hint of the shortcut recorder. */
-"Records a key combination that opens the mixer from any app." = "Records a key combination that opens the mixer from any app.";
+"Records a key combination that opens the mixer from any app. Press Escape while recording to cancel." = "Records a key combination that opens the mixer from any app. Press Escape while recording to cancel.";
+
+/* VoiceOver announcement after a keyboard shortcut is saved. %@ is the shortcut in key symbols, such as ⌥⌘H. */
+"Keyboard shortcut set to %@" = "Keyboard shortcut set to %@";
 
 /* VoiceOver hint of the shortcut recorder while it waits for a key combination. */
 "Press the key combination, or Escape to cancel." = "Press the key combination, or Escape to cancel.";

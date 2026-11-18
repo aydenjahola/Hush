@@ -63,10 +63,21 @@ struct ShortcutRecorder: View {
                 .accessibilityLabel(L10n.clearShortcut)
             }
         }
+        .background(WindowReader { monitor.window = $0 })
         .onDisappear { stopRecording() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             stopRecording()
         }
+        .onChange(of: controller.problem) { _, problem in
+            if let problem { announce(String(localized: KeyboardShortcutRow.message(for: problem))) }
+        }
+        .onChange(of: controller.shortcut) { _, shortcut in
+            if let shortcut { announce(String(localized: L10n.shortcutSaved(ShortcutFormatter.string(for: shortcut)))) }
+        }
+    }
+
+    private func announce(_ text: String) {
+        AccessibilityNotification.Announcement(text).post()
     }
 
     private var title: String {
@@ -82,8 +93,10 @@ struct ShortcutRecorder: View {
     }
 
     private func startRecording() {
+        // Without the window, keys can't be limited to Settings, so don't record at all.
+        guard monitor.window != nil else { return }
         controller.beginRecording()
-        monitor.start { event in handle(event) }
+        monitor.start(onKeyDown: { event in handle(event) }, onResignKey: { stopRecording() })
     }
 
     private func stopRecording() {
@@ -109,22 +122,59 @@ struct ShortcutRecorder: View {
     }
 }
 
-/// A local key-down monitor that swallows every key press while installed.
+/// While started, takes key presses aimed at the recorder's window and swallows them. Key
+/// presses in any other window (the popover, the quick menu) pass through untouched. It also
+/// reports when that window stops being the key window.
 @MainActor
 final class KeyDownMonitor {
+    /// The window the recorder is in, set by `WindowReader`.
+    weak var window: NSWindow?
     private var token: Any?
+    private var resignObserver: (any NSObjectProtocol)?
 
-    func start(_ handler: @escaping @MainActor (NSEvent) -> Void) {
+    func start(onKeyDown: @escaping @MainActor (NSEvent) -> Void, onResignKey: @escaping @MainActor () -> Void) {
         stop()
-        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            MainActor.assumeIsolated { handler(event) }
+        guard let window else { return }
+        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak window] event in
+            guard let window, event.window === window else { return event }
+            MainActor.assumeIsolated { onKeyDown(event) }
             return nil
+        }
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: window, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { onResignKey() }
         }
     }
 
     func stop() {
-        guard let token else { return }
-        NSEvent.removeMonitor(token)
-        self.token = nil
+        if let token { NSEvent.removeMonitor(token) }
+        token = nil
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        resignObserver = nil
+    }
+}
+
+/// Reports the window a SwiftUI view is in, and again whenever it moves to another one.
+private struct WindowReader: NSViewRepresentable {
+    let onChange: @MainActor (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> ReportingView {
+        let view = ReportingView()
+        view.onWindowChange = onChange
+        return view
+    }
+
+    func updateNSView(_ view: ReportingView, context: Context) {
+        view.onWindowChange = onChange
+    }
+
+    final class ReportingView: NSView {
+        var onWindowChange: (@MainActor (NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindowChange?(window)
+        }
     }
 }

@@ -138,6 +138,63 @@ private final class FakeHotKey: HotKeyRegistering {
                 == "That's a standard app shortcut. Add ⌥ or ⌃.")
     }
 
+    @Test func endRecordingRegistersTheSavedShortcutAgain() {
+        let (controller, hotKey, _) = make(saved: optionCommandH)
+        controller.start()
+        controller.beginRecording()
+        #expect(hotKey.registered == nil)
+        controller.endRecording()
+        #expect(hotKey.registered == optionCommandH)
+        #expect(hotKey.registrations == [optionCommandH, optionCommandH])
+        #expect(controller.problem == nil)
+    }
+
+    @Test func aFailedReRegistrationAfterRecordingReportsInUse() {
+        let (controller, hotKey, persister) = make(saved: optionCommandH)
+        controller.start()
+        controller.beginRecording()
+        hotKey.taken = [optionCommandH]  // another app took it meanwhile
+        controller.endRecording()
+        #expect(controller.problem == .inUse)
+        #expect(controller.shortcut == optionCommandH)
+        #expect(persister.document.globalShortcut == optionCommandH)
+    }
+
+    @Test(arguments: [
+        (GlobalShortcut(keyCode: 0x08, modifiers: .command), GlobalShortcutController.Problem.standardShortcut),
+        (GlobalShortcut(keyCode: 0x08, modifiers: .shift), .needsModifier),
+    ])
+    func aSavedShortcutThatIsNoLongerAllowedIsNotRegistered(
+        saved: GlobalShortcut, problem: GlobalShortcutController.Problem
+    ) {
+        let (controller, hotKey, _) = make(saved: saved)
+        controller.start()
+        #expect(controller.shortcut == saved)
+        #expect(controller.problem == problem)
+        #expect(hotKey.registrations.isEmpty)
+        controller.beginRecording()
+        controller.endRecording()
+        #expect(hotKey.registrations.isEmpty)
+    }
+
+    /// Goes through the real `GlobalHotKey` with a fixed list of system shortcuts. The reserved
+    /// check comes before any Carbon call, so nothing is registered in the test process.
+    @Test func aValidCombinationReservedBySystemIsInUse() {
+        let controlUp = GlobalShortcut(keyCode: GlobalShortcut.KeyCode.upArrow, modifiers: .control)
+        let missionControl = GlobalHotKey.SymbolicHotKey(
+            keyCode: Int(GlobalShortcut.KeyCode.upArrow), carbonModifiers: controlKey, isEnabled: true)
+        let hotKey = GlobalHotKey(symbolicHotKeys: { [missionControl] })
+        let persister = FakePersister(document: SettingsDocument())
+        let controller = GlobalShortcutController(persister: persister, hotKey: hotKey)
+        controller.start()
+        controller.beginRecording()
+        #expect(controlUp.validity == .ok)
+        #expect(!controller.record(controlUp))
+        #expect(controller.problem == .inUse)
+        #expect(controller.shortcut == nil)
+        #expect(persister.saved.isEmpty)
+    }
+
     @Test func clearingRemovesTheShortcut() {
         let (controller, hotKey, persister) = make(saved: optionCommandH)
         controller.start()

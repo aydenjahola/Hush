@@ -100,7 +100,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     }
 
     private var isIconOnScreen: Bool {
-        guard statusItem.isVisible, let window = statusItem.button?.window, window.isVisible else { return false }
+        guard statusItem.isVisible, let window = statusItem.button?.window, window.isVisible,
+            window.occlusionState.contains(.visible)
+        else { return false }
         return NSScreen.screens.contains { $0.frame.intersects(window.frame) }
     }
 

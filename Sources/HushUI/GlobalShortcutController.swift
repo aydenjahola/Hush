@@ -36,11 +36,22 @@ package final class GlobalShortcutController {
         hotKey.onPress = { [weak self] in self?.onPress?() }
     }
 
-    /// Loads the saved shortcut and registers it.
+    /// Reads the saved shortcut (from the settings already in memory, if any) and registers it.
     package func start() {
-        shortcut = persister.load().globalShortcut
+        shortcut = persister.latest().globalShortcut
         problem = nil
-        if let shortcut, !hotKey.register(shortcut) { problem = .inUse }
+        registerSaved()
+    }
+
+    /// Registers the saved shortcut if it's allowed. One that isn't (written by hand, or by a
+    /// version with looser rules) stays saved but inactive, with the reason shown in Settings.
+    private func registerSaved() {
+        guard let shortcut else { return }
+        switch shortcut.validity {
+        case .ok: if !hotKey.register(shortcut) { problem = .inUse }
+        case .needsModifier: problem = .needsModifier
+        case .standardShortcut: problem = .standardShortcut
+        }
     }
 
     /// Unregisters the shortcut (when Hush quits). The saved value is kept.
@@ -59,7 +70,7 @@ package final class GlobalShortcutController {
     package func endRecording() {
         guard isRecording else { return }
         isRecording = false
-        if let shortcut, !hotKey.register(shortcut) { problem = .inUse }
+        registerSaved()
     }
 
     /// Saves and registers a combination the user pressed while recording. A combination that
@@ -80,7 +91,7 @@ package final class GlobalShortcutController {
         guard hotKey.register(candidate) else {
             problem = .inUse
             // Trying the candidate cleared the previous registration; put it back.
-            if let shortcut { _ = hotKey.register(shortcut) }
+            if let shortcut, shortcut.isValid { _ = hotKey.register(shortcut) }
             return false
         }
         problem = nil

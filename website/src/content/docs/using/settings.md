@@ -42,11 +42,11 @@ Strips for apps that aren't playing are dimmed. An app that isn't running is sho
 A key combination that opens the mixer from any app, as if you'd clicked the Hush icon. Press it again to close the mixer. There's none by default.
 
 - To set one, click **Record Shortcut**, then press the combination, such as **⌥⌘H**. It's saved straight away and shown with the standard key symbols.
-- The combination must include **⌥** or **⌃** (with or without **⌘** and **⇧**). **⌘** or **⌘⇧** on their own aren't enough, because apps use those for their own commands, such as **⌘C** or **⌘⇧4**: Hush shows **"That's a standard app shortcut. Add ⌥ or ⌃."** A function key (**F1** to **F20**) can be used on its own or with any modifiers.
+- The combination must include **⌥** or **⌃** (with or without **⌘** and **⇧**). **⌘** or **⌘⇧** on their own aren't enough, because apps use those for their own commands, such as **⌘C** or **⌘⇧4**. **⌥⌘Esc** (Force Quit) is left to macOS too. For these, Hush shows **"That's a standard app shortcut. Add ⌥ or ⌃."** A function key (**F1** to **F20**) can be used on its own or with any modifiers.
 - Press **Esc** while recording to cancel and keep the current shortcut.
 - To remove the shortcut, click the **ⓧ** button next to it.
 
-If macOS or another app already uses the combination, Hush shows **"That shortcut is in use. Try another."** and keeps your previous shortcut. The same message appears if a saved shortcut has been taken by another app since Hush last started.
+If Hush can tell the combination is already taken, it shows **"That shortcut is in use. Try another."** and keeps your previous shortcut. It can tell for macOS's own shortcuts (those turned on in **System Settings → Keyboard → Keyboard Shortcuts**) and for combinations another app has claimed exclusively. Most apps don't claim their shortcuts that way, so Hush can't always see them. If your shortcut also does something in another app, choose a different one. The same message appears if a saved shortcut has been taken since Hush last started.
 
 The shortcut needs no extra permission. See [Keyboard and accessibility](/Hush/using/keyboard-accessibility/#opening-the-mixer-with-a-shortcut).
 
