@@ -72,6 +72,31 @@ enum BufferRouting {
         return peak
     }
 
+    /// Runs of exact zeros in the first input channel from `firstInputBuffer`, continuing a run of
+    /// `carrying` zeros from the previous buffer. Returns the run still open at the end, the
+    /// longest run (the carried one included) and whether every frame was zero. A missing channel
+    /// counts as all zeros, with no frames.
+    static func zeroRun(
+        in input: UnsafeMutableAudioBufferListPointer, firstInputBuffer: Int = 0, carrying: Int = 0
+    ) -> (trailing: Int, longest: Int, allZero: Bool) {
+        guard let source = locate(channel: 0, in: input, from: firstInputBuffer) else {
+            return (carrying, carrying, true)
+        }
+        var current = carrying
+        var longest = carrying
+        var frame = 0
+        while frame < source.frames {
+            if source.pointer[frame * source.stride] == 0 {
+                current += 1
+                if current > longest { longest = current }
+            } else {
+                current = 0
+            }
+            frame += 1
+        }
+        return (current, longest, current == carrying + source.frames)
+    }
+
     static func silence(_ output: UnsafeMutableAudioBufferListPointer) {
         for buffer in output {
             if let data = buffer.mData {

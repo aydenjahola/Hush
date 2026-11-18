@@ -74,6 +74,92 @@ import Testing
         #expect(first.allSatisfy { $0 != 0 }, "every replayed sample of a non-zero input is non-zero")
     }
 
+    // MARK: Takeover diagnostics (#50)
+
+    /// One cycle with the given input on both channels.
+    func cycle(_ block: AudioDeviceIOBlock, left samples: [Float]) {
+        let input = TestBufferList([(channels: 2, samples: samples.flatMap { [$0, $0] })])
+        let output = TestBufferList([(channels: 2, samples: [Float](repeating: 9, count: samples.count * 2))])
+        var time = AudioTimeStamp()
+        block(&time, UnsafePointer(input.list.unsafeMutablePointer), &time, output.list.unsafeMutablePointer, &time)
+    }
+
+    @Test func theTakeoverWatchMeasuresTheTapsZeroRunAcrossReplayedBuffers() {
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        let silent = [Float](repeating: 0, count: Self.frames)
+        let sound = [Float](repeating: 0.5, count: Self.frames)
+        cycle(block, left: sound)
+        cycle(block, left: sound)
+        AppAudioEngine.beginReplay(state: state, gain: 0.5)
+
+        cycle(block, left: [Float](repeating: 0.5, count: Self.frames - 10) + [Float](repeating: 0, count: 10))
+        cycle(block, left: silent)  // the HAL's dropped buffer
+        cycle(block, left: [Float](repeating: 0, count: 20) + [Float](repeating: 0.5, count: Self.frames - 20))
+
+        #expect(state.watchFirstCycle.load(ordering: .relaxed) == 3, "the first replayed buffer was cycle 3")
+        #expect(state.watchLongestZeroRun.load(ordering: .relaxed) == UInt32(10 + Self.frames + 20))
+        #expect(state.watchSilentBuffers.load(ordering: .relaxed) == 1)
+        #expect(state.watchCyclesLeft.load(ordering: .relaxed) == EngineSharedState.takeoverWatchCycles - 3)
+    }
+
+    @Test func theTakeoverWatchStopsAfterItsCycles() {
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        AppAudioEngine.beginReplay(state: state, gain: 0.5)
+        for _ in 0..<EngineSharedState.takeoverWatchCycles { _ = cycle(block) }
+        #expect(state.watchCyclesLeft.load(ordering: .relaxed) == 0)
+        cycle(block, left: [Float](repeating: 0, count: Self.frames))
+        #expect(state.watchSilentBuffers.load(ordering: .relaxed) == 0, "a later silent buffer isn't counted")
+        #expect(state.watchLongestZeroRun.load(ordering: .relaxed) == 0)
+    }
+
+    @Test func theTakeoverWatchIgnoresMeterOnlyCycles() {
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        cycle(block, left: [Float](repeating: 0, count: Self.frames))
+        #expect(state.watchSilentBuffers.load(ordering: .relaxed) == 0)
+        #expect(state.watchCyclesLeft.load(ordering: .relaxed) == 0, "not armed until beginReplay")
+    }
+
+    @Test func silentTapInputIsCountedUntilTheFirstSound() {
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        let silent = [Float](repeating: 0, count: Self.frames)
+        cycle(block, left: silent)
+        cycle(block, left: silent)
+        var heard = state.heardTapInput.load(ordering: .relaxed)
+        #expect(!heard)
+        #expect(state.silentCyclesBeforeSound.load(ordering: .relaxed) == 2)
+
+        _ = cycle(block)
+        cycle(block, left: silent)
+        heard = state.heardTapInput.load(ordering: .relaxed)
+        #expect(heard)
+        #expect(
+            state.silentCyclesBeforeSound.load(ordering: .relaxed) == 2, "silence after the first sound isn't counted")
+    }
+
+    @Test func aReplayedCycleAlsoCountsAsHearingTheTap() {
+        let state = EngineSharedState(gain: 0.5, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        let heard = state.heardTapInput.load(ordering: .relaxed)
+        #expect(heard)
+    }
+
+    @Test func theDiagnosticsLeaveTheReplayUnchanged() {
+        // The watch only reads the input: a watched ramp renders exactly as before.
+        let state = EngineSharedState(gain: 1, mode: .meterOnly)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        AppAudioEngine.beginReplay(state: state, gain: 0.5)
+        let first = left(cycle(block))
+        #expect(first.allSatisfy { $0 != 0 })
+        #expect(isApproximatelyEqual(first.last!, 0.25, tolerance: 0.01))
+        #expect(left(cycle(block)).allSatisfy { isApproximatelyEqual($0, 0.25) })
+    }
+
     // MARK: Muted fast path (#5)
 
     func fastPathCycles(_ state: EngineSharedState) -> UInt32 { state.mutedFastPathCycles.load(ordering: .relaxed) }

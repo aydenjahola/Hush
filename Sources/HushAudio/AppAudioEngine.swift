@@ -20,6 +20,29 @@ final class EngineSharedState: Sendable {
     /// add). Only read by tests, to tell the fast path apart from a full render at gain 0.
     let mutedFastPathCycles = Atomic<UInt32>(0)
 
+    // Takeover diagnostics (#50), read only by the integration tests. They cost the IOProc a
+    // relaxed load or two per cycle, plus a scan of one channel while the watch is armed.
+
+    /// Set by the IOProc on the first cycle since the last build whose tap input has a non-zero
+    /// sample, so a switch can tell whether the tap had delivered any sound yet.
+    let heardTapInput = Atomic<Bool>(false)
+    /// Cycles since the last build whose tap input was all zeros, until `heardTapInput` was set.
+    let silentCyclesBeforeSound = Atomic<UInt32>(0)
+    /// Replayed buffers still to watch. `beginReplay` arms it; then only the IOProc writes the
+    /// watch counters.
+    let watchCyclesLeft = Atomic<UInt32>(0)
+    /// The `ioCycles` value of the first replayed buffer after the last `beginReplay`.
+    let watchFirstCycle = Atomic<UInt32>(0)
+    /// The open and the longest run of exact zeros in the tap's first channel across the watched
+    /// buffers: the same measure the integration tests apply to the output.
+    let watchZeroRun = Atomic<UInt32>(0)
+    let watchLongestZeroRun = Atomic<UInt32>(0)
+    /// Watched buffers whose tap input was entirely zeros.
+    let watchSilentBuffers = Atomic<UInt32>(0)
+
+    /// About 85 ms at 512-frame buffers and 48 kHz, well past the takeover's gap.
+    static let takeoverWatchCycles: UInt32 = 8
+
     /// `appliedGainBits` is the replay's current gain: a meter-only engine starts at 0, so it has
     /// nothing to fade out.
     init(gain: Float, mode: EngineMode) {
@@ -55,6 +78,8 @@ package final class AppAudioEngine: AudioEngineHandle {
     private var ioProcID: AudioDeviceIOProcID?
     /// Set between `beginRebuild` and `finishRebuild` for an engine that was `.control`.
     private var pendingTakeoverGain: Float?
+    /// The main thread's half of the last switch to `.control` (#50 diagnostics).
+    private var lastSwitch: (issuedAt: UInt32, muteReturnedAt: UInt32, heardTapInput: Bool, silentCycles: UInt32)?
     private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
 
     package init(
@@ -75,6 +100,23 @@ package final class AppAudioEngine: AudioEngineHandle {
     var ioProcHasRun: Bool { state.hasRun.load(ordering: .acquiring) }
 
     package var ioCycleCount: UInt32 { state.ioCycles.load(ordering: .relaxed) }
+
+    /// What the last switch of a live tap to `.control` saw, for the integration tests' takeover
+    /// log (#50). Nil until one has happened.
+    var takeoverDiagnostics: TakeoverDiagnostics? {
+        guard let lastSwitch else { return nil }
+        let left = min(state.watchCyclesLeft.load(ordering: .relaxed), EngineSharedState.takeoverWatchCycles)
+        let watched = EngineSharedState.takeoverWatchCycles - left
+        return TakeoverDiagnostics(
+            heardTapInputBeforeSwitch: lastSwitch.heardTapInput,
+            silentCyclesBeforeSound: lastSwitch.silentCycles,
+            muteCallSpannedCycles: lastSwitch.muteReturnedAt &- lastSwitch.issuedAt,
+            firstReplayAfterCycles: watched > 0
+                ? state.watchFirstCycle.load(ordering: .relaxed) &- lastSwitch.issuedAt : nil,
+            watchedBuffers: watched,
+            silentInputBuffers: state.watchSilentBuffers.load(ordering: .relaxed),
+            longestInputZeroRun: Int(state.watchLongestZeroRun.load(ordering: .relaxed)))
+    }
 
     package func isAttached(toOutputDeviceID outputDeviceID: AudioObjectID) -> Bool? {
         guard aggregateID != kAudioObjectUnknown else { return false }
@@ -224,6 +266,9 @@ package final class AppAudioEngine: AudioEngineHandle {
         switch newMode {
         case .control:
             // Replay first (ramping up from g/1000 across the first buffer), then mute the source.
+            let heard = state.heardTapInput.load(ordering: .relaxed)
+            let silentCycles = state.silentCyclesBeforeSound.load(ordering: .relaxed)
+            let issuedAt = state.ioCycles.load(ordering: .relaxed)
             Self.beginReplay(state: state, gain: gain)
             do {
                 try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .control))
@@ -231,6 +276,7 @@ package final class AppAudioEngine: AudioEngineHandle {
                 state.replaying.store(false, ordering: .releasing)
                 throw error
             }
+            lastSwitch = (issuedAt, state.ioCycles.load(ordering: .relaxed), heard, silentCycles)
         case .meterOnly:
             // Unmute the source first, then stop the replay (it fades out over one buffer).
             try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .meterOnly))
@@ -246,9 +292,16 @@ package final class AppAudioEngine: AudioEngineHandle {
     /// already playing, Core Audio drops exactly one IO buffer of it (a 512-frame zero run at
     /// 512-frame buffers), whatever the order or timing of the replay and the mute. Waiting for
     /// the IOProc to render a replay buffer before muting made no difference, so Hush doesn't.
+    /// The HAL applies the mute asynchronously (#38), and some takeovers have measured up to 1.7
+    /// buffers of zeros (#50); `TakeoverDiagnostics` records what the tap delivered each time.
     nonisolated static func beginReplay(state: EngineSharedState, gain: Float) {
         state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
         state.appliedGainBits.store((gain / 1000).bitPattern, ordering: .relaxed)
+        state.watchZeroRun.store(0, ordering: .relaxed)
+        state.watchLongestZeroRun.store(0, ordering: .relaxed)
+        state.watchSilentBuffers.store(0, ordering: .relaxed)
+        state.watchFirstCycle.store(0, ordering: .relaxed)
+        state.watchCyclesLeft.store(EngineSharedState.takeoverWatchCycles, ordering: .relaxed)
         state.replaying.store(true, ordering: .releasing)
     }
 
@@ -285,6 +338,8 @@ package final class AppAudioEngine: AudioEngineHandle {
     private func build() throws {
         tapUUID = UUID()
         state.hasRun.store(false, ordering: .relaxed)
+        state.heardTapInput.store(false, ordering: .relaxed)
+        state.silentCyclesBeforeSound.store(0, ordering: .relaxed)
         let description = makeDescription(processes: processObjectIDs, mode: mode)
         if mode == .meterOnly { state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed) }
         state.replaying.store(mode == .control, ordering: .releasing)
@@ -344,6 +399,7 @@ package final class AppAudioEngine: AudioEngineHandle {
         list[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 8, mData: samples)
         _ = BufferRouting.render(input: list, output: list, startGain: 1, endGain: 1)
         _ = BufferRouting.peak(of: list)
+        _ = BufferRouting.zeroRun(in: list)
         BufferRouting.silence(list)
     }
 
@@ -351,7 +407,7 @@ package final class AppAudioEngine: AudioEngineHandle {
     nonisolated static func makeIOBlock(state: EngineSharedState, tapBufferOffset: Int) -> AudioDeviceIOBlock {
         return { _, inputData, _, outputData, _ in
             state.hasRun.store(true, ordering: .relaxed)
-            state.ioCycles.wrappingAdd(1, ordering: .relaxed)
+            let cycle = state.ioCycles.wrappingAdd(1, ordering: .relaxed).newValue
             let input = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
             let output = UnsafeMutableAudioBufferListPointer(outputData)
             let peak: Float
@@ -373,6 +429,9 @@ package final class AppAudioEngine: AudioEngineHandle {
                         input: input, output: output, startGain: applied, endGain: target,
                         firstInputBuffer: tapBufferOffset)
                     state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
+                    watchTakeover(state: state, input: input, tapBufferOffset: tapBufferOffset, cycle: cycle)
+                    // With a non-zero gain the output is silent exactly when the tap's input is.
+                    noteTapInput(state: state, heard: peak != 0)
                 }
             } else {
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
@@ -385,10 +444,66 @@ package final class AppAudioEngine: AudioEngineHandle {
                     BufferRouting.silence(output)
                 }
                 peak = BufferRouting.peak(of: input, firstInputBuffer: tapBufferOffset)
+                noteTapInput(state: state, heard: peak != 0)
             }
             // Non-negative Float bit patterns order like the values, so an atomic max is a valid peak hold.
             _ = state.peakBits.max(peak.bitPattern, ordering: .relaxed)
         }
+    }
+
+    /// Realtime. Counts all-zero tap input until the first sound since the build (#50 diagnostics).
+    nonisolated private static func noteTapInput(state: EngineSharedState, heard: Bool) {
+        guard !state.heardTapInput.load(ordering: .relaxed) else { return }
+        if heard {
+            state.heardTapInput.store(true, ordering: .relaxed)
+        } else {
+            state.silentCyclesBeforeSound.wrappingAdd(1, ordering: .relaxed)
+        }
+    }
+
+    /// Realtime. While `beginReplay`'s watch is armed, follows the run of exact zeros in the tap's
+    /// input across the first replayed buffers (#50 diagnostics). The muted fast path doesn't read
+    /// its input, so a takeover at gain 0 isn't watched.
+    nonisolated private static func watchTakeover(
+        state: EngineSharedState, input: UnsafeMutableAudioBufferListPointer, tapBufferOffset: Int, cycle: UInt32
+    ) {
+        let left = state.watchCyclesLeft.load(ordering: .relaxed)
+        guard left > 0 else { return }
+        if left == EngineSharedState.takeoverWatchCycles { state.watchFirstCycle.store(cycle, ordering: .relaxed) }
+        let carried = Int(state.watchZeroRun.load(ordering: .relaxed))
+        let run = BufferRouting.zeroRun(in: input, firstInputBuffer: tapBufferOffset, carrying: carried)
+        state.watchZeroRun.store(UInt32(clamping: run.trailing), ordering: .relaxed)
+        _ = state.watchLongestZeroRun.max(UInt32(clamping: run.longest), ordering: .relaxed)
+        if run.allZero { state.watchSilentBuffers.wrappingAdd(1, ordering: .relaxed) }
+        state.watchCyclesLeft.store(left - 1, ordering: .relaxed)
+    }
+}
+
+/// What a switch to `.control` saw (#50). The integration tests log it next to the output's
+/// longest zero run; nothing in the app reads it.
+struct TakeoverDiagnostics: Sendable, CustomStringConvertible {
+    /// Whether the tap had delivered a non-zero sample before the switch.
+    let heardTapInputBeforeSwitch: Bool
+    /// Cycles since the build whose tap input was all zeros, counted up to the switch.
+    let silentCyclesBeforeSound: UInt32
+    /// IO cycles that ran while the switch was setting `kAudioTapPropertyDescription`.
+    let muteCallSpannedCycles: UInt32
+    /// IO cycles from issuing the switch to the first replayed buffer (1 is the very next cycle).
+    let firstReplayAfterCycles: UInt32?
+    let watchedBuffers: UInt32
+    /// Watched replayed buffers whose tap input was entirely zeros.
+    let silentInputBuffers: UInt32
+    /// Longest run of exact zeros in the tap's input across the watched buffers. Silence in the
+    /// output beyond this run was written by Hush, not delivered by the HAL.
+    let longestInputZeroRun: Int
+
+    var description: String {
+        let firstReplay = firstReplayAfterCycles.map { "\($0) cycle(s) after the switch" } ?? "not yet rendered"
+        return
+            "tap heard before the switch: \(heardTapInputBeforeSwitch) (\(silentCyclesBeforeSound) silent cycles first), "
+            + "mute call spanned \(muteCallSpannedCycles) IO cycle(s), first replayed buffer \(firstReplay), "
+            + "\(silentInputBuffers) of \(watchedBuffers) replayed buffers had all-zero tap input, "
+            + "longest tap-input zero run \(longestInputZeroRun) frames"
     }
 }
 

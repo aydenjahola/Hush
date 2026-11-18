@@ -225,7 +225,7 @@ extension CoreAudioIntegration {
 
             let check = try await swapCheck(
                 rig, after: mark, "first adjust (new control engine) at 0.25",
-                zeroRunAllowance: takeoverAllowance(rig))
+                zeroRunAllowance: takeoverAllowance(rig), engine: engine as? AppAudioEngine)
             expectTakeoverOverlap(check, rig, "the takeover")
             #expect(
                 await rig.waitForLevel(rig.baseline * 0.25),
@@ -233,7 +233,7 @@ extension CoreAudioIntegration {
         }
 
         @Test(
-            "Output rebuild of a control engine at 50%: at most a one-buffer gap and no louder than normal",
+            "Output rebuild of a control engine at 50%: at most a two-buffer gap and no louder than normal",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func outputRebuildOfAControlEngineStaysWithinOneBufferAndNormalLevel() async throws {
             IntegrationEnvironment.recordRun(group: "B")
@@ -247,13 +247,14 @@ extension CoreAudioIntegration {
             // The BlackHole rig has one output device, so rebuild onto the same ID.
             // Documented limitation: while the engine moves devices its muted tap is destroyed, so
             // the source is briefly audible at normal (unattenuated) level. That blip is accepted.
-            // Rejected: silence longer than one buffer + 8 frames, and anything above 1.15x the
-            // normal level (source plus replay).
+            // Rejected: silence longer than the takeover allowance (two buffers + 8 frames, see
+            // `takeoverAllowance`), and anything above 1.15x the normal level (source plus replay).
             let mark = rig.capture.frameCount
             try engine.rebuild(outputDeviceID: rig.blackHole.id)
             #expect(engine.mode == .control)
             let check = try await swapCheck(
-                rig, after: mark, "output rebuild of a control engine", zeroRunAllowance: takeoverAllowance(rig))
+                rig, after: mark, "output rebuild of a control engine", zeroRunAllowance: takeoverAllowance(rig),
+                engine: engine)
             expectTakeoverOverlap(check, rig, "the rebuild")
             // 1 s is plenty on hardware. On the GitHub Actions VM the rebuilt aggregate (the old one
             // destroyed and a new one started on the same device) has been seen still silent after
@@ -349,20 +350,31 @@ extension CoreAudioIntegration {
 
         /// Known limitation, accepted by the owner: when a tap starts muting a process that's already
         /// playing (meter-only → control, or a fresh control engine on a playing app), Core Audio
-        /// drops exactly one IO buffer of it, whatever Hush's order or timing (measured: 513 frames
-        /// at 512-frame buffers, with and without waiting for the replay first). A few frames of
-        /// slack cover the samples at the gap's edges. Every other swap stays at one buffer.
+        /// drops about one IO buffer of it, whatever Hush's order or timing (measured: 513 frames
+        /// at 512-frame buffers, with and without waiting for the replay first).
+        ///
+        /// The allowance is two buffers + 8 frames on hardware (issue #50): the owner's Mac has
+        /// measured 777 and 877 frames on the takeover paths, against 277–513 in most runs. The
+        /// HAL applies the tap's new mute behaviour asynchronously and nothing reports when it
+        /// lands (#38), so the source can go quiet up to a buffer before the replay's first buffer
+        /// plays, or the tap can deliver more than one buffer of zeros. Hush already turns the
+        /// replay on before it asks for the mute, and the replay never writes an exact zero for a
+        /// non-zero input; closing the rest would need a hold before the mute, which adds a
+        /// near-silent gap to every takeover (rejected in #38). A few frames of slack cover the
+        /// samples at the gap's edges. Every other swap stays at one buffer. Each takeover logs a
+        /// `[takeover]` line with the tap input's own longest zero run, so an output run longer than
+        /// it shows silence Hush wrote.
         ///
         /// CI-only allowance: on the GitHub Actions VM (`GITHUB_ACTIONS=true`) the same gaps measured
         /// 1860–3720 frames at 512-frame buffers (virtualised coreaudiod and BlackHole clock), against
         /// about 512 on hardware. There the bound widens to 8 buffers in total, so silence is still
         /// bounded (a stuck engine or a dropped replay is far longer) and a `[ci-tolerance]` line
-        /// says so. Real hardware, `CI=1` included, keeps one buffer + 8 frames.
+        /// says so. Real hardware, `CI=1` included, keeps two buffers + 8 frames.
         private func takeoverAllowance(_ rig: LoopbackRig) -> Int {
-            let strict = 8
-            guard IntegrationEnvironment.isGitHubActions else { return strict }
             let buffer = rig.capture.bufferFrameSize
-            let allowance = 7 * buffer + strict
+            let strict = buffer + 8
+            guard IntegrationEnvironment.isGitHubActions else { return strict }
+            let allowance = 7 * buffer + 8
             print(
                 "[ci-tolerance] GITHUB_ACTIONS=true: takeover zero-run limit \(buffer + allowance) frames (8 buffers of \(buffer)) instead of \(buffer + strict)"
             )
@@ -397,7 +409,8 @@ extension CoreAudioIntegration {
                 return (
                     engine,
                     try await swapCheck(
-                        rig, after: mark, "meter-only → control at \(gain)", zeroRunAllowance: takeoverAllowance(rig))
+                        rig, after: mark, "meter-only → control at \(gain)", zeroRunAllowance: takeoverAllowance(rig),
+                        engine: engine)
                 )
             } catch {
                 engine.stop()
@@ -407,9 +420,11 @@ extension CoreAudioIntegration {
 
         /// Analyses the 600 ms after `mark`, checks the zero run, and logs how long the level sat
         /// above the unprocessed baseline (the source/replay overlap while the mute changes).
-        private func swapCheck(_ rig: LoopbackRig, after mark: Int, _ what: String, zeroRunAllowance: Int = 0)
-            async throws -> SwapCheck
-        {
+        /// For a takeover, pass the `engine` to log what it saw of the tap's input (#50).
+        private func swapCheck(
+            _ rig: LoopbackRig, after mark: Int, _ what: String, zeroRunAllowance: Int = 0,
+            engine: AppAudioEngine? = nil
+        ) async throws -> SwapCheck {
             let swap = try await rig.samples(after: mark, .milliseconds(600))
             let check = SwapCheck(
                 samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize,
@@ -424,6 +439,15 @@ extension CoreAudioIntegration {
             print(
                 "[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, \(String(format: "%.1f", quiet)) ms below 0.05× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames)), \(trailingZeros) silent frames at the window's end"
             )
+            if let engine {
+                // Diagnostic only (#50). An output zero run longer than the tap input's own longest
+                // run is silence Hush wrote (the source went quiet before the replay's first buffer
+                // played); one no longer than it is zeros the HAL delivered.
+                let diagnostics = engine.takeoverDiagnostics.map { "\($0)" } ?? "no switch recorded"
+                print(
+                    "[takeover] \(what): output longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames)); \(diagnostics)"
+                )
+            }
             #expect(
                 check.longestZeroRun <= check.bufferFrames + zeroRunAllowance,
                 "\(what): \(check.longestZeroRun) frames of digital silence (limit: one buffer, \(check.bufferFrames), + \(zeroRunAllowance))"
