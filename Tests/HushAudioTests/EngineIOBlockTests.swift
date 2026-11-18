@@ -1,4 +1,5 @@
 import CoreAudio
+import HushCore
 import Synchronization
 import Testing
 @testable import HushAudio
@@ -71,6 +72,139 @@ import Testing
         AppAudioEngine.beginReplay(state: state, gain: 0.25)
         let first = cycle(block)
         #expect(first.allSatisfy { $0 != 0 }, "every replayed sample of a non-zero input is non-zero")
+    }
+
+    // MARK: Muted fast path (#5)
+
+    func fastPathCycles(_ state: EngineSharedState) -> UInt32 { state.mutedFastPathCycles.load(ordering: .relaxed) }
+    func peak(_ state: EngineSharedState) -> Float { Float(bitPattern: state.peakBits.load(ordering: .relaxed)) }
+
+    @Test func aSettledGainOfZeroWritesExactZerosOnTheFastPath() {
+        let state = EngineSharedState(gain: 0, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        let out = cycle(block)
+        #expect(out.allSatisfy { $0 == 0 && $0.sign == .plus }, "every sample is an exact +0, the stale 9s overwritten")
+        #expect(fastPathCycles(state) == 1)
+        #expect(Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed)) == 0, "stays settled at 0")
+    }
+
+    @Test func theFastPathSkipsTheSampleLoop() {
+        // The full render multiplies each input sample by 0, which turns a NaN into NaN. The fast
+        // path never reads the input, so a NaN in shows that the sample loop didn't run.
+        let state = EngineSharedState(gain: 0, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        let input = TestBufferList([(channels: 2, samples: [Float](repeating: .nan, count: Self.frames * 2))])
+        let output = TestBufferList([(channels: 2, samples: [Float](repeating: 9, count: Self.frames * 2))])
+        var time = AudioTimeStamp()
+        block(&time, UnsafePointer(input.list.unsafeMutablePointer), &time, output.list.unsafeMutablePointer, &time)
+        #expect(output.samples(0).allSatisfy { $0 == 0 })
+    }
+
+    @Test func aRampToZeroTakesTheFastPathOnlyOnceItHasSettled() {
+        let state = EngineSharedState(gain: 0.5, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        state.targetGainBits.store(Float(0).bitPattern, ordering: .relaxed)  // mute
+
+        let fade = left(cycle(block))
+        #expect(fastPathCycles(state) == 0, "the ramp down renders in full")
+        #expect(isApproximatelyEqual(fade[0], 0.25, tolerance: 0.01), "starts where the replay was")
+        #expect(zip(fade, fade.dropFirst()).allSatisfy { $0 >= $1 }, "falls monotonically")
+        #expect(fade.last! < 0.01)
+
+        #expect(cycle(block).allSatisfy { $0 == 0 })
+        #expect(fastPathCycles(state) == 1, "the next buffer, settled at 0, takes the fast path")
+    }
+
+    @Test func unmutingRampsUpFromZero() {
+        let state = EngineSharedState(gain: 0, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        _ = cycle(block)
+        state.targetGainBits.store(Float(0.5).bitPattern, ordering: .relaxed)  // unmute
+
+        let rise = left(cycle(block))
+        #expect(fastPathCycles(state) == 2, "the ramp up renders in full")
+        #expect(rise[0] == 0, "starts from the settled 0")
+        #expect(zip(rise, rise.dropFirst()).allSatisfy { $0 <= $1 }, "rises monotonically")
+        #expect(isApproximatelyEqual(rise.last!, 0.25, tolerance: 0.01))
+        #expect(left(cycle(block)).allSatisfy { isApproximatelyEqual($0, 0.25) }, "then holds the target")
+    }
+
+    @Test func unmutingToABoostRampsUpThroughTheLimiter() {
+        // The limiter keeps no state, so resuming from the fast path straight into a boost is the
+        // same as resuming from a rendered 0: a clean ramp that the limiter caps below 1.
+        let state = EngineSharedState(gain: 0, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        state.targetGainBits.store(Float(2).bitPattern, ordering: .relaxed)
+
+        let rise = left(cycle(block))
+        #expect(rise[0] == 0)
+        #expect(zip(rise, rise.dropFirst()).allSatisfy { $0 <= $1 })
+        #expect(rise.allSatisfy { $0 < 1 })
+        #expect(left(cycle(block)).allSatisfy { isApproximatelyEqual($0, SoftLimiter.process(1)) })
+    }
+
+    @Test func theMutedMeterMatchesTheFullRender() {
+        // Before the fast path, a muted control engine metered render(gain 0 -> 0): input × 0.
+        let input = TestBufferList([(channels: 2, samples: [Float](repeating: 0.5, count: Self.frames * 2))])
+        let output = TestBufferList([(channels: 2, samples: [Float](repeating: 9, count: Self.frames * 2))])
+        let rendered = BufferRouting.render(input: input.list, output: output.list, startGain: 0, endGain: 0)
+
+        let state = EngineSharedState(gain: 0, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        #expect(fastPathCycles(state) == 1)
+        #expect(peak(state) == rendered)
+        #expect(peak(state) == 0, "a muted strip shows no level")
+    }
+
+    @Test func theMeterDuringTheRampDownStillReportsTheFade() {
+        let state = EngineSharedState(gain: 0.5, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        _ = state.peakBits.exchange(0, ordering: .relaxed)
+        state.targetGainBits.store(Float(0).bitPattern, ordering: .relaxed)
+        _ = cycle(block)
+        #expect(isApproximatelyEqual(peak(state), 0.25, tolerance: 0.01), "the fade's first sample")
+        _ = state.peakBits.exchange(0, ordering: .relaxed)
+        _ = cycle(block)
+        #expect(peak(state) == 0)
+    }
+
+    @Test func theFastPathAdvancesHasRunAndTheCycleCounter() {
+        let state = EngineSharedState(gain: 0, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        for _ in 0..<3 { _ = cycle(block) }
+        let hasRun = state.hasRun.load(ordering: .relaxed)
+        #expect(hasRun)
+        #expect(state.ioCycles.load(ordering: .relaxed) == 3)
+        #expect(fastPathCycles(state) == 3)
+    }
+
+    @Test func takingOverAMutedAppGoesStraightToTheFastPath() {
+        // meter-only -> control at gain 0: beginReplay's g/1000 is 0, so there is nothing to ramp.
+        let state = EngineSharedState(gain: 0, mode: .meterOnly)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        #expect(fastPathCycles(state) == 0, "meter-only never takes the fast path")
+        #expect(peak(state) == 0.5, "meter-only meters the source")
+        AppAudioEngine.beginReplay(state: state, gain: 0)
+        _ = state.peakBits.exchange(0, ordering: .relaxed)
+        #expect(cycle(block).allSatisfy { $0 == 0 })
+        #expect(fastPathCycles(state) == 1)
+        #expect(peak(state) == 0)
+    }
+
+    @Test func stoppingAMutedReplayGoesBackToMeteringTheSource() {
+        let state = EngineSharedState(gain: 0, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        state.replaying.store(false, ordering: .releasing)
+        #expect(cycle(block).allSatisfy { $0 == 0 })
+        #expect(fastPathCycles(state) == 1, "meter-only uses its own silent path")
+        #expect(peak(state) == 0.5)
     }
 
     @Test func ioBlockSetsHasRun() {

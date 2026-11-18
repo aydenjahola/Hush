@@ -30,9 +30,9 @@ Measured with the headless harness described below, on an Apple M4 running macOS
 | An adjusted app, popover closed | 0.09% | 0.15% |
 | Idle with app churn | 0.11% | 0.2% |
 | Popover open, 3 strips with live meters | 1.47% | 2% |
-| One adjusted app playing (real engine) | 0.47% | 1% |
+| One adjusted app playing (real engine) | 0.47% before the muted fast path; to be remeasured | 1% |
 
-The harness rows use fake engines, so they exclude real audio processing. The "one adjusted app playing (real engine)" row covers that: it was measured at 0.47% on the owner's Mac with Spotify muted and the popover closed.
+The harness rows use fake engines, so they exclude real audio processing. The "one adjusted app playing (real engine)" row covers that: it was measured at 0.47% on the owner's Mac with Spotify muted and the popover closed. That figure predates the muted fast path (see below), which skips the per-sample work for a muted app. The owner will measure the new figure and update this row.
 
 Memory sits well under 40 MB with the SwiftUI scene loaded, and a 10 minute churn run showed no leaks and under 1 MB of growth.
 
@@ -64,5 +64,6 @@ Don't undo these without measuring:
 - The process list is read once per change, behind a coalesced refresh, with per-process identities cached.
 - The poller reads only the adjusted apps' processes while the popover is closed.
 - Timers carry tolerance, so the system can coalesce wake-ups.
+- A muted app's engine takes a fast path in the IOProc. Once its gain has ramped down to exactly 0, each buffer is cleared with `memset` instead of running the gain ramp, the soft limiter and peak metering on every sample. The meter still reads 0 for a muted app, as before, and unmuting ramps up from 0 through the full path.
 
 See [Testing](/Hush/contributing/testing/) for the unit, integration and manual checks that go with these.

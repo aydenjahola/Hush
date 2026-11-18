@@ -16,6 +16,9 @@ final class EngineSharedState: Sendable {
     /// Incremented by the IOProc on every cycle (one relaxed wrapping add). Never reset, so the
     /// main thread can compare two readings to tell whether IO is still flowing.
     let ioCycles = Atomic<UInt32>(0)
+    /// Incremented by the IOProc on every cycle that took the muted fast path (one relaxed wrapping
+    /// add). Only read by tests, to tell the fast path apart from a full render at gain 0.
+    let mutedFastPathCycles = Atomic<UInt32>(0)
 
     /// `appliedGainBits` is the replay's current gain: a meter-only engine starts at 0, so it has
     /// nothing to fade out.
@@ -356,10 +359,21 @@ package final class AppAudioEngine: AudioEngineHandle {
             if state.replaying.load(ordering: .acquiring) {
                 let target = Float(bitPattern: state.targetGainBits.load(ordering: .relaxed))
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
-                peak = BufferRouting.render(
-                    input: input, output: output, startGain: applied, endGain: target, firstInputBuffer: tapBufferOffset
-                )
-                state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
+                if target == 0 && applied == 0 {
+                    // Muted and settled: the ramp down already ran (it ends by storing an exact 0),
+                    // so the full render would only multiply every sample by 0. Write the zeros
+                    // directly. The meter reports the replay's level, input × gain, which is 0 here,
+                    // exactly what the render would have returned. The limiter keeps no state, so
+                    // the next ramp up from 0 renders as if this path had never run.
+                    BufferRouting.silence(output)
+                    state.mutedFastPathCycles.wrappingAdd(1, ordering: .relaxed)
+                    peak = 0
+                } else {
+                    peak = BufferRouting.render(
+                        input: input, output: output, startGain: applied, endGain: target,
+                        firstInputBuffer: tapBufferOffset)
+                    state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
+                }
             } else {
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
                 if applied != 0 {
