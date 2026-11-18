@@ -16,7 +16,7 @@ Turn Spotify down, boost a quiet call, mute a noisy tab: Hush gives every app th
 
 ## Privacy
 
-Hush doesn't collect or send any data about you or your audio. The only network request it makes is the update check: once a day (and about 30 seconds after launch) it asks GitHub's public API for the latest Hush release, sending nothing but a `Hush/<version>` user agent. When a newer version exists, Hush shows a banner in the popover, a dot on the menu bar icon and a notification. **Download** opens the release in your browser; Hush never downloads or installs anything itself. Turn the check off in Settings → "Check for updates automatically".
+Hush doesn't collect or send any data about you or your audio. The only network request it makes is the update check: about 30 seconds after launch and then once a day, it asks GitHub's public API for the latest Hush release. The request carries only a generic `Hush/<version>` user agent and standard HTTP headers (`Accept`, `Accept-Language: en`, the GitHub API version, and an `If-None-Match` tag so an unchanged answer costs almost nothing), with no cookies, accounts or other identifiers. If a check fails, Hush retries after 1 hour, then 4 hours, then daily. When a newer version exists, Hush shows a banner in the popover, a dot on the menu bar icon and a notification. **Download** opens the release in your browser; Hush never downloads or installs anything itself. Turn the check off in Settings → "Check for updates automatically".
 
 ## Requirements
 
