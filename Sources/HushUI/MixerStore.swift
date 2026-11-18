@@ -138,6 +138,50 @@ package final class MixerStore {
         commit(setting, for: id)
     }
 
+    /// Mutes every app that's playing right now, keeping each one's percent. Apps that aren't
+    /// playing are left alone. One debounced save, like `toggleMute(for:)`.
+    package func muteAllPlaying() {
+        guard controlsEnabled else { return }
+        let ids = apps.filter(\.isPlaying).map(\.id).filter { settings[$0]?.isMuted != true }
+        guard !ids.isEmpty else { return }
+        for id in ids {
+            var setting = settings[id] ?? AppVolumeSetting()
+            setting.isMuted = true
+            setting.lastAdjusted = now()
+            settings[id] = setting
+            engineErrors[id] = nil
+        }
+        settingsDidChange()
+    }
+
+    /// Unmutes every muted app, playing or not, including saved settings for apps that aren't
+    /// running, so nothing stays silenced after "Unmute All". Percents are kept.
+    package func unmuteAll() {
+        guard controlsEnabled else { return }
+        let ids = settings.filter(\.value.isMuted).map(\.key)
+        guard !ids.isEmpty else { return }
+        for id in ids {
+            guard var setting = settings[id] else { continue }
+            setting.isMuted = false
+            setting.lastAdjusted = now()
+            settings[id] = setting.isDefault ? nil : setting
+            engineErrors[id] = nil
+        }
+        settingsDidChange()
+    }
+
+    /// What the quick menu's bulk mute item offers: "Unmute All" once every playing app is muted
+    /// (or nothing plays but something is muted), otherwise "Mute All Playing Apps".
+    package var bulkMute: BulkMuteAction {
+        let playing = apps.filter(\.isPlaying)
+        let anyMuted = settings.values.contains(where: \.isMuted)
+        let allPlayingMuted = playing.allSatisfy { settings[$0.id]?.isMuted == true }
+        if anyMuted, allPlayingMuted {
+            return BulkMuteAction(kind: .unmuteAll, isEnabled: controlsEnabled)
+        }
+        return BulkMuteAction(kind: .muteAllPlaying, isEnabled: controlsEnabled && !playing.isEmpty)
+    }
+
     package func setMaxBoost(_ limit: BoostLimit) {
         preferences.maxBoostPercent = limit
         settings = SettingsDocument(preferences: preferences, apps: settings).normalized().apps

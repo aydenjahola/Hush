@@ -26,6 +26,9 @@
 
 "Channel strips" = "Channel strips";
 
+/* Quick menu item (right-click on the menu bar icon): checks GitHub for a newer version now. */
+"Check for Updates…" = "Check for Updates…";
+
 "Check Now" = "Check Now";
 
 "Check for updates automatically" = "Check for updates automatically";
@@ -92,6 +95,9 @@
 /* VoiceOver label of a mute button. %@ is the app's name. */
 "Mute %@" = "Mute %@";
 
+/* Quick menu item (right-click on the menu bar icon): mutes every app that is playing. */
+"Mute All Playing Apps" = "Mute All Playing Apps";
+
 "Muted" = "Muted";
 
 "No Output" = "No Output";
@@ -103,6 +109,9 @@
 "Open System Settings" = "Open System Settings";
 
 "Open the download in your browser" = "Open the download in your browser";
+
+/* Quick menu submenu title (right-click on the menu bar icon) listing the output devices. */
+"Output" = "Output";
 
 /* VoiceOver label of the output device menu in the popover header (VoiceOver adds "pop-up button"). %@ is the device name. */
 "Output: %@" = "Output: %@";
@@ -129,6 +138,9 @@
 "Reset all app levels?" = "Reset all app levels?";
 
 "Settings" = "Settings";
+
+/* Quick menu item (right-click on the menu bar icon): opens the Settings window. */
+"Settings…" = "Settings…";
 
 "Show apps that aren't playing" = "Show apps that aren't playing";
 
@@ -157,6 +169,9 @@
 
 /* VoiceOver label of an unmute button. %@ is the app's name. */
 "Unmute %@" = "Unmute %@";
+
+/* Quick menu item (right-click on the menu bar icon): unmutes every muted app. */
+"Unmute All" = "Unmute All";
 
 "Updates" = "Updates";
 

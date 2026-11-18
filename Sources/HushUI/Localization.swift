@@ -53,6 +53,14 @@ package enum L10n {
         count == 0 ? resource("No apps playing") : resource("\(count) apps playing")
     }
 
+    // MARK: Quick menu (right-click on the menu bar icon)
+
+    package static let output = resource("Output")
+    package static let muteAllPlaying = resource("Mute All Playing Apps")
+    package static let unmuteAll = resource("Unmute All")
+    package static let settingsEllipsis = resource("Settings…")
+    package static let checkForUpdates = resource("Check for Updates…")
+
     // MARK: Strips
 
     package static let muted = resource("Muted")
@@ -160,7 +168,7 @@ package enum L10n {
         [
             appName, menuBarLabel(updateAvailable: true), noOutput, outputDevice(named: "x"), outputDevice(named: nil),
             soundSettings, outputSwitchFailed("x"), nothingIsPlaying, settings, quit, playingSummary(count: 0),
-            playingSummary(count: 2),
+            playingSummary(count: 2), output, muteAllPlaying, unmuteAll, settingsEllipsis, checkForUpdates,
             muted, percent(50), mute("x"), unmute("x"), volumeLabel("x"), volumeValue(50), warning("x"),
             clickToMute, clickToUnmute, permissionNeeded, openSystemSettings, updateAvailable("x"), download, later,
             skipThisVersion, downloadHelp, laterHelp, general, launchAtLogin, maximumBoost, showInactiveApps, levels,
