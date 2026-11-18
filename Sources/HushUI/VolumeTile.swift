@@ -1,3 +1,4 @@
+import HushCore
 import SwiftUI
 
 /// A row that is itself the slider: drag anywhere, the fill shows the volume and a soft green

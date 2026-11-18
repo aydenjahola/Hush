@@ -1,4 +1,5 @@
 import CoreAudio
+import Synchronization
 import Testing
 @testable import HushAudio
 

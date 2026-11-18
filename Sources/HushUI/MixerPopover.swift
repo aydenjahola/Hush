@@ -1,3 +1,5 @@
+import HushCore
+import HushAudio
 import AppKit
 import SwiftUI
 

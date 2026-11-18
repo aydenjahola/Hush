@@ -1,3 +1,4 @@
+import HushCore
 import SwiftUI
 
 /// Dense one-line layout, like Control Center: icon, name, horizontal slider with a thin live

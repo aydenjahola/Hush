@@ -4,18 +4,18 @@ import Observation
 import os
 
 /// What the user can do about an available update, from the popover banner or the notification.
-public enum UpdateAction: String, Sendable, CaseIterable {
+nonisolated public enum UpdateAction: String, Sendable, CaseIterable {
     case download, later, skip
 }
 
-public enum ReleaseFetchResult: Equatable, Sendable {
+nonisolated public enum ReleaseFetchResult: Equatable, Sendable {
     /// The latest release (nil when the repository has none yet) and its ETag, if any.
     case release(GitHubRelease?, etag: String?)
     /// 304: unchanged since the ETag sent with the request.
     case notModified
 }
 
-public enum ReleaseFetchError: Error, Equatable {
+nonisolated public enum ReleaseFetchError: Error, Equatable {
     case notHTTP
     /// Anything but 200, 304, 404 or a rate limit.
     case status(Int)
@@ -24,7 +24,7 @@ public enum ReleaseFetchError: Error, Equatable {
 }
 
 /// Fetches the latest published release. Injected so tests never touch the network.
-public protocol ReleaseFetching: Sendable {
+nonisolated public protocol ReleaseFetching: Sendable {
     func latestRelease(ifNoneMatch etag: String?) async throws -> ReleaseFetchResult
 }
 

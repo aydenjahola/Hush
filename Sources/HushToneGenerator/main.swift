@@ -246,7 +246,7 @@ let player = TonePlayer(options: options)
     }
 }
 
-var signalSources: [DispatchSourceSignal] = []
+var signalSources: [any DispatchSourceSignal] = []
 @MainActor func handle(_ signalNumber: Int32, _ action: @escaping @MainActor () -> Void) {
     signal(signalNumber, SIG_IGN)
     let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)

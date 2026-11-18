@@ -248,7 +248,7 @@ import Testing
     }
 }
 
-final class Counter: @unchecked Sendable {
+nonisolated final class Counter: @unchecked Sendable {
     private(set) var value = 0
     func increment() { value += 1 }
 }

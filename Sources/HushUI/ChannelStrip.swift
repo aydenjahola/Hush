@@ -1,3 +1,4 @@
+import HushCore
 import SwiftUI
 
 /// One app's column: percent, meter + fader, icon, name, mute button.

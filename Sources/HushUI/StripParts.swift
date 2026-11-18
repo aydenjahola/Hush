@@ -1,3 +1,4 @@
+import HushCore
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
