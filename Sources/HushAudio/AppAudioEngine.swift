@@ -354,7 +354,9 @@ package final class AppAudioEngine: AudioEngineHandle {
         state.silentCyclesBeforeSound.store(0, ordering: .relaxed)
         let description = makeDescription(processes: processObjectIDs, mode: mode)
         if mode == .meterOnly { state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed) }
-        state.replayedLastCycle.store(mode == .control, ordering: .relaxed)
+        // A brand-new IOProc has never replayed a cycle, so its first replayed cycle always ramps
+        // in from target/1000, whatever `appliedGainBits` was left holding.
+        state.replayedLastCycle.store(false, ordering: .relaxed)
         state.replaying.store(mode == .control, ordering: .releasing)
 
         var newTap = AudioObjectID(kAudioObjectUnknown)

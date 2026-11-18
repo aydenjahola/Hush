@@ -351,7 +351,7 @@ import Testing
     }
 
     @Test func takingOverAMutedAppGoesStraightToTheFastPath() {
-        // meter-only -> control at gain 0: beginReplay's g/1000 is 0, so there is nothing to ramp.
+        // meter-only -> control at gain 0: the IOProc's ramp starts at target/1000, which is 0, so there is nothing to ramp.
         let state = EngineSharedState(gain: 0, mode: .meterOnly)
         let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
         _ = cycle(block)
