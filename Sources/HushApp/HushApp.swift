@@ -61,7 +61,10 @@ struct HushApp: App {
         MenuBarExtra {
             MixerPopover(store: store, updates: updates)
         } label: {
-            Image(nsImage: MenuBarIcon.image(attenuated: store.isAnyAppAttenuated, badged: updates.hasPendingUpdate))
+            Image(nsImage: MenuBarIcon.image(
+                style: store.preferences.appearance.menuBarIcon,
+                attenuated: store.isAnyAppAttenuated,
+                badged: updates.hasPendingUpdate))
                 .accessibilityLabel(updates.hasPendingUpdate ? "Hush, update available" : "Hush")
         }
         .menuBarExtraStyle(.window)
