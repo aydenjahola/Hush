@@ -37,4 +37,18 @@ public enum StripOrdering {
     public static func sorted(_ keys: [StripSortKey]) -> [StripSortKey] {
         keys.sorted(by: areInIncreasingOrder)
     }
+
+    /// By name (Finder-style, so "App 2" comes before "App 10"), then by ID.
+    public static func alphabeticallyInIncreasingOrder(_ a: StripSortKey, _ b: StripSortKey) -> Bool {
+        let byName = a.displayName.localizedStandardCompare(b.displayName)
+        if byName != .orderedSame { return byName == .orderedAscending }
+        return a.id < b.id
+    }
+
+    public static func sorted(_ keys: [StripSortKey], mode: StripSortMode) -> [StripSortKey] {
+        switch mode {
+        case .activity: keys.sorted(by: areInIncreasingOrder)
+        case .alphabetical: keys.sorted(by: alphabeticallyInIncreasingOrder)
+        }
+    }
 }

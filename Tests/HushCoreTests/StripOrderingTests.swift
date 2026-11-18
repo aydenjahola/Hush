@@ -42,4 +42,30 @@ import Testing
         ]
         #expect(StripOrdering.sorted(keys).map(\.id) == ["d", "a", "b", "e", "c"])
     }
+
+    @Test func alphabeticalIgnoresPlayingAndAdjustment() {
+        let keys = [
+            StripSortKey(id: "z", displayName: "Zoom", isPlaying: true, lastAdjusted: newer),
+            StripSortKey(id: "a", displayName: "arc", isPlaying: false, lastAdjusted: nil),
+            StripSortKey(id: "m", displayName: "Music", isPlaying: true, lastAdjusted: older),
+        ]
+        #expect(StripOrdering.sorted(keys, mode: .alphabetical).map(\.id) == ["a", "m", "z"])
+    }
+
+    @Test func alphabeticalUsesFinderNumberOrderThenID() {
+        let keys = [
+            StripSortKey(id: "10", displayName: "App 10", isPlaying: true, lastAdjusted: nil),
+            StripSortKey(id: "2b", displayName: "App 2", isPlaying: true, lastAdjusted: nil),
+            StripSortKey(id: "2a", displayName: "App 2", isPlaying: false, lastAdjusted: nil),
+        ]
+        #expect(StripOrdering.sorted(keys, mode: .alphabetical).map(\.id) == ["2a", "2b", "10"])
+    }
+
+    @Test func activityModeIsTheDefaultOrdering() {
+        let keys = [
+            StripSortKey(id: "paused", displayName: "Aardvark", isPlaying: false, lastAdjusted: newer),
+            StripSortKey(id: "playing", displayName: "Zebra", isPlaying: true, lastAdjusted: nil),
+        ]
+        #expect(StripOrdering.sorted(keys, mode: .activity) == StripOrdering.sorted(keys))
+    }
 }
