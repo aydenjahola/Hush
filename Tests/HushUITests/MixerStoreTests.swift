@@ -506,6 +506,46 @@ import Testing
         #expect(h.factory.made.count == 1)
     }
 
+    @Test func outputChangeBeginsEveryRebuildBeforeFinishingAny() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(), "b": mutedSetting()]))
+        h.processes.emit([makeApp("a", objects: [42]), makeApp("b", objects: [43])])
+        let before = h.factory.events.count
+
+        h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
+        let events = Array(h.factory.events.dropFirst(before))
+        #expect(events.count == 4)
+        #expect(events.prefix(2).allSatisfy { $0.hasPrefix("beginRebuild") })
+        #expect(events.suffix(2).allSatisfy { $0.hasPrefix("finishRebuild") })
+        #expect(h.factory.live("a")?.mode == .control)
+        #expect(h.factory.live("b")?.mode == .control)
+    }
+
+    @Test func finishFailureTearsTheEngineDownAndReportsTheControlMode() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
+        h.processes.emit([makeApp("a")])
+        let engine = try #require(h.factory.live("a"))
+        engine.finishRebuildError = FakeError()
+
+        h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
+        #expect(engine.isStopped)
+        #expect(h.store.engineCount == 0)
+        let message = try #require(h.store.strips.first?.engineError)
+        #expect(message.contains("couldn't control this app's audio"), "reports the pre-rebuild mode")
+    }
+
+    @Test func beginFailureTearsTheEngineDownAndReportsTheControlMode() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
+        h.processes.emit([makeApp("a")])
+        let engine = try #require(h.factory.live("a"))
+        engine.rebuildError = FakeError()
+
+        h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
+        #expect(engine.isStopped)
+        #expect(h.store.engineCount == 0)
+        let message = try #require(h.store.strips.first?.engineError)
+        #expect(message.contains("couldn't control this app's audio"))
+    }
+
     @Test func outputChangeRebuildsMutedAppsEngine() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a")])

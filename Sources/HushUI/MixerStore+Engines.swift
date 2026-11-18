@@ -71,8 +71,9 @@ extension MixerStore {
     func rebuildEngines(onOutputDevice device: OutputDevice) {
         engineErrors = [:]
         // Two phases so control engines overlap their start-up: every engine restarts first (a
-        // control one meter-only), then each is switched back once its IOProc has run, so the
-        // waits overlap instead of adding up.
+        // control one meter-only), then each is switched back once its IOProc has run. In the
+        // typical case the waits overlap (later engines are already running when their turn
+        // comes); the worst case is serial, N x (device start + 0.2 s) on the main actor.
         var started: [(id: String, engine: any AudioEngineHandle, mode: EngineMode)] = []
         for (id, engine) in engines {
             let mode = engine.mode

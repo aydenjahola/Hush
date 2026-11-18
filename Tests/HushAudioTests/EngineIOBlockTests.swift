@@ -112,8 +112,9 @@ import Testing
         #expect(clock >= 0.2 && clock < 0.21, "waits about the limit, no longer")
     }
 
-    @Test func rebuiltControlEngineRestartsMeterOnlyUntilTheIOProcRuns() throws {
-        // The state a rebuilt control engine starts in: no replay, nothing applied, not yet run.
+    @Test func takeOverLeavesTheSourceUnmutedUntilTheIOProcRan() throws {
+        // Static takeOver on a meter-only state: the switch (replay, then mute) only starts once
+        // the IOProc has run, and not before.
         let state = EngineSharedState(gain: 0.5, mode: .meterOnly)
         var clock = 0.0
         var sleeps = 0
@@ -129,17 +130,31 @@ import Testing
         #expect(replayingAtSwitch == false, "the source is still unmuted when the switch starts")
     }
 
-    @Test func overlappedTakeoversWaitOnceInTotal() throws {
-        // Engines started together share one wait: once the first is up, the rest are already running.
-        let states = (0..<4).map { _ in EngineSharedState(gain: 1, mode: .meterOnly) }
+    @Test func overlappedTakeoversWaitNoLongerThanTheSlowestFirstRun() throws {
+        // Four engines started together, each running at a different simulated time. Taking them
+        // over in order waits for the slowest once, not the sum of the delays.
+        let delays = [0.010, 0.030, 0.020, 0.050]
+        let states = delays.map { _ in EngineSharedState(gain: 1, mode: .meterOnly) }
         var clock = 0.0
-        var sleeps = 0
-        let sleep: (TimeInterval) -> Void = {
-            clock += $0; sleeps += 1; if sleeps == 5 { for s in states { s.hasRun.store(true, ordering: .relaxed) } }
+        let sleep: (TimeInterval) -> Void = { step in
+            clock += step
+            for (state, delay) in zip(states, delays) where clock >= delay {
+                state.hasRun.store(true, ordering: .relaxed)
+            }
         }
         for state in states {
-            _ = try AppAudioEngine.takeOver(state: state, sleep: sleep, now: { clock }, switchToControl: {})
+            let ran = try AppAudioEngine.takeOver(state: state, sleep: sleep, now: { clock }, switchToControl: {})
+            #expect(ran)
         }
-        #expect(sleeps == 5, "only the first engine waits")
+        #expect(clock >= 0.050 && clock < 0.060, "total wait \(clock)s is about the slowest delay, not the sum (0.11)")
+    }
+
+    @MainActor @Test func factoryStopsTheEngineAndRethrowsWhenTakeOverFails() {
+        struct Boom: Error {}
+        var stopped = false
+        #expect(throws: Boom.self) {
+            try AppAudioEngine.takeOverOrStop(takeOver: { throw Boom() }, stop: { stopped = true })
+        }
+        #expect(stopped)
     }
 }

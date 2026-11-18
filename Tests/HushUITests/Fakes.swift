@@ -76,10 +76,31 @@ final class FakeEngine: AudioEngineHandle {
     func setGain(_ gain: Float) { currentGain = gain }
     func currentPeak() -> Float { peak }
 
+    var finishRebuildError: (any Error)?
+
     func rebuild(outputDeviceID: AudioObjectID) throws {
+        try beginRebuild(outputDeviceID: outputDeviceID)
+        try finishRebuild()
+    }
+
+    /// Like the real engine, a control engine is meter-only between begin and finish.
+    func beginRebuild(outputDeviceID: AudioObjectID) throws {
+        log?("beginRebuild \(appID)")
         if let rebuildError { throw rebuildError }
         rebuiltDeviceIDs.append(outputDeviceID)
+        if mode == .control {
+            mode = .meterOnly
+            pendingControl = true
+        }
     }
+
+    func finishRebuild() throws {
+        log?("finishRebuild \(appID)")
+        if pendingControl, finishRebuildError == nil { mode = .control }
+        pendingControl = false
+        if let finishRebuildError { throw finishRebuildError }
+    }
+    private var pendingControl = false
 
     /// Test hook: makes the engine's list differ from the app's without going through the store.
     func forceProcessObjectIDs(_ ids: [AudioObjectID]) { processObjectIDs = ids }

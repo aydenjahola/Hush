@@ -235,9 +235,9 @@ extension CoreAudioIntegration {
         }
 
         @Test(
-            "Takeover: an output rebuild of a control engine at 50% (headphones plugged in)",
+            "Output rebuild of a control engine at 50%: at most a one-buffer gap and no louder than normal",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
-        func outputRebuildOfAControlEngine() async throws {
+        func outputRebuildOfAControlEngineStaysWithinOneBufferAndNormalLevel() async throws {
             IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
@@ -247,6 +247,10 @@ extension CoreAudioIntegration {
             #expect(await rig.waitForLevel(rig.baseline * 0.25), "the control engine didn't attenuate")
 
             // The BlackHole rig has one output device, so rebuild onto the same ID.
+            // Documented limitation: while the engine moves devices its muted tap is destroyed, so
+            // the source is briefly audible at normal (unattenuated) level. That blip is accepted.
+            // Rejected: silence longer than one buffer + 8 frames, and anything above 1.15x the
+            // normal level (source plus replay).
             let mark = rig.capture.frameCount
             try engine.rebuild(outputDeviceID: rig.blackHole.id)
             #expect(engine.mode == .control)

@@ -81,9 +81,21 @@ package final class AppAudioEngine: AudioEngineHandle {
         if !ran { logger.debug("IOProc hadn't run within \(Self.firstRunLimit)s for \(self.appID, privacy: .public)") }
     }
 
+    /// The factory's failure path: a takeover that throws leaves no running engine behind.
+    static func takeOverOrStop(takeOver: () throws -> Void, stop: () -> Void) throws {
+        do {
+            try takeOver()
+        } catch {
+            stop()
+            throw error
+        }
+    }
+
     nonisolated static let firstRunLimit: TimeInterval = 0.2
 
     /// Waits for the first IOProc run (bounded), then calls `switchToControl` either way.
+    /// Each call blocks the main actor for at most `limit`; callers that take over several engines
+    /// start them all first, so the waits usually overlap, but the worst case is serial.
     /// Returns whether the IOProc had run.
     nonisolated static func takeOver(
         state: EngineSharedState,
@@ -133,6 +145,7 @@ package final class AppAudioEngine: AudioEngineHandle {
     /// replay) so the app isn't muted while `AudioDeviceStart` runs; `finishRebuild` then switches
     /// it back in place once the IOProc has run.
     package func beginRebuild(outputDeviceID: AudioObjectID) throws {
+        pendingTakeoverGain = nil  // never act on a gain left by an earlier, unfinished rebuild
         let wasControl = mode == .control
         let gain = Float(bitPattern: state.targetGainBits.load(ordering: .relaxed))
         stop()
@@ -366,12 +379,8 @@ package final class AppAudioEngineFactory: AudioEngineFactory {
             outputDeviceID: outputDeviceID)
         try engine.start()
         if mode == .control {
-            do {
-                try engine.takeOver(gain: initialGain)
-            } catch {
-                engine.stop()
-                throw error
-            }
+            try AppAudioEngine.takeOverOrStop(
+                takeOver: { try engine.takeOver(gain: initialGain) }, stop: { engine.stop() })
         }
         return engine
     }
