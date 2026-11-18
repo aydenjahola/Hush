@@ -58,22 +58,32 @@ test: require-xcode
 # Real Core Audio tests (taps, aggregates, BlackHole loopback). Needs Audio Recording permission
 # for the app running this (Terminal/VS Code), requested once if undetermined (never under CI);
 # Group B also needs BlackHole 2ch. See website/src/content/docs/contributing/testing.md.
-# Each test that really runs appends a line to the marker file. If none ran (everything skipped),
-# this fails unless ALLOW_SKIP=1.
+# Each test that really runs appends "A <test>" or "B <test>" to the marker file, and a skipping
+# gate appends "SKIP <reason>". Swift Testing counts skips as passes, so this fails when nothing
+# ran, or when Group B (BlackHole end to end) didn't run, unless ALLOW_SKIP=1.
 INTEGRATION_MARKER := .build/hush-integration-ran
 
 integration-test: require-xcode
 	swift build --product HushToneGenerator
 	@mkdir -p .build && : > $(INTEGRATION_MARKER)
 	HUSH_INTEGRATION=1 HUSH_INTEGRATION_MARKER="$(CURDIR)/$(INTEGRATION_MARKER)" swift test --no-parallel --filter HushIntegrationTests
-	@ran=$$(wc -l < $(INTEGRATION_MARKER) | tr -d ' '); \
-	group_a=$$(grep -c '^A ' $(INTEGRATION_MARKER) || true); \
+	@group_a=$$(grep -c '^A ' $(INTEGRATION_MARKER) || true); \
 	group_b=$$(grep -c '^B ' $(INTEGRATION_MARKER) || true); \
-	if [ "$$group_b" -gt 0 ]; then b_state="ran ($$group_b)"; else b_state="skipped"; fi; \
+	ran=$$((group_a + group_b)); \
+	if grep -q '^SKIP permission' $(INTEGRATION_MARKER); then reason="Audio Recording permission isn't granted"; \
+	elif grep -q '^SKIP blackhole' $(INTEGRATION_MARKER); then reason="BlackHole 2ch isn't installed"; \
+	else reason="see the skip messages above"; fi; \
+	if [ "$$group_b" -gt 0 ]; then b_state="ran ($$group_b)"; else b_state="skipped: $$reason"; fi; \
 	echo "Integration tests: $$ran ran (Group A engine level: $$group_a; Group B BlackHole end to end: $$b_state)"; \
-	if [ "$$ran" -eq 0 ] && [ "$(ALLOW_SKIP)" != "1" ]; then \
-		echo "No integration tests ran (permission or BlackHole missing). See the message above. Set ALLOW_SKIP=1 to bypass." >&2; \
-		exit 1; \
+	if [ "$(ALLOW_SKIP)" != "1" ]; then \
+		if [ "$$ran" -eq 0 ]; then \
+			echo "No integration tests ran (permission or BlackHole missing). See the message above. Set ALLOW_SKIP=1 to bypass." >&2; \
+			exit 1; \
+		fi; \
+		if [ "$$group_b" -eq 0 ]; then \
+			echo "The BlackHole end-to-end tests didn't run ($$reason), so mute and volume weren't checked at the output. Install BlackHole 2ch (brew install --cask blackhole-2ch) or set ALLOW_SKIP=1 to bypass." >&2; \
+			exit 1; \
+		fi; \
 	fi
 
 app: require-xcode

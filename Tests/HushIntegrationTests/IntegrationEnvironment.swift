@@ -40,8 +40,11 @@ enum IntegrationEnvironment {
         guard isEnabled else { return true }
         guard let handle = dlopen("/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW),
               dlsym(handle, "TCCAccessPreflight") != nil
-        else { return false }
-        return await MainActor.run {
+        else {
+            recordRun(group: "SKIP", test: "permission")
+            return false
+        }
+        let authorized = await MainActor.run {
             if let authorization { return authorization }
             let task = Task { @MainActor in
                 await CapturePermissionGate.resolve(
@@ -50,16 +53,21 @@ enum IntegrationEnvironment {
             authorization = task
             return task
         }.value
+        if !authorized { recordRun(group: "SKIP", test: "permission") }
+        return authorized
     }
 
     /// True when BlackHole 2ch is installed (or the suite is disabled, see `captureAuthorized`).
     static func blackHoleAvailable() async -> Bool {
         guard isEnabled else { return true }
-        return await MainActor.run { AudioDevices.blackHole() != nil }
+        let available = await MainActor.run { AudioDevices.blackHole() != nil }
+        if !available { recordRun(group: "SKIP", test: "blackhole") }
+        return available
     }
 
-    /// Records that an integration test really ran (not skipped), one line per test, in the file
-    /// named by `HUSH_INTEGRATION_MARKER`. `make integration-test` fails if nothing was recorded.
+    /// Appends to the file named by `HUSH_INTEGRATION_MARKER`: `A <test>` or `B <test>` for each test
+    /// that really runs (not skipped), and `SKIP <reason>` when a gate skips. `make integration-test`
+    /// reads it to fail when nothing, or no BlackHole test, ran, and to print why.
     static func recordRun(group: String, test: String = #function) {
         guard let path = ProcessInfo.processInfo.environment["HUSH_INTEGRATION_MARKER"], !path.isEmpty else { return }
         let line = Data("\(group) \(test)\n".utf8)
