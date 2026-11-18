@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://aydenjahola.github.io/Hush/
+    about: Installing, using the mixer, settings and how Hush works.
+  - name: Troubleshooting
+    url: https://aydenjahola.github.io/Hush/help/troubleshooting/
+    about: Fixes for common problems, like the purple recording dot or an app not showing up.
+  - name: Report a security vulnerability
+    url: https://github.com/aydenjahola/Hush/security/advisories/new
+    about: Report security problems privately, not in a public issue. See SECURITY.md.

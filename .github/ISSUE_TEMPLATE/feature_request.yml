@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an idea or an improvement for Hush.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Hush aims to stay small and light, so describing the problem you want solved matters more than the exact feature.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      placeholder: When I join a call I have to lower three apps one by one.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like Hush to do?
+      placeholder: A way to save volume presets and switch between them from the menu bar.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Workarounds you use today, or how other apps handle it.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched existing issues and this hasn't been suggested yet.
+          required: true
+        - label: I'd be willing to help build this.

@@ -1,0 +1,89 @@
+name: Bug report
+description: Something in Hush doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. First check [Troubleshooting](https://aydenjahola.github.io/Hush/help/troubleshooting/) and [Known limitations](https://aydenjahola.github.io/Hush/help/known-limitations/). Some behaviour, like a brief moment at normal volume after switching outputs, is expected.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+      placeholder: I muted Spotify in the mixer, but it kept playing at full volume.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Play a song in Spotify.
+        2. Open Hush from the menu bar.
+        3. Click Spotify's mute button.
+    validations:
+      required: true
+  - type: input
+    id: hush-version
+    attributes:
+      label: Hush version
+      description: Shown in Hush → Settings → About. Say if it's a local build (it shows "local build" and a commit).
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      description: Apple menu → About This Mac.
+      placeholder: "macOS 26.1 (25B78)"
+    validations:
+      required: true
+  - type: dropdown
+    id: mac
+    attributes:
+      label: Mac
+      options:
+        - Apple silicon
+        - Intel
+    validations:
+      required: true
+  - type: input
+    id: apps
+    attributes:
+      label: Apps involved
+      description: The apps whose audio is affected, with versions if you know them.
+      placeholder: Spotify 1.2.50, Zen Browser 1.17
+  - type: input
+    id: output
+    attributes:
+      label: Output device
+      description: Where the sound goes, for example built-in speakers, AirPods or a USB interface.
+      placeholder: AirPods Pro (Bluetooth)
+  - type: dropdown
+    id: layout
+    attributes:
+      label: Layout
+      description: Settings → Appearance → Layout, if the bug is visual.
+      options:
+        - Not relevant
+        - Channel strips
+        - Classic rows
+        - Tiles
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: |
+        Screenshots or a screen recording help a lot for visual bugs. For audio bugs, logs from Console.app filtered to "Hush" around the time of the problem are useful. Remove anything private first.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: I'm on the latest release, or I said above that I'm not.
+          required: true
