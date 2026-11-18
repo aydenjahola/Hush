@@ -17,5 +17,7 @@ let package = Package(
         .testTarget(name: "HushCoreTests", dependencies: ["HushCore"]),
         .testTarget(name: "HushAudioTests", dependencies: ["HushAudio"]),
         .testTarget(name: "HushUITests", dependencies: ["HushUI", "HushAudio", "HushCore"]),
+        // Real Core Audio: skipped unless HUSH_INTEGRATION=1 (`make integration-test`).
+        .testTarget(name: "HushIntegrationTests", dependencies: ["HushUI", "HushAudio", "HushCore"]),
     ]
 )
