@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.0](https://github.com/aydenjahola/Hush/compare/v0.2.0...v0.3.0) (2026-11-18)
+
+
+### Features
+
+* open the mixer with a global keyboard shortcut ([#40](https://github.com/aydenjahola/Hush/issues/40)) ([353e4dc](https://github.com/aydenjahola/Hush/commit/353e4dcb17385641983f8e10cf7c8f8170681e85))
+* **ui:** mark local builds with a DEV badge and commit in About ([#26](https://github.com/aydenjahola/Hush/issues/26)) ([05b1561](https://github.com/aydenjahola/Hush/commit/05b15614749a128d5f96f2242828cb292317fde5))
+* **ui:** open a quick menu on right-click of the menu bar icon ([#28](https://github.com/aydenjahola/Hush/issues/28)) ([1b025fa](https://github.com/aydenjahola/Hush/commit/1b025fa94337ee43fa074b850f00a241c6ca504d))
+
+
+### Bug Fixes
+
+* **audio:** keep adjusted apps' engines across sleep when the output is unchanged ([#33](https://github.com/aydenjahola/Hush/issues/33)) ([1e47b9c](https://github.com/aydenjahola/Hush/commit/1e47b9c8e90761afae65101a4b07f419c40dd562))
+* **settings:** show Launch at Login's real state and when it needs approval ([#32](https://github.com/aydenjahola/Hush/issues/32)) ([00acc91](https://github.com/aydenjahola/Hush/commit/00acc91462adddcd10fd5bc33b3d600ae5965f85))
+* **ui:** close the mixer when clicking in another app or on the desktop ([#43](https://github.com/aydenjahola/Hush/issues/43)) ([d555d5a](https://github.com/aydenjahola/Hush/commit/d555d5ac2acd3433ae3e930ee62083338462a888))
+* **ui:** keep the output pill's chevron next to the device name, and refresh screenshots ([#42](https://github.com/aydenjahola/Hush/issues/42)) ([6a5404e](https://github.com/aydenjahola/Hush/commit/6a5404e0ffa23f3ce8513242f986f79c3ab4d19c))
+
 ## [0.2.0](https://github.com/aydenjahola/Hush/compare/v0.1.0...v0.2.0) (2026-11-18)
 
 
