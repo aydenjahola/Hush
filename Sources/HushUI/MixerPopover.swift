@@ -3,17 +3,26 @@ import SwiftUI
 
 public struct MixerPopover: View {
     let store: MixerStore
+    let updates: UpdateChecker
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var overflow = EdgeOverflow()
 
-    public init(store: MixerStore) {
+    public init(store: MixerStore, updates: UpdateChecker) {
         self.store = store
+        self.updates = updates
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            if let update = updates.pendingUpdate {
+                UpdateBanner(
+                    version: update.version,
+                    onDownload: updates.download,
+                    onLater: updates.remindLater,
+                    onSkip: updates.skipThisVersion)
+            }
             if !store.controlsEnabled {
                 PermissionBanner()
             }
@@ -27,9 +36,15 @@ public struct MixerPopover: View {
         .padding(14)
         .frame(width: 340)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.strips.map(\.id))
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: updates.pendingUpdate?.version)
         .background(
             WindowVisibilityObserver { visible in
-                if visible { store.popoverDidAppear() } else { store.popoverDidDisappear() }
+                if visible {
+                    store.popoverDidAppear()
+                    updates.refresh()
+                } else {
+                    store.popoverDidDisappear()
+                }
             })
     }
 

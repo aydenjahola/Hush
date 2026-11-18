@@ -4,13 +4,15 @@ import SwiftUI
 
 public struct SettingsView: View {
     @Bindable var store: MixerStore
+    @Bindable var updates: UpdateChecker
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var launchError: String?
     @State private var confirmingReset = false
 
-    public init(store: MixerStore) {
+    public init(store: MixerStore, updates: UpdateChecker) {
         self.store = store
+        self.updates = updates
     }
 
     public var body: some View {
@@ -43,6 +45,18 @@ public struct SettingsView: View {
                 }
             }
 
+            Section("Updates") {
+                Toggle("Check for updates automatically", isOn: $updates.automaticChecks)
+                HStack(spacing: 8) {
+                    Button("Check Now") {
+                        Task { await updates.checkNow() }
+                    }
+                    .disabled(updates.checkStatus == .checking)
+                    updateStatus
+                    Spacer(minLength: 0)
+                }
+            }
+
             Section("About") {
                 LabeledContent("Version", value: Self.version)
                 Link("Source code on GitHub", destination: URL(string: "https://github.com/aydenjahola/Hush")!)
@@ -54,6 +68,33 @@ public struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 420)
         .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
+    }
+
+    @ViewBuilder
+    private var updateStatus: some View {
+        switch updates.checkStatus {
+        case .idle:
+            if let lastCheck = updates.lastUpdateCheck {
+                statusText("Last checked \(lastCheck.formatted(.relative(presentation: .named)))")
+            }
+        case .checking:
+            ProgressView().controlSize(.small)
+            statusText("Checking…")
+        case .upToDate:
+            statusText("Hush is up to date")
+        case .available(let version):
+            statusText("Hush \(version.description) is available")
+            Button("Download") { updates.download() }
+                .buttonStyle(.link)
+        case .failed:
+            statusText("Couldn't check for updates")
+        }
+    }
+
+    private func statusText(_ text: String) -> some View {
+        Text(text)
+            .font(.callout)
+            .foregroundStyle(.secondary)
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
