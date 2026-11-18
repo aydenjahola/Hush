@@ -154,26 +154,27 @@ extension CoreAudioIntegration {
         }
 
         @Test(
-            "Make before break: meter-only → control at 50% never bursts or gaps",
+            "In place: meter-only → control at 50% never bursts or gaps",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func meterOnlyToControlSwap() async throws {
             IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
-            let meter = rig.makeEngine(.meterOnly, gain: 1)
-            defer { meter.stop() }
-            try meter.start()
+            let engine = rig.makeEngine(.meterOnly, gain: 1)
+            defer { engine.stop() }
+            try engine.start()
             #expect(await rig.waitForLevel(rig.baseline), "a meter-only engine changed the level")
 
+            // What MixerStore.reconcile does when the user first adjusts a metered app: the same
+            // tap becomes .mutedWhenTapped and the running IOProc starts replaying it.
             let mark = rig.capture.frameCount
-            let control = rig.makeEngine(.control, gain: VolumeCurve.gain(percent: 50))
-            defer { control.stop() }
-            try control.start()  // same order as MixerStore.reconcile: new engine first, then stop the old
-            meter.stop()
+            try engine.switchMode(to: .control, gain: VolumeCurve.gain(percent: 50))
+            #expect(engine.mode == .control)
 
             let swap = try await rig.samples(after: mark, .milliseconds(600))
             let check = SwapCheck(samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize, window: windowFrames(rig))
-            // Full volume is expected until the control engine takes over; after that it must not come back.
+            // Full volume is expected until the mute lands (switchMode starts the replay first, so
+            // the source and the replay may briefly overlap before that); after that it must not come back.
             let onset = try #require(check.firstWindowBelowThreshold, "the level never dropped below baseline × 0.75 during the swap")
             #expect(check.loudestWindow(from: onset) <= check.threshold,
                     "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
@@ -183,31 +184,58 @@ extension CoreAudioIntegration {
         }
 
         @Test(
-            "Make before break: control → control at 50% never bursts or gaps",
+            "In place: a control engine at 50% takes in and drops a helper process without a burst or gap",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func controlToControlSwap() async throws {
             IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
-            let gain = VolumeCurve.gain(percent: 50)
-            let old = rig.makeEngine(.control, gain: gain)
-            defer { old.stop() }
-            try old.start()
-            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the first control engine didn't attenuate")
+            let engine = rig.makeEngine(.control, gain: VolumeCurve.gain(percent: 50))
+            defer { engine.stop() }
+            try engine.start()
+            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the control engine didn't attenuate")
 
-            let mark = rig.capture.frameCount
-            let new = rig.makeEngine(.control, gain: gain)
-            defer { new.stop() }
-            try new.start()
-            old.stop()
+            // A helper process appears (a browser spawning one): it has a process object but isn't
+            // playing yet. A different frequency keeps the two tones from interfering.
+            let helper = try ToneProcess(deviceUID: rig.blackHole.uid, level: LoopbackRig.toneLevel, frequency: 440, paused: true)
+            defer { helper.terminate() }
+            let helperObject = try await helper.processObject(playing: false)
 
+            // What MixerStore.reconcile does for a process-list change: update the same tap.
+            var mark = rig.capture.frameCount
+            try engine.updateProcesses([rig.toneObject, helperObject].sorted())
+            try await expectNoBurstOrGap(rig, after: mark, "adding the helper")
+
+            // Positive control: the update really reached the tap. The helper starts playing and
+            // must come out at 50% too: two tones at 0.25× each sum to 0.25 × √2 × baseline
+            // (-9 dB), while an unprocessed helper would bring the level back to about 0 dB.
+            helper.startPlayback()
+            let playingObject = try await helper.processObject(playing: true)
+            if playingObject != helperObject {  // the monitor would report the new object, and MixerStore update again
+                try engine.updateProcesses([rig.toneObject, playingObject].sorted())
+            }
+            let bothAtHalf = rig.baseline * 0.25 * Float(2).squareRoot()
+            #expect(await rig.waitForLevel(bothAtHalf, timeout: .milliseconds(1500)),
+                    "with the helper playing the capture is \(rig.capture.recentLevel()), expected \(dBFS(bothAtHalf)) dBFS: the updated tap isn't processing the helper")
+
+            // The helper exits, and its object goes with it.
+            helper.terminate()
+            #expect(await rig.waitForLevel(rig.baseline * 0.25, timeout: .milliseconds(1500)), "the level didn't return to -12 dB after the helper quit")
+            mark = rig.capture.frameCount
+            try engine.updateProcesses([rig.toneObject])
+            try await expectNoBurstOrGap(rig, after: mark, "dropping the helper")
+            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't stay at -12 dB after the update")
+        }
+
+        /// The 600 ms after `mark` never rise above the burst limit or go digitally silent for
+        /// more than one buffer.
+        private func expectNoBurstOrGap(_ rig: LoopbackRig, after mark: Int, _ what: String) async throws {
             let swap = try await rig.samples(after: mark, .milliseconds(600))
             let check = SwapCheck(samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize, window: windowFrames(rig))
             #expect(check.loudestWindow(from: 0) <= check.threshold,
-                    "a burst of \(check.loudestWindow(from: 0)) RMS during the swap (limit \(check.threshold))")
+                    "\(what): a burst of \(check.loudestWindow(from: 0)) RMS (limit \(check.threshold))")
             #expect(check.longestZeroRun <= check.bufferFrames,
-                    "\(check.longestZeroRun) frames of digital silence during the swap (one buffer is \(check.bufferFrames))")
-            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't stay at -12 dB after the swap")
+                    "\(what): \(check.longestZeroRun) frames of digital silence (one buffer is \(check.bufferFrames))")
         }
 
         @Test(
