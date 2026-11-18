@@ -21,9 +21,9 @@ The Swift package has four targets, each depending only on the ones above it in 
 
 | Target | Responsibility | Key types |
 |---|---|---|
-| `HushCore` | Pure logic with no system frameworks beyond Foundation. Fully unit tested. | `VolumeCurve`, `SoftLimiter`, `SampleProcessor`, `MeterBallistics`, `AppVolumeSetting`, `Preferences`, `SettingsDocument`, `StripOrdering`, `SemanticVersion`, `UpdatePolicy`, `UpdateSettings`, `HushIdentity` |
+| `HushCore` | Pure logic with no system frameworks beyond Foundation. Fully unit tested. | `VolumeCurve`, `SoftLimiter`, `SampleProcessor`, `MeterBallistics`, `AppVolumeSetting`, `Preferences`, `SettingsDocument`, `StripOrdering`, `SemanticVersion`, `UpdatePolicy`, `UpdateSettings`, `GlobalShortcut`, `HushIdentity` |
 | `HushAudio` | Everything that talks to Core Audio and the system. | `AudioProcessMonitor`, `RunningStatePoller`, `AppIdentityResolver`, `DefaultOutputMonitor`, `AppAudioEngine`, `BufferRouting`, `AudioCapturePermission`, `CoreAudioProperty` |
-| `HushUI` | State and SwiftUI views. | `MixerStore`, `SettingsStore`, `UpdateChecker`, `GitHubReleaseFetcher`, `MixerPopover`, `ChannelStrip`, `VerticalFader`, `LevelMeter`, `MuteButton`, `PermissionBanner`, `UpdateBanner`, `SettingsView` |
+| `HushUI` | State and SwiftUI views. | `MixerStore`, `SettingsStore`, `UpdateChecker`, `GitHubReleaseFetcher`, `MixerPopover`, `ChannelStrip`, `VerticalFader`, `LevelMeter`, `MuteButton`, `PermissionBanner`, `UpdateBanner`, `SettingsView`, `GlobalShortcutController`, `GlobalHotKey` |
 | `HushApp` | The `@main` entry point with the `Settings` scene, and the AppKit menu bar item: an `NSStatusItem` whose left-click toggles an `NSPopover` hosting `MixerPopover` and whose right-click opens the quick menu (`QuickMenu` in `HushUI`). | `HushApp`, `StatusItemController` |
 
 `HushIdentity.bundleID` (`io.github.aydenjahola.Hush`) is the single source for the `os.Logger` subsystem and the prefix of every aggregate device UID.
@@ -114,6 +114,15 @@ Settings live at `~/Library/Application Support/Hush/settings.json`, a versioned
 - `normalized()` clamps every level to the current maximum boost and drops entries at the default (100%, unmuted) before encoding.
 - A file that can't be decoded, or that has an unknown version, is moved aside to `settings.corrupt-<unix-time>.json`, and Hush starts with defaults.
 - Every field added after the first release is optional on disk, so older files still decode.
+
+## Global shortcut: `GlobalShortcutController`
+
+The optional shortcut that toggles the popover uses Carbon's `RegisterEventHotKey` (wrapped in `GlobalHotKey`), which needs no Accessibility or Input Monitoring permission. Hush never uses an event tap or a global `NSEvent` monitor.
+
+- `GlobalShortcut` (in `HushCore`) holds a virtual key code and modifiers, validates them (⌥ or ⌃ is required, since ⌘ and ⌘⇧ alone are left to apps; a function key may be used alone) and supplies the glyphs. `ShortcutFormatter` takes letters from the current keyboard layout with `UCKeyTranslate`.
+- It's stored as the top-level `globalShortcut` field of `settings.json`, outside `preferences`, so the mixer's debounced saves never overwrite it.
+- Registration is refused when it fails or when an enabled system shortcut (`CopySymbolicHotKeys`) already uses the combination. The previous shortcut is kept.
+- The Settings recorder uses a local `NSEvent` key-down monitor only while recording, and unregisters the shortcut meanwhile so pressing it records it. `StatusItemController.togglePopover()` is what the shortcut calls.
 
 ## Update notifier: `UpdateChecker`
 

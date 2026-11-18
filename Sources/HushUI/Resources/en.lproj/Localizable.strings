@@ -206,3 +206,39 @@
 
 /* VoiceOver label of the warning badge. %@ is the explanation. */
 "Warning: %@" = "Warning: %@";
+
+/* Settings > General: label of the row that records the global shortcut for opening the mixer. Also its VoiceOver label. */
+"Keyboard shortcut" = "Keyboard shortcut";
+
+/* Settings > General: the shortcut recorder's button when no shortcut is set. */
+"Record Shortcut" = "Record Shortcut";
+
+/* Settings > General: the shortcut recorder's button while it waits for a key combination. */
+"Type Shortcut" = "Type Shortcut";
+
+/* VoiceOver value of the shortcut recorder when no shortcut is set. */
+"None" = "None";
+
+/* Settings > General: tooltip and VoiceOver label of the button that removes the keyboard shortcut. */
+"Clear keyboard shortcut" = "Clear keyboard shortcut";
+
+/* VoiceOver hint of the shortcut recorder. */
+"Records a key combination that opens the mixer from any app." = "Records a key combination that opens the mixer from any app.";
+
+/* VoiceOver hint of the shortcut recorder while it waits for a key combination. */
+"Press the key combination, or Escape to cancel." = "Press the key combination, or Escape to cancel.";
+
+/* Settings > General: shown when the recorded shortcut is already used by macOS or another app. */
+"That shortcut is in use. Try another." = "That shortcut is in use. Try another.";
+
+/* Settings > General: shown when the recorded shortcut has no modifier key. Keep the key symbols as they are. */
+"Include ⌥ or ⌃, or use a function key." = "Include ⌥ or ⌃, or use a function key.";
+
+/* Settings > General: shown when the recorded shortcut uses only ⌘ or ⌘⇧, like an app's own menu commands (⌘C, ⌘Q). Keep the key symbols as they are. */
+"That's a standard app shortcut. Add ⌥ or ⌃." = "That's a standard app shortcut. Add ⌥ or ⌃.";
+
+/* Name of the space bar in a keyboard shortcut, as in "⌥⌘Space". */
+"Space" = "Space";
+
+/* A key in a keyboard shortcut that has no printable name. %lld is its key code. */
+"Key %lld" = "Key %lld";

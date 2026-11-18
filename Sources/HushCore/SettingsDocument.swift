@@ -14,20 +14,26 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
     package var apps: [String: AppVolumeSetting]
     /// Added after version 1 shipped; optional on disk, so it didn't need a version bump.
     package var updates: UpdateSettings
+    /// The shortcut that opens the mixer from anywhere; nil (the default) means none. Added after
+    /// version 1 shipped and optional on disk. It lives at the top level rather than in
+    /// `preferences` because Settings owns it, not the mixer, so the mixer's saves leave it alone.
+    package var globalShortcut: GlobalShortcut?
 
     package init(
         preferences: Preferences = Preferences(),
         apps: [String: AppVolumeSetting] = [:],
-        updates: UpdateSettings = UpdateSettings()
+        updates: UpdateSettings = UpdateSettings(),
+        globalShortcut: GlobalShortcut? = nil
     ) {
         self.version = Self.currentVersion
         self.preferences = preferences
         self.apps = apps
         self.updates = updates
+        self.globalShortcut = globalShortcut
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, preferences, apps, updates
+        case version, preferences, apps, updates, globalShortcut
     }
 
     package init(from decoder: any Decoder) throws {
@@ -36,6 +42,8 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         preferences = try container.decode(Preferences.self, forKey: .preferences)
         apps = try container.decode([String: AppVolumeSetting].self, forKey: .apps)
         updates = try container.decodeIfPresent(UpdateSettings.self, forKey: .updates) ?? UpdateSettings()
+        // A malformed shortcut is dropped (no shortcut) rather than discarding the whole file.
+        globalShortcut = (try? container.decodeIfPresent(GlobalShortcut.self, forKey: .globalShortcut)) ?? nil
     }
 
     private struct VersionProbe: Decodable {

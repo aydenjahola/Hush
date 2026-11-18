@@ -7,6 +7,7 @@ description: Control Hush from the keyboard and with VoiceOver, and how it follo
 
 | Action | How |
 |---|---|
+| Open or close the mixer from any app | The shortcut you set in [Settings → General → Keyboard shortcut](/Hush/using/settings/#keyboard-shortcut) (none by default) |
 | Raise or lower the focused fader, slider or tile by 5% | **↑** / **↓**, or **→** / **←** |
 | Move between controls | **Tab** / **Shift-Tab** |
 | Mute or unmute (mute button focused) | **Space** |
@@ -18,7 +19,11 @@ This works the same in every [layout](/Hush/using/mixer/#layouts). In the tiles 
 
 If **Tab** skips the faders and buttons, turn on **Keyboard navigation** in **System Settings → Keyboard**.
 
-Hush doesn't have a global keyboard shortcut for opening the mixer.
+### Opening the mixer with a shortcut
+
+Hush has no global shortcut until you choose one, so it never takes over a key combination you use elsewhere. Set one in [Settings → General → Keyboard shortcut](/Hush/using/settings/#keyboard-shortcut). Pressing it anywhere works like clicking the Hush icon: it opens the mixer, or closes it if it's open. If macOS is hiding the Hush icon (for example, because it's turned off in **System Settings → Menu Bar**), the shortcut does nothing, because the mixer opens from the icon.
+
+The shortcut doesn't need Accessibility or Input Monitoring permission: macOS tells Hush only when that one combination is pressed, and Hush never sees your other key presses.
 
 ## Mouse and trackpad
 
@@ -39,6 +44,7 @@ Every control has a spoken label:
 | Mute button | "Mute *App*", or "Unmute *App*" when muted |
 | Warning badge | "Warning:" followed by the problem, for example "Hush couldn't control this app's audio, so it's playing normally." |
 | Gear button | "Settings" |
+| Shortcut recorder (Settings) | "Keyboard shortcut", with the shortcut as its value (or "None"), and "Type Shortcut" while it's waiting for keys. The button next to it reads "Clear keyboard shortcut". |
 
 The level meters (and the tiles' green glow) are decorative and hidden from VoiceOver, as is the small layout preview in Settings. VoiceOver reads the level even when **Show percentages** is off.
 
