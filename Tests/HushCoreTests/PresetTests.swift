@@ -106,6 +106,40 @@ import Testing
         #expect(!preset.matches(["a": AppVolumeSetting(percent: 50)], maxPercent: 200))
     }
 
+    // MARK: Hidden apps
+
+    @Test func applyingLeavesHiddenAppsOutAndAppliesTheRest() {
+        let preset = Preset(name: "Call", apps: ["chat": level(150), "hidden": level(30, muted: true)])
+        let settings = ["other": AppVolumeSetting(percent: 40, lastAdjusted: earlier)]
+        let applied = preset.applied(to: settings, maxPercent: 200, now: now, excluding: ["hidden"])
+        #expect(applied == ["chat": AppVolumeSetting(percent: 150, lastAdjusted: now)])
+    }
+
+    @Test func matchingIgnoresHiddenApps() {
+        let preset = Preset(name: "Call", apps: ["chat": level(150), "hidden": level(30)])
+        let settings = ["chat": AppVolumeSetting(percent: 150, lastAdjusted: now)]
+        #expect(!preset.matches(settings, maxPercent: 200), "the hidden app's level is missing")
+        #expect(preset.matches(settings, maxPercent: 200, excluding: ["hidden"]))
+
+        var withHiddenEntry = settings
+        withHiddenEntry["hidden"] = AppVolumeSetting(percent: 80, lastAdjusted: now)
+        #expect(preset.matches(withHiddenEntry, maxPercent: 200, excluding: ["hidden"]), "left out on both sides")
+    }
+
+    @Test func activePresetIgnoresHiddenApps() {
+        let preset = Preset(name: "Call", apps: ["chat": level(150), "hidden": level(30)])
+        let library = PresetLibrary(presets: [preset])
+        let settings = ["chat": AppVolumeSetting(percent: 150)]
+        #expect(library.activePreset(for: settings, maxPercent: 200) == nil)
+        #expect(library.activePreset(for: settings, maxPercent: 200, excluding: ["hidden"]) == preset)
+    }
+
+    @Test func levelWithoutIsMutedDecodesAsUnmuted() throws {
+        let json = #"{"displayName": "Chat", "percent": 40}"#
+        let decoded = try JSONDecoder().decode(Preset.Level.self, from: Data(json.utf8))
+        #expect(decoded == Preset.Level(displayName: "Chat", percent: 40, isMuted: false))
+    }
+
     @Test func roundTripsThroughJSON() throws {
         let preset = Preset(name: "Call", apps: ["chat": level(150, muted: true, name: "Chat")])
         let decoded = try JSONDecoder().decode(Preset.self, from: JSONEncoder().encode(preset))

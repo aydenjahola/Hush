@@ -216,6 +216,72 @@ import Testing
         #expect(reloaded.presets.map(\.name) == ["Quiet"])
     }
 
+    @Test func presetsSurviveTheShortcutWriterAndTheShortcutSurvivesLevelSaves() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "HushTests-\(UUID().uuidString)")
+        let file = directory.appending(path: "settings.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let settings = SettingsStore(fileURL: file)
+        let processes = FakeProcessSource()
+        let store = MixerStore(
+            processSource: processes,
+            outputSource: FakeOutputSource(),
+            engineFactory: FakeEngineFactory(),
+            permissionSource: FakePermission(),
+            persister: settings,
+            saveDelay: .seconds(3600),
+            now: { Harness.fixedNow },
+            installedApp: { _ in nil })
+        store.start()
+        processes.emit([makeApp("a")])
+        let shortcut = GlobalShortcut(keyCode: 0x04, modifiers: [.option, .command])
+
+        store.setPercent(40, for: "a")
+        store.saveCurrentLevelsAsPreset(named: "Quiet")
+        store.flushPendingSave()
+        // Settings' shortcut recorder writes only its own field, as GlobalShortcutController does.
+        settings.update { $0.globalShortcut = shortcut }
+        store.setPercent(90, for: "a")
+        store.flushPendingSave()
+
+        let onDisk = try SettingsDocument.decode(from: Data(contentsOf: file))
+        #expect(onDisk.presets?.map(\.name) == ["Quiet"])
+        #expect(onDisk.globalShortcut == shortcut)
+        #expect(onDisk.apps["a"]?.percent == 90)
+    }
+
+    // MARK: Hidden apps
+
+    @Test func applyingSkipsHiddenAppsAndStillAppliesTheRest() {
+        let preset = Preset(name: "Call", apps: ["a": level(20, name: "A"), "h": level(30, name: "H")])
+        let h = Harness(document: SettingsDocument(presets: [preset]))
+        h.processes.emit([makeApp("a"), makeApp("h", objects: [43])])
+        h.store.hideApp("h", displayName: "H")
+
+        h.store.applyPreset(preset.id)
+        h.store.flushPendingSave()
+
+        #expect(h.persister.saved.last?.apps.keys.sorted() == ["a"], "a hidden app never gets a level")
+        #expect(h.factory.live("h") == nil)
+        #expect(h.factory.live("a") != nil)
+        #expect(h.store.activePresetID == preset.id, "still active with its hidden app left out")
+        #expect(h.store.presets.first?.apps["h"] != nil, "the preset itself keeps the hidden app")
+    }
+
+    @Test func showingAHiddenAppAgainKeepsThePresetInactiveUntilReapplied() {
+        let preset = Preset(name: "Call", apps: ["a": level(20, name: "A"), "h": level(30, name: "H")])
+        let h = Harness(document: SettingsDocument(presets: [preset]))
+        h.processes.emit([makeApp("a"), makeApp("h", objects: [43])])
+        h.store.hideApp("h", displayName: "H")
+        h.store.applyPreset(preset.id)
+
+        h.store.showApp("h")
+        #expect(h.store.activePresetID == nil, "h is back at 100%, not the preset's 30%")
+
+        h.store.applyPreset(preset.id)
+        #expect(h.store.strips.first { $0.id == "h" }?.setting.percent == 30)
+        #expect(h.store.activePresetID == preset.id)
+    }
+
     // MARK: Quick menu model
 
     @Test func quickMenuModelListsPresetsAndChecksTheActiveOne() {
@@ -231,6 +297,24 @@ import Testing
         #expect(model.presetsEnabled)
         #expect(
             !QuickMenuModel(store: Harness(permission: .denied).store, updates: UpdateHarness().checker).presetsEnabled)
+    }
+
+    @Test func quickMenuPresetItemsAreDisabledWhenTheStoreHasNoPermission() throws {
+        let call = Preset(name: "Call", apps: [:])
+        let h = Harness(document: SettingsDocument(presets: [call]), permission: .denied)
+        let model = QuickMenuModel(store: h.store, updates: UpdateHarness().checker)
+        let actions = QuickMenuActions(
+            selectOutput: { _ in }, openSoundSettings: {}, muteAllPlaying: {}, unmuteAll: {}, openSettings: {},
+            checkForUpdates: {}, quit: {})
+
+        let items = QuickMenu.items(for: model, actions: actions)
+        let submenu = try #require(items.first { $0.title == "Presets" }?.submenu)
+
+        let byTitle = Dictionary(
+            uniqueKeysWithValues: submenu.items.filter { !$0.isSeparatorItem }.map { ($0.title, $0) })
+        #expect(byTitle["Call"]?.isEnabled == false)
+        #expect(byTitle["Save Current Levels as Preset…"]?.isEnabled == false)
+        #expect(byTitle["Manage Presets…"]?.isEnabled == true)
     }
 }
 
