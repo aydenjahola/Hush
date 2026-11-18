@@ -111,6 +111,8 @@ final class UpdateHarness {
     private(set) var sleeps: [Duration] = []
     /// The schedule loop's sleep throws (ending the loop) once this many sleeps have happened.
     var sleepLimit = Int.max
+    /// False simulates sleeps that return early (the clock doesn't move).
+    var sleepAdvancesClock = true
     var checker: UpdateChecker!
 
     init(
@@ -132,7 +134,7 @@ final class UpdateHarness {
                 guard let self else { throw CancellationError() }
                 self.sleeps.append(duration)
                 if self.sleeps.count >= self.sleepLimit { throw CancellationError() }
-                clock.advance(duration / .seconds(1))
+                if self.sleepAdvancesClock { clock.advance(duration / .seconds(1)) }
             })
     }
 

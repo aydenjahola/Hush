@@ -214,4 +214,33 @@ import Testing
         let futureAttempt = now.addingTimeInterval(10 * 86_400)
         #expect(schedule.nextCheck(lastAttempt: futureAttempt, launchedAt: now, now: now) == now.addingTimeInterval(86_400))
     }
+
+    @Test func failuresBackOffOneHourThenFourThenADay() {
+        let schedule = UpdateSchedule()
+        let attempt = now
+        func next(_ failures: Int) -> TimeInterval {
+            schedule.nextCheck(lastAttempt: attempt, consecutiveFailures: failures, launchedAt: now, now: attempt)
+                .timeIntervalSince(attempt)
+        }
+        #expect(next(0) == 86_400)
+        #expect(next(1) == 3_600)
+        #expect(next(2) == 14_400)
+        #expect(next(3) == 86_400)
+        #expect(next(9) == 86_400)
+    }
+
+    @Test func notBeforeDelaysTheCheckButNeverPastADay() {
+        let schedule = UpdateSchedule()
+        let later = now.addingTimeInterval(7_200)
+        #expect(schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, notBefore: later, launchedAt: now, now: now) == later)
+        let tooLate = now.addingTimeInterval(10 * 86_400)
+        #expect(schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, notBefore: tooLate, launchedAt: now, now: now)
+                == now.addingTimeInterval(86_400))
+    }
+
+    @Test func attemptsAreAlwaysAtLeastAMinuteApart() {
+        let schedule = UpdateSchedule(launchDelay: 30, interval: 5, retryIntervals: [1])
+        #expect(schedule.nextCheck(lastAttempt: now, launchedAt: now, now: now) == now.addingTimeInterval(60))
+        #expect(schedule.nextCheck(lastAttempt: now, consecutiveFailures: 1, launchedAt: now, now: now) == now.addingTimeInterval(60))
+    }
 }

@@ -254,15 +254,57 @@ struct OfflineError: Error {}
         #expect(h.fake.calls == 2)
     }
 
-    @Test func failedChecksRetryOnTheNextCycle() async {
+    @Test func failedChecksRetryAfterOneHourThenFourThenDaily() async {
         let h = UpdateHarness()
         h.fake.response = .failure(OfflineError())
-        h.sleepLimit = 3
+        h.sleepLimit = 6
         h.checker.start()
         await h.checker.scheduleTask?.value
 
-        #expect(h.sleeps == [.seconds(30), .seconds(Self.day), .seconds(Self.day)])
-        #expect(h.fake.calls == 2)
+        #expect(h.sleeps == [.seconds(30), .seconds(3_600), .seconds(14_400), .seconds(Self.day), .seconds(Self.day), .seconds(Self.day)])
+        #expect(h.fake.calls == 5)
+    }
+
+    @Test func successAfterAFailureReturnsToTheDailyCadence() async {
+        let h = UpdateHarness()
+        h.fake.response = .failure(OfflineError())
+        await h.checker.checkAutomatically()
+        h.fake.response = .release(makeRelease("0.1.0"))
+        h.sleepLimit = 3
+        h.checker.start()
+        await h.checker.scheduleTask?.value
+        // The pending retry fires an hour after the failure, succeeds, then it's daily again.
+        #expect(h.sleeps == [.seconds(3_600), .seconds(Self.day), .seconds(Self.day)])
+    }
+
+    @Test func unversionedBuildNeverSchedules() async {
+        let h = UpdateHarness(current: nil)
+        h.sleepLimit = 5
+        h.checker.start()
+        await h.checker.scheduleTask?.value
+        #expect(h.checker.scheduleTask == nil)
+        #expect(h.sleeps.isEmpty)
+        #expect(h.fake.calls == 0)
+    }
+
+    @Test func unversionedManualCheckStillMovesTheScheduleForward() async {
+        let h = UpdateHarness(current: nil)
+        await h.checker.checkNow()
+        await h.checker.checkNow()
+        #expect(h.checker.checkStatus == .failed)
+        #expect(h.fake.calls == 0)
+    }
+
+    @Test func scheduleNeverSpinsEvenWhenSleepsReturnEarly() async {
+        let h = UpdateHarness()
+        h.fake.response = .failure(OfflineError())
+        h.sleepAdvancesClock = false
+        h.sleepLimit = 6
+        h.checker.start()
+        await h.checker.scheduleTask?.value
+
+        #expect(h.sleeps.count == 6)
+        #expect(h.sleeps.dropFirst().allSatisfy { $0 >= .seconds(60) }, "\(h.sleeps)")
     }
 
     @Test func turningAutomaticChecksOffStopsTheScheduleAndPersists() async {

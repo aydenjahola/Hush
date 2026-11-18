@@ -123,20 +123,47 @@ public enum UpdatePolicy {
     }
 }
 
-/// When the next automatic check is due: shortly after launch, then once a day.
+/// When the next automatic check is due: shortly after launch, then once a day. After a failure it
+/// retries sooner (1 h, then 4 h, then daily) and returns to daily after a success.
 public struct UpdateSchedule: Equatable, Sendable {
+    /// Consecutive attempts are never closer than this, whatever else the schedule says.
+    public static let minimumGap: TimeInterval = 60
+
     public var launchDelay: TimeInterval
     public var interval: TimeInterval
+    /// Delay after the 1st, 2nd, … consecutive failure; the last value repeats.
+    public var retryIntervals: [TimeInterval]
 
-    public init(launchDelay: TimeInterval = 30, interval: TimeInterval = 24 * 60 * 60) {
+    public init(
+        launchDelay: TimeInterval = 30,
+        interval: TimeInterval = 24 * 60 * 60,
+        retryIntervals: [TimeInterval] = [60 * 60, 4 * 60 * 60, 24 * 60 * 60]
+    ) {
         self.launchDelay = launchDelay
         self.interval = interval
+        self.retryIntervals = retryIntervals
     }
 
-    /// `lastAttempt` is this session's last check attempt (successful or not), nil before the first.
-    public func nextCheck(lastAttempt: Date?, launchedAt: Date, now: Date) -> Date {
+    /// - Parameters:
+    ///   - lastAttempt: this session's last check attempt (successful or not), nil before the first.
+    ///   - consecutiveFailures: failed attempts since the last success.
+    ///   - notBefore: a server-requested earliest retry (Retry-After / rate-limit reset).
+    public func nextCheck(
+        lastAttempt: Date?,
+        consecutiveFailures: Int = 0,
+        notBefore: Date? = nil,
+        launchedAt: Date,
+        now: Date
+    ) -> Date {
         guard let lastAttempt else { return launchedAt.addingTimeInterval(launchDelay) }
-        // If the wall clock moved backwards, don't wait longer than one interval from now.
-        return min(lastAttempt.addingTimeInterval(interval), now.addingTimeInterval(interval))
+        let delay = consecutiveFailures > 0 && !retryIntervals.isEmpty
+            ? retryIntervals[min(consecutiveFailures, retryIntervals.count) - 1]
+            : interval
+        var due = lastAttempt.addingTimeInterval(delay)
+        if let notBefore { due = max(due, notBefore) }
+        due = max(due, lastAttempt.addingTimeInterval(Self.minimumGap))
+        // If the wall clock moved backwards (or a server asked for too long), don't wait longer
+        // than one interval from now.
+        return min(due, now.addingTimeInterval(max(interval, Self.minimumGap)))
     }
 }

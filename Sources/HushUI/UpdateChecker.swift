@@ -74,6 +74,7 @@ public final class UpdateChecker {
     @ObservationIgnored private var launchedAt: Date
     /// This session's last check attempt, successful or not; failures wait for the next cycle.
     @ObservationIgnored private var lastAttempt: Date?
+    @ObservationIgnored private var consecutiveFailures = 0
     @ObservationIgnored private var inFlight: Task<Outcome, Never>?
     /// The sleeping schedule loop (exposed for tests).
     @ObservationIgnored private(set) var scheduleTask: Task<Void, Never>?
@@ -104,8 +105,10 @@ public final class UpdateChecker {
 
     // MARK: Lifecycle
 
+    /// Starts the schedule. A build without a version (the bare binary, or a non-semver bundle
+    /// version) has nothing to compare against, so it never schedules checks.
     public func start() {
-        guard !isStarted else { return }
+        guard !isStarted, currentVersion != nil else { return }
         isStarted = true
         launchedAt = now()
         notifier.onAction = { [weak self] action, version, url in
@@ -149,18 +152,21 @@ public final class UpdateChecker {
     }
 
     private func fetchAndApply() async -> Outcome {
+        // Recorded before any early return, so the schedule always moves forward.
+        lastAttempt = now()
         guard let currentVersion else {
             logger.debug("Skipping update check: this build has no version")
             return .failed
         }
-        lastAttempt = now()
         let release: GitHubRelease?
         do {
             release = try await fetcher.latestRelease()
         } catch {
-            logger.debug("Update check failed: \(String(describing: error), privacy: .public)")
+            consecutiveFailures += 1
+            logger.debug("Update check failed (\(self.consecutiveFailures, privacy: .public) in a row): \(String(describing: error), privacy: .public)")
             return .failed
         }
+        consecutiveFailures = 0
         settings.lastUpdateCheck = now()
         if let release, UpdatePolicy.isIgnored(release) {
             logger.debug("Ignoring release \(release.tagName, privacy: .public): draft, prerelease or unparseable tag")
@@ -251,7 +257,8 @@ public final class UpdateChecker {
 
     private func nextWake() -> (wake: Date, due: Date)? {
         let current = now()
-        let due = schedule.nextCheck(lastAttempt: lastAttempt, launchedAt: launchedAt, now: current)
+        let due = schedule.nextCheck(
+            lastAttempt: lastAttempt, consecutiveFailures: consecutiveFailures, launchedAt: launchedAt, now: current)
         var wake: Date? = settings.automaticUpdateChecks ? due : nil
         if let snoozedUntil = settings.snoozedUntil, snoozedUntil > current {
             wake = min(wake ?? snoozedUntil, snoozedUntil)
@@ -260,8 +267,12 @@ public final class UpdateChecker {
     }
 
     private func runSchedule() async {
+        var isFirstWake = true
         while !Task.isCancelled, let next = nextWake() {
-            let delay = max(0, next.wake.timeIntervalSince(now()))
+            var delay = max(0, next.wake.timeIntervalSince(now()))
+            // Belt and braces: whatever the dates say, the loop can't spin.
+            if !isFirstWake { delay = max(delay, UpdateSchedule.minimumGap) }
+            isFirstWake = false
             do {
                 try await sleep(.seconds(delay))
             } catch {
