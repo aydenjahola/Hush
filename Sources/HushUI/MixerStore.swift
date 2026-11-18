@@ -217,13 +217,17 @@ public final class MixerStore {
         meterLevels = levels
     }
 
+    static let meterInterval: Duration = .milliseconds(33)
+    /// About 10%: lets the system coalesce meter wakeups; the ballistics use the real elapsed time.
+    static let meterTolerance: Duration = meterInterval / 10
+
     private func startMeterPolling() {
         meterTask?.cancel()
         meterTask = Task { [weak self] in
             let clock = ContinuousClock()
             var last = clock.now
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(33))
+                try? await Task.sleep(for: Self.meterInterval, tolerance: Self.meterTolerance)
                 guard !Task.isCancelled, let self else { break }
                 let current = clock.now
                 let elapsed = (current - last) / .seconds(1)

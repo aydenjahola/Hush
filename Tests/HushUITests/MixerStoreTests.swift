@@ -657,6 +657,11 @@ import Testing
         #expect(h.store.meterLevels.isEmpty)
     }
 
+    @Test func meterLoopSleepsWithATenPercentTolerance() {
+        #expect(MixerStore.meterTolerance == MixerStore.meterInterval / 10)
+        #expect(MixerStore.meterTolerance > .zero)
+    }
+
     @Test func meterPollingDoesNotWriteAfterPopoverCloses() async throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
