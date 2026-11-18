@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Hush plural strings. Keys are the English source text (see Localizable.strings). -->
+<dict>
+	<!-- Footer of the popover when two or more apps are playing; the count varies by plural. -->
+	<key>%lld apps playing</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@apps@</string>
+		<key>apps</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld app playing</string>
+			<key>other</key>
+			<string>%lld apps playing</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

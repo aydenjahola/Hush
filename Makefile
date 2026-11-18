@@ -30,7 +30,7 @@ XCODE_MESSAGE := Hush needs Xcode 26+ to build. Install Xcode, then run: sudo xc
 INSTALL_DIR ?= /Applications
 BUNDLE_ID := io.github.aydenjahola.Hush
 
-.PHONY: require-xcode build test format lint integration-test app dmg install icon run clean
+.PHONY: require-xcode build test format lint integration-test app check-app-strings dmg install icon run clean
 
 # Fails unless the developer directory is inside an Xcode app whose version is 26 or later.
 require-xcode:
@@ -99,14 +99,31 @@ app: require-xcode
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp "$$($(SWIFT_BUILD) --show-bin-path)/Hush" $(APP)/Contents/MacOS/Hush
-	# SwiftPM's resource bundle (the String Catalog); HushUI finds it in Contents/Resources.
+	# SwiftPM's resource bundle (en.lproj strings); HushUI finds it in Contents/Resources.
 	ditto "$$($(SWIFT_BUILD) --show-bin-path)/Hush_HushUI.bundle" $(APP)/Contents/Resources/Hush_HushUI.bundle
+	@$(MAKE) --no-print-directory check-app-strings
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	plutil -replace CFBundleShortVersionString -string "$(VERSION)" $(APP)/Contents/Info.plist
 	plutil -replace CFBundleVersion -string "$(BUILD_NUMBER)" $(APP)/Contents/Info.plist
 	plutil -lint $(APP)/Contents/Info.plist
 	cp Resources/Hush.icns $(APP)/Contents/Resources/Hush.icns
 	codesign --force --sign "$(SIGN_IDENTITY)" $(SIGN_FLAGS) --entitlements Resources/Hush.entitlements $(APP)
+
+# Fails unless the packaged resource bundle has every English string: each file in
+# Sources/HushUI/Resources/en.lproj must be in the app with the same number of top-level keys.
+# The bundle layout differs between SwiftPM build systems (flat or Contents/Resources), so find it.
+STRINGS_DIR := Sources/HushUI/Resources/en.lproj
+APP_STRINGS_BUNDLE := $(APP)/Contents/Resources/Hush_HushUI.bundle
+
+check-app-strings:
+	@for file in Localizable.strings Localizable.stringsdict; do \
+		packaged="$$(find $(APP_STRINGS_BUNDLE) -path "*/en.lproj/$$file" | head -n 1)"; \
+		if [ -z "$$packaged" ]; then echo "error: $(APP_STRINGS_BUNDLE) has no en.lproj/$$file" >&2; exit 1; fi; \
+		want=$$(plutil -convert xml1 -o - "$(STRINGS_DIR)/$$file" | grep -c '^.<key>'); \
+		got=$$(plutil -convert xml1 -o - "$$packaged" | grep -c '^.<key>'); \
+		if [ "$$want" != "$$got" ]; then echo "error: $$packaged has $$got keys, expected $$want" >&2; exit 1; fi; \
+		echo "$$file: $$got keys in the app bundle"; \
+	done
 
 # Uses `diskutil image create from` when available, otherwise hdiutil (e.g. the macos-26 CI runner).
 dmg: app
