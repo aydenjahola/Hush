@@ -6,6 +6,8 @@ import HushCore
 struct StripListBuilder {
     var apps: [AudioApp]
     var settings: [String: AppVolumeSetting]
+    /// Apps hidden from the mixer: never listed, running or saved.
+    var hidden: Set<String> = []
     var preferences: Preferences
     var engineErrors: [String: String]
     var isPopoverVisible: Bool
@@ -16,7 +18,7 @@ struct StripListBuilder {
         var byID: [String: MixerStore.Strip] = [:]
         // Idle apps are listed only when they're real (Dock) apps or the user has a level saved for them;
         // otherwise every daemon with a Core Audio process object would get a strip.
-        for app in apps
+        for app in HiddenAppsPlan.visibleApps(apps, hidden: hidden)
         where app.isPlaying
             || (preferences.showInactiveApps && (app.isRegularApp || settings[app.id] != nil))
         {
@@ -30,7 +32,7 @@ struct StripListBuilder {
                 engineError: engineErrors[app.id])
         }
         if preferences.showInactiveApps {
-            for (id, setting) in settings where byID[id] == nil {
+            for (id, setting) in settings where byID[id] == nil && !hidden.contains(id) {
                 let info = installedApp(id)
                 byID[id] = MixerStore.Strip(
                     id: id, displayName: info?.displayName ?? id, icon: info?.icon, isPlaying: false,

@@ -72,6 +72,10 @@ package enum L10n {
     package static func warning(_ detail: String) -> LocalizedStringResource { resource("Warning: \(detail)") }
     package static let clickToMute = resource("Click to mute")
     package static let clickToUnmute = resource("Click to unmute")
+    package static func hideApp(_ app: String) -> LocalizedStringResource { resource("Hide \(app)") }
+    package static func hideAppHelp(_ app: String) -> LocalizedStringResource {
+        resource("Hides \(app) and plays it at its normal volume.")
+    }
 
     // MARK: Banners
 
@@ -119,6 +123,10 @@ package enum L10n {
     package static let resetAllLevelsTitle = resource("Reset all app levels?")
     package static let resetAllLevels = resource("Reset All Levels")
     package static let resetAllLevelsMessage = resource("Every app goes back to 100% and unmuted.")
+    package static let hiddenApps = resource("Hidden apps")
+    package static let noHiddenApps = resource("No hidden apps.")
+    package static let show = resource("Show")
+    package static func showApp(_ app: String) -> LocalizedStringResource { resource("Show \(app)") }
     package static let updates = resource("Updates")
     package static let checkAutomatically = resource("Check for updates automatically")
     package static let checkNow = resource("Check Now")
@@ -209,6 +217,7 @@ package enum L10n {
             showLevelMeters, recordingIndicatorNote, showPercentages, sortApps, sortActivity, sortAlphabetical,
             accentColour, amber, systemAccent, menuBarIcon, speaker, faderGlyph, previewChannelStrips,
             previewClassicRows, previewTiles, controlFailed, meterFailed, failureDetail("x", "y"), notificationBody,
+            hideApp("x"), hideAppHelp("x"), hiddenApps, noHiddenApps, show, showApp("x"),
         ]
     }
 }

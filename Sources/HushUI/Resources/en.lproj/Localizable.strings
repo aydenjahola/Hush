@@ -60,6 +60,15 @@
 
 "General" = "General";
 
+/* Settings → Levels: heading of the list of apps hidden from the mixer. */
+"Hidden apps" = "Hidden apps";
+
+/* Right-click menu item on an app in the mixer: hides it from the mixer. %@ is the app's name. */
+"Hide %@" = "Hide %@";
+
+/* Tooltip of the "Hide %@" menu item: a hidden app is no longer adjusted. %@ is the app's name. */
+"Hides %@ and plays it at its normal volume." = "Hides %@ and plays it at its normal volume.";
+
 "Hush" = "Hush";
 
 /* %@ is a version number such as 1.2.0. */
@@ -110,6 +119,9 @@
 
 "No apps playing" = "No apps playing";
 
+/* Settings → Levels: shown in the hidden apps list when no app is hidden. */
+"No hidden apps." = "No hidden apps.";
+
 "Nothing is playing" = "Nothing is playing";
 
 /* Button under Launch at login that opens System Settings → General → Login Items. */
@@ -150,6 +162,12 @@
 
 /* Quick menu item (right-click on the menu bar icon): opens the Settings window. */
 "Settings…" = "Settings…";
+
+/* Settings → Levels: button on a hidden app's row that shows the app in the mixer again. */
+"Show" = "Show";
+
+/* VoiceOver label of the Show button on a hidden app's row. %@ is the app's name. */
+"Show %@" = "Show %@";
 
 "Show apps that aren't playing" = "Show apps that aren't playing";
 

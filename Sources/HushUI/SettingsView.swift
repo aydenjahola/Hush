@@ -47,6 +47,7 @@ package struct SettingsView: View {
             AppearanceSettingsSection(store: store)
 
             Section(L10n.levels) {
+                HiddenAppsList(store: store)
                 Button(L10n.resetAllLevelsButton, role: .destructive) {
                     confirmingReset = true
                 }

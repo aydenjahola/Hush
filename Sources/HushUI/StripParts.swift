@@ -66,6 +66,35 @@ struct StripPercentLabel: View {
     }
 }
 
+/// The right-click menu every layout's strip shares: "Hide <App>". Not shown in the Settings
+/// preview, whose sample strips aren't real apps.
+struct StripContextMenu: ViewModifier {
+    let strip: MixerStore.Strip
+    let actions: StripActions
+
+    @Environment(\.isMixerPreview) private var isPreview
+
+    func body(content: Content) -> some View {
+        if isPreview {
+            content
+        } else {
+            content.contextMenu {
+                Button(L10n.hideApp(strip.displayName)) {
+                    actions.hide(displayName: strip.displayName)
+                }
+                .help(Text(L10n.hideAppHelp(strip.displayName)))
+            }
+        }
+    }
+}
+
+extension View {
+    /// Adds the shared strip context menu (see `StripContextMenu`).
+    func stripContextMenu(_ strip: MixerStore.Strip, actions: StripActions) -> some View {
+        modifier(StripContextMenu(strip: strip, actions: actions))
+    }
+}
+
 extension MixerStore.Strip {
     /// Whether its meter should show anything: playing and not muted.
     var meterIsActive: Bool { isPlaying && !setting.isMuted }

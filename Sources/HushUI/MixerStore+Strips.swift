@@ -7,6 +7,7 @@ extension MixerStore {
         let builder = StripListBuilder(
             apps: apps,
             settings: settings,
+            hidden: hiddenApps.ids,
             preferences: preferences,
             engineErrors: engineErrors,
             isPopoverVisible: isPopoverVisible,
@@ -17,7 +18,7 @@ extension MixerStore {
         meterBank.retain(only: Set(order))
     }
 
-    private func cachedInstalledApp(_ id: String) -> InstalledAppInfo? {
+    func cachedInstalledApp(_ id: String) -> InstalledAppInfo? {
         if let cached = installedAppCache[id] { return cached }
         let info = installedApp(id)
         installedAppCache[id] = info
