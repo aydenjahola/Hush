@@ -1,6 +1,7 @@
 import CoreAudio
 import Foundation
 import HushCore
+import os
 import Synchronization
 
 /// Lock-free state shared between the main thread and the realtime IOProc.
@@ -10,6 +11,8 @@ final class EngineSharedState: Sendable {
     let peakBits = Atomic<UInt32>(0)
     /// True: replay the tap with gain (`.control`). False: only measure it (`.meterOnly`).
     let replaying: Atomic<Bool>
+    /// Incremented by the IOProc after each buffer it renders in replay mode (wraps).
+    let replayBuffers = Atomic<UInt32>(0)
 
     /// `appliedGainBits` is the replay's current gain: a meter-only engine starts at 0, so it has
     /// nothing to fade out.
@@ -120,15 +123,14 @@ public final class AppAudioEngine: AudioEngineHandle {
         // new mute behaviour (the integration tests bound and log how long that is).
         switch newMode {
         case .control:
-            // Replay first, fading in from gain 0, then mute the source.
-            state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
-            state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed)
-            state.replaying.store(true, ordering: .releasing)
-            do {
-                try applyTapDescription(makeDescription(processes: processObjectIDs, mode: .control))
-            } catch {
-                state.replaying.store(false, ordering: .releasing)
-                throw error
+            let description = makeDescription(processes: processObjectIDs, mode: .control)
+            let acknowledged = try Self.replayThenMute(
+                state: state, gain: gain, timeout: .milliseconds(50), interval: .microseconds(500),
+                now: { ContinuousClock.now },
+                pause: { usleep(UInt32($0 / .microseconds(1))) },
+                mute: { try applyTapDescription(description) })
+            if !acknowledged {
+                Self.logger.debug("No replay buffer within 50 ms for \(self.appID, privacy: .public); muted anyway")
             }
         case .meterOnly:
             // Unmute the source first, then stop the replay (it fades out over one buffer).
@@ -136,6 +138,50 @@ public final class AppAudioEngine: AudioEngineHandle {
             state.replaying.store(false, ordering: .releasing)
         }
         mode = newMode
+    }
+
+    private static let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
+
+    /// meter-only → control sequencing, kept free of the HAL so it can be tested.
+    ///
+    /// Turns the replay on, then mutes the source only once the IOProc has rendered a replay buffer
+    /// (or `timeout` passes; the app must be muted even if IO stalls). Measured on real hardware:
+    /// muting straight away took effect one IO cycle before the first replayed buffer reached the
+    /// output (a 513-frame zero run at 512-frame buffers). The IOProc renders into the next output
+    /// buffer and the mute lands at the next cycle boundary, so waiting one rendered buffer makes
+    /// them meet. The replay ramps up from g/1000 across that buffer, never from an exact 0.
+    /// Blocks the caller for about one buffer (≤ `timeout`). Returns whether the IOProc acknowledged.
+    nonisolated static func replayThenMute(
+        state: EngineSharedState,
+        gain: Float,
+        timeout: Duration,
+        interval: Duration,
+        now: () -> ContinuousClock.Instant,
+        pause: (Duration) -> Void,
+        mute: () throws -> Void
+    ) throws -> Bool {
+        state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
+        state.appliedGainBits.store((gain / 1000).bitPattern, ordering: .relaxed)
+        let before = state.replayBuffers.load(ordering: .acquiring)
+        state.replaying.store(true, ordering: .releasing)
+
+        let deadline = now().advanced(by: timeout)
+        var acknowledged = false
+        while true {
+            if state.replayBuffers.load(ordering: .acquiring) != before {
+                acknowledged = true
+                break
+            }
+            if now() >= deadline { break }
+            pause(interval)
+        }
+        do {
+            try mute()
+        } catch {
+            state.replaying.store(false, ordering: .releasing)
+            throw error
+        }
+        return acknowledged
     }
 
     private func makeDescription(processes: [AudioObjectID], mode: EngineMode) -> CATapDescription {
@@ -241,6 +287,7 @@ public final class AppAudioEngine: AudioEngineHandle {
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
                 peak = BufferRouting.render(input: input, output: output, startGain: applied, endGain: target, firstInputBuffer: tapBufferOffset)
                 state.appliedGainBits.store(target.bitPattern, ordering: .relaxed)
+                state.replayBuffers.wrappingAdd(1, ordering: .releasing)
             } else {
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
                 if applied != 0 {
