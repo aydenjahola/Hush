@@ -3,6 +3,7 @@ name: PR title
 # Pull requests are squash-merged, and the squash commit takes the PR title as its
 # message. release-please reads those messages, so the title must be a Conventional
 # Commit. release-please's own PRs ("chore(main): release x.y.z") already match.
+# PRs opened by bots are skipped (see the job's `if`).
 
 on:
   pull_request:
@@ -12,6 +13,11 @@ permissions: {}
 
 jobs:
   conventional-title:
+    # Bot PRs (imgbot, dependabot, …) pick their own titles. A maintainer gives them a
+    # conventional title when squash-merging, or they're left out of the changelog.
+    if: >-
+      github.event.pull_request.user.type != 'Bot' &&
+      !endsWith(github.event.pull_request.user.login, '[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Check the title is a Conventional Commit

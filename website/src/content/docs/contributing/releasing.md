@@ -24,6 +24,8 @@ Pull requests are **squash-merged**, and the squash commit uses the pull request
 
 For example `fix(audio): keep the tap alive after sleep`. release-please's own pull requests (`chore(main): release 0.2.0`) already match.
 
+The check skips pull requests opened by bots (author type `Bot` or a login ending in `[bot]`, such as Imgbot and Dependabot). Their titles still become the squash commit, so when you merge one, change the title to a Conventional Commit (for example `chore: optimize images`), or accept that it won't appear in the changelog.
+
 | Prefix | Meaning | Version bump |
 |---|---|---|
 | `fix:` | A bug fix | Patch |
