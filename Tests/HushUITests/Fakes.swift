@@ -1,3 +1,4 @@
+import AppKit
 import CoreAudio
 import Foundation
 import HushAudio
@@ -98,6 +99,15 @@ final class FakeEngine: AudioEngineHandle {
     func setGain(_ gain: Float) { currentGain = gain }
     func currentPeak() -> Float { peak }
 
+    /// False models a stalled IOProc: the cycle count stops moving. While true, every read
+    /// returns a higher count, as if IO ran in between.
+    var isFlowing = true
+    private var cycles: UInt32 = 0
+    var ioCycleCount: UInt32 {
+        if isFlowing { cycles &+= 1 }
+        return cycles
+    }
+
     var finishRebuildError: (any Error)?
 
     func rebuild(outputDeviceID: AudioObjectID) throws {
@@ -110,6 +120,7 @@ final class FakeEngine: AudioEngineHandle {
         log?("beginRebuild \(appID)")
         if let rebuildError { throw rebuildError }
         rebuiltDeviceIDs.append(outputDeviceID)
+        isFlowing = true  // a rebuilt engine runs on a fresh aggregate
         if mode == .control {
             mode = .meterOnly
             pendingControl = true
@@ -204,6 +215,8 @@ final class Harness {
     let factory: FakeEngineFactory
     let permission: FakePermission
     let persister: FakePersister
+    /// Stands in for `NSWorkspace.shared.notificationCenter`; `simulateWake()` posts to it.
+    let wakeNotifications = NotificationCenter()
     let store: MixerStore
 
     init(
@@ -233,9 +246,17 @@ final class Harness {
             persister: persister,
             saveDelay: .seconds(3600),
             outputErrorDuration: outputErrorDuration,
+            wakeNotifications: wakeNotifications,
+            healthCheckDelay: .zero,
             now: { Harness.fixedNow },
             installedApp: installedApp)
         store.start()
+    }
+
+    /// Posts a wake notification, then waits for the health check it schedules to finish.
+    func simulateWake() async {
+        wakeNotifications.post(name: NSWorkspace.didWakeNotification, object: nil)
+        await store.healthCheckTask?.value
     }
 }
 

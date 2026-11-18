@@ -31,6 +31,33 @@ extension CoreAudioIntegration {
         }
 
         @Test(
+            "A running engine's IO cycle count advances, and stops once the engine stops",
+            .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
+        func ioCycleCountTracksTheIOProc() async throws {
+            IntegrationEnvironment.recordRun(group: "A")
+            let output = try TestOutput.resolve()
+            let (tone, object) = try await ToneProcess.launch(deviceUID: output.device.uid, level: output.quietLevel)
+            defer { tone.terminate() }
+
+            let engine = AppAudioEngine(
+                appID: "tone", processObjectIDs: [object], mode: .meterOnly, initialGain: 1,
+                outputDeviceID: output.device.id)
+            defer { engine.stop() }
+            try engine.start()
+            let start = engine.ioCycleCount
+            // The wake health check waits 300 ms; a running engine must advance well within that.
+            let advanced = await waitUntil(timeout: .milliseconds(300), interval: .milliseconds(10)) {
+                engine.ioCycleCount != start
+            }
+            #expect(advanced, "the count stayed at \(start) for 300 ms on a running engine")
+
+            engine.stop()
+            let stopped = engine.ioCycleCount
+            try await Task.sleep(for: .milliseconds(100))
+            #expect(engine.ioCycleCount == stopped, "a stopped engine reads as stalled")
+        }
+
+        @Test(
             "Gain 0.25 (50%) scales the engine's output peak to a quarter",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func gainScalesOutputPeak() async throws {

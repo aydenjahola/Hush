@@ -60,6 +60,15 @@ package final class MixerStore {
     @ObservationIgnored let outputErrorDuration: Duration
     @ObservationIgnored var outputErrorTask: Task<Void, Never>?
     @ObservationIgnored let engineFactory: any AudioEngineFactory
+    /// Where `NSWorkspace.didWakeNotification` arrives (injectable for tests).
+    @ObservationIgnored private let wakeNotifications: NotificationCenter
+    @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
+    /// How long the health check waits before comparing each engine's IO cycle count.
+    @ObservationIgnored let healthCheckDelay: Duration
+    /// The pending health check, if any (exposed for tests).
+    @ObservationIgnored var healthCheckTask: Task<Void, Never>?
+    /// Each engine and its IO cycle count when the pending health check began.
+    @ObservationIgnored var healthCheckBaseline: [String: (engine: any AudioEngineHandle, cycles: UInt32)] = [:]
     @ObservationIgnored private let permissionSource: any AudioCapturePermissionSource
     @ObservationIgnored private let persister: any SettingsPersisting
     @ObservationIgnored private let now: () -> Date
@@ -84,6 +93,8 @@ package final class MixerStore {
         persister: any SettingsPersisting,
         saveDelay: Duration = .milliseconds(500),
         outputErrorDuration: Duration = .seconds(4),
+        wakeNotifications: NotificationCenter = NSWorkspace.shared.notificationCenter,
+        healthCheckDelay: Duration = .milliseconds(300),
         now: @escaping () -> Date = Date.init,
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = InstalledAppInfo.lookUp(bundleID:)
     ) {
@@ -94,6 +105,8 @@ package final class MixerStore {
         self.persister = persister
         self.saver = DebouncedSaver(delay: saveDelay)
         self.outputErrorDuration = outputErrorDuration
+        self.wakeNotifications = wakeNotifications
+        self.healthCheckDelay = healthCheckDelay
         self.now = now
         self.installedApp = installedApp
         let document = persister.load()
@@ -107,6 +120,11 @@ package final class MixerStore {
         outputSource.start { [weak self] device in self?.outputDidChange(device) }
         outputSource.observeDevices { [weak self] devices in self?.outputDevicesDidChange(devices) }
         processSource.start { [weak self] apps in self?.appsDidChange(apps) }
+        wakeObserver = wakeNotifications.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.systemDidWake() }
+        }
         if permission == .undetermined {
             permissionRequest = Task { [weak self] in
                 guard let self else { return }
@@ -277,6 +295,7 @@ package final class MixerStore {
     package func shutdown() {
         flushPendingSave()
         stopMeterPolling()
+        cancelHealthCheck()
         tearDownAllEngines()
     }
 
@@ -298,7 +317,14 @@ package final class MixerStore {
         let previous = outputDevice
         outputDevice = device
         if let device, let previous, previous.id != device.id {
-            rebuildEngines(onOutputDevice: device)
+            if OutputDevice.isSameDevice(previous, device) {
+                // The same device under a new object ID (it was re-enumerated, as can happen
+                // across sleep). The aggregates name it by UID, so keep every engine and only
+                // rebuild the ones whose IO stopped.
+                scheduleHealthCheck()
+            } else {
+                rebuildEngines(onOutputDevice: device)
+            }
         }
         reconcile()
         rebuildStrips()
