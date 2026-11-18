@@ -184,7 +184,12 @@ public final class MixerStore {
         saveTask = nil
         guard hasPendingSave else { return }
         hasPendingSave = false
-        persister.save(SettingsDocument(preferences: preferences, apps: settings))
+        let preferences = preferences
+        let apps = settings
+        persister.update { document in
+            document.preferences = preferences
+            document.apps = apps
+        }
     }
 
     public func shutdown() {

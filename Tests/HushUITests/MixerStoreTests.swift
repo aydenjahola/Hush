@@ -193,6 +193,17 @@ import Testing
         #expect(h.persister.saved.count == 1, "nothing pending, nothing written")
     }
 
+    @Test func savingLevelsKeepsUpdateSettings() {
+        var document = SettingsDocument()
+        document.updates.skippedVersion = "0.3.0"
+        let h = Harness(document: document)
+        h.processes.emit([makeApp("a")])
+        h.store.setPercent(80, for: "a")
+        h.store.flushPendingSave()
+        #expect(h.persister.saved.last?.updates.skippedVersion == "0.3.0")
+        #expect(h.persister.saved.last?.apps["a"]?.percent == 80)
+    }
+
     @Test func deniedPermissionDisablesControls() {
         let h = Harness(permission: .denied)
         h.processes.emit([makeApp("a")])

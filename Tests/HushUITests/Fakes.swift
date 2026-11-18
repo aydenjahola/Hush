@@ -127,7 +127,10 @@ final class FakePersister: SettingsPersisting {
 
     init(document: SettingsDocument) { self.document = document }
     func load() -> SettingsDocument { document }
-    func save(_ document: SettingsDocument) { saved.append(document) }
+    func update(_ change: (inout SettingsDocument) -> Void) {
+        change(&document)
+        saved.append(document)
+    }
 }
 
 @MainActor

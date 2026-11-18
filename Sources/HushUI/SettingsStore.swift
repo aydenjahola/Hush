@@ -2,13 +2,23 @@ import Foundation
 import HushCore
 import os
 
+/// Settings access for `MixerStore`. Writes go through `update` so they change only the parts
+/// they own: the update checker shares the same file.
 public protocol SettingsPersisting: AnyObject {
     func load() -> SettingsDocument
-    func save(_ document: SettingsDocument)
+    func update(_ change: (inout SettingsDocument) -> Void)
+}
+
+/// Settings access for `UpdateChecker`: only the "updates" section.
+public protocol UpdateSettingsPersisting: AnyObject {
+    func loadUpdateSettings() -> UpdateSettings
+    func saveUpdateSettings(_ settings: UpdateSettings)
 }
 
 /// Reads and writes settings.json. A corrupt or unknown-version file is moved aside.
-public final class SettingsStore: SettingsPersisting {
+/// Keeps the last loaded or written document in memory, so each writer's `update` starts from
+/// the other writers' latest changes. Used on the main actor only.
+public final class SettingsStore: SettingsPersisting, UpdateSettingsPersisting {
     public static var defaultFileURL: URL {
         URL.applicationSupportDirectory.appending(path: "Hush/settings.json")
     }
@@ -16,6 +26,7 @@ public final class SettingsStore: SettingsPersisting {
     private let fileURL: URL
     private let now: () -> Date
     private let logger = Logger(subsystem: HushIdentity.bundleID, category: "settings")
+    private var current: SettingsDocument?
 
     public init(fileURL: URL = SettingsStore.defaultFileURL, now: @escaping () -> Date = Date.init) {
         self.fileURL = fileURL
@@ -23,6 +34,38 @@ public final class SettingsStore: SettingsPersisting {
     }
 
     public func load() -> SettingsDocument {
+        let document = readFile()
+        current = document
+        return document
+    }
+
+    public func update(_ change: (inout SettingsDocument) -> Void) {
+        var document = current ?? load()
+        change(&document)
+        save(document)
+    }
+
+    public func loadUpdateSettings() -> UpdateSettings {
+        (current ?? load()).updates
+    }
+
+    public func saveUpdateSettings(_ settings: UpdateSettings) {
+        update { $0.updates = settings }
+    }
+
+    public func save(_ document: SettingsDocument) {
+        current = document
+        do {
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            try document.encoded().write(to: fileURL, options: .atomic)
+        } catch {
+            logger.error("Could not save settings: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func readFile() -> SettingsDocument {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return SettingsDocument() }
         do {
             let data = try Data(contentsOf: fileURL)
@@ -31,17 +74,6 @@ public final class SettingsStore: SettingsPersisting {
             logger.error("Settings unreadable, starting with defaults: \(String(describing: error), privacy: .public)")
             moveAside()
             return SettingsDocument()
-        }
-    }
-
-    public func save(_ document: SettingsDocument) {
-        do {
-            try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true)
-            try document.encoded().write(to: fileURL, options: .atomic)
-        } catch {
-            logger.error("Could not save settings: \(String(describing: error), privacy: .public)")
         }
     }
 
