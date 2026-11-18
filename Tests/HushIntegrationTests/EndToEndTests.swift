@@ -160,27 +160,106 @@ extension CoreAudioIntegration {
             IntegrationEnvironment.recordRun(group: "B")
             let rig = try await LoopbackRig()
             defer { rig.tearDown() }
-            let engine = rig.makeEngine(.meterOnly, gain: 1)
+            let gain = VolumeCurve.gain(percent: 50)
+            let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
+            defer { engine.stop() }
+            // Full volume is expected until the mute lands (switchMode starts the replay first, so
+            // the source and the fading-in replay may briefly overlap before that); after that it
+            // must not come back.
+            let onset = try #require(check.firstWindowBelowThreshold, "the level never dropped below baseline × 0.75 during the swap")
+            #expect(check.loudestWindow(from: onset) <= check.threshold,
+                    "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
+            let overlapLimit = rig.baseline * (1 + gain) * 1.1
+            #expect(check.loudestWindow(in: 0..<onset) <= overlapLimit,
+                    "before the level dropped it reached \(check.loudestWindow(in: 0..<onset)) RMS, more than source + replay (limit \(overlapLimit))")
+            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't settle at -12 dB after the swap")
+        }
+
+        @Test(
+            "In place: meter-only → control at 99% stays within source + replay and never gaps",
+            .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
+        func meterOnlyToControlAt99() async throws {
+            // The first step of a drag down from 100%: the overlap here is the worst case (≈ 2×).
+            IntegrationEnvironment.recordRun(group: "B")
+            let rig = try await LoopbackRig()
+            defer { rig.tearDown() }
+            let gain = VolumeCurve.gain(percent: 99)
+            let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
+            defer { engine.stop() }
+            let overlapLimit = rig.baseline * (1 + gain) * 1.1
+            #expect(check.loudestWindow(from: 0) <= overlapLimit,
+                    "the swap reached \(check.loudestWindow(from: 0)) RMS, more than source + replay (limit \(overlapLimit))")
+            // Positive control: an unmuted source plus the replay would settle near +6 dB.
+            #expect(await rig.waitForLevel(rig.baseline * gain), "the level didn't settle at 99% (now \(rig.capture.recentLevel()))")
+        }
+
+        @Test(
+            "In place: control → meter-only (back to 100%) never gaps",
+            .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
+        func controlToMeterOnlySwap() async throws {
+            // Resetting a lowered app to 100% with the popover open.
+            IntegrationEnvironment.recordRun(group: "B")
+            let rig = try await LoopbackRig()
+            defer { rig.tearDown() }
+            let gain = VolumeCurve.gain(percent: 50)
+            let engine = rig.makeEngine(.control, gain: gain)
             defer { engine.stop() }
             try engine.start()
+            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the control engine didn't attenuate")
+
+            let mark = rig.capture.frameCount
+            try engine.switchMode(to: .meterOnly, gain: 1)
+            #expect(engine.mode == .meterOnly)
+            let check = try await swapCheck(rig, after: mark, "control → meter-only")
+            let overlapLimit = rig.baseline * (1 + gain) * 1.1
+            #expect(check.loudestWindow(from: 0) <= overlapLimit,
+                    "the swap reached \(check.loudestWindow(from: 0)) RMS, more than source + replay (limit \(overlapLimit))")
+            #expect(await rig.waitForLevel(rig.baseline), "the level didn't return to full after the swap (now \(rig.capture.recentLevel()))")
+            _ = engine.currentPeak()
+            #expect(await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 }, "the converted engine stopped metering")
+        }
+
+        /// Starts a meter-only engine, switches it to control at `gain`, and returns it (the caller
+        /// stops it) with the analysed 600 ms after the switch (zero runs already checked).
+        private func switchMeteredEngineToControl(_ rig: LoopbackRig, gain: Float) async throws -> (AppAudioEngine, SwapCheck) {
+            let engine = rig.makeEngine(.meterOnly, gain: 1)
+            do {
+                try engine.start()
+            } catch {
+                engine.stop()
+                throw error
+            }
             #expect(await rig.waitForLevel(rig.baseline), "a meter-only engine changed the level")
 
             // What MixerStore.reconcile does when the user first adjusts a metered app: the same
             // tap becomes .mutedWhenTapped and the running IOProc starts replaying it.
             let mark = rig.capture.frameCount
-            try engine.switchMode(to: .control, gain: VolumeCurve.gain(percent: 50))
+            do {
+                try engine.switchMode(to: .control, gain: gain)
+            } catch {
+                engine.stop()
+                throw error
+            }
             #expect(engine.mode == .control)
+            do {
+                return (engine, try await swapCheck(rig, after: mark, "meter-only → control at \(gain)"))
+            } catch {
+                engine.stop()
+                throw error
+            }
+        }
 
+        /// Analyses the 600 ms after `mark`, checks the zero run, and logs how long the level sat
+        /// above the unprocessed baseline (the source/replay overlap while the mute changes).
+        private func swapCheck(_ rig: LoopbackRig, after mark: Int, _ what: String) async throws -> SwapCheck {
             let swap = try await rig.samples(after: mark, .milliseconds(600))
             let check = SwapCheck(samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize, window: windowFrames(rig))
-            // Full volume is expected until the mute lands (switchMode starts the replay first, so
-            // the source and the replay may briefly overlap before that); after that it must not come back.
-            let onset = try #require(check.firstWindowBelowThreshold, "the level never dropped below baseline × 0.75 during the swap")
-            #expect(check.loudestWindow(from: onset) <= check.threshold,
-                    "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
+            let windowMS = Double(windowFrames(rig)) / rig.capture.sampleRate * 1000
+            let above = Double(check.windowCount(above: rig.baseline * 1.05)) * windowMS
+            print("[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames))")
             #expect(check.longestZeroRun <= check.bufferFrames,
-                    "\(check.longestZeroRun) frames of digital silence during the swap (one buffer is \(check.bufferFrames))")
-            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't settle at -12 dB after the swap")
+                    "\(what): \(check.longestZeroRun) frames of digital silence (one buffer is \(check.bufferFrames))")
+            return check
         }
 
         @Test(
@@ -324,6 +403,14 @@ struct SwapCheck {
 
     func loudestWindow(from index: Int) -> Float {
         windows[min(index, windows.count)...].max() ?? 0
+    }
+
+    func loudestWindow(in range: Range<Int>) -> Float {
+        windows[range.clamped(to: 0..<windows.count)].max() ?? 0
+    }
+
+    func windowCount(above level: Float) -> Int {
+        windows.filter { $0 > level }.count
     }
 }
 
