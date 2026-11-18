@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Reports whether the hosting window is visible on screen (MenuBarExtra popover open/closed).
+/// Reports whether the hosting window is visible on screen (the mixer popover open or closed).
 struct WindowVisibilityObserver: NSViewRepresentable {
     let onChange: (Bool) -> Void
 
