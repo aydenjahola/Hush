@@ -3,13 +3,23 @@ title: The mixer
 description: The three mixer layouts, and how to change each app's volume, boost quiet apps, mute noisy ones and read the level meters.
 ---
 
-Click the Hush icon in the menu bar to open the mixer. It has three parts:
+Click the Hush icon in the menu bar to open the mixer, and click it again (or press **Esc**, or click anywhere else) to close it. Right-click the icon for the [quick menu](#quick-menu). The mixer has three parts:
 
 - **Header:** the name Hush and a pill showing your current output device, such as "MacBook Pro Speakers". Click it to [switch output device](#output-device). If there's no output device, the pill reads "No Output".
 - **Apps:** one strip, row or tile per app, depending on the [layout](#layouts).
 - **Footer:** how many apps are playing, such as "2 apps playing", and the gear button for [Settings](/Hush/using/settings/).
 
 When nothing is playing, the mixer shows **Nothing is playing**. If an update is available, a banner appears at the top. See [Settings](/Hush/using/settings/#updates).
+
+## Quick menu
+
+Right-click the Hush icon in the menu bar, click it with two fingers on a trackpad, or Control-click it, to open a short menu without opening the mixer:
+
+- **Output:** the same list of output devices as the [output pill](#output-device), with a checkmark on the current one, and **Sound Settings…** at the bottom.
+- **Mute All Playing Apps:** mutes every app that's playing right now. Each app keeps its level, so unmuting brings it back where it was. Once every playing app is muted, the item reads **Unmute All** instead, which unmutes every muted app, including ones that aren't playing or running at the moment. It's greyed out when there's nothing to mute or unmute, or when Hush doesn't have permission.
+- **Settings…** opens [Settings](/Hush/using/settings/).
+- **Check for Updates…** checks for a new version straight away, like **Check Now** in [Settings](/Hush/using/settings/#updates).
+- **Quit Hush.**
 
 ## Which apps appear
 

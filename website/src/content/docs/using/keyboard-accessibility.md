@@ -11,6 +11,8 @@ description: Control Hush from the keyboard and with VoiceOver, and how it follo
 | Move between controls | **Tab** / **Shift-Tab** |
 | Mute or unmute (mute button focused) | **Space** |
 | Open the output menu (output pill focused) | **Space**, then **↑** / **↓** and **Return** to choose |
+| Close the mixer | **Esc** |
+| Open Settings or quit, with the [quick menu](/Hush/using/mixer/#quick-menu) open | **⌘,** or **⌘Q** (or **↑** / **↓** and **Return**) |
 
 This works the same in every [layout](/Hush/using/mixer/#layouts). In the tiles layout, the tile itself is the slider and takes focus; its mute button is the next stop.
 
@@ -20,6 +22,7 @@ Hush doesn't have a global keyboard shortcut for opening the mixer.
 
 ## Mouse and trackpad
 
+- Control-click the Hush icon in the menu bar (or right-click it, or click it with two fingers) to open the [quick menu](/Hush/using/mixer/#quick-menu) for output, mute all, Settings and Quit.
 - In channel strips, scroll over a fader to change it in 5% steps. In classic rows and tiles a plain scroll moves the list; hold **Option** and scroll over an app to change its volume instead. Scrolling up always raises the level, whatever your natural-scrolling setting.
 - Double-click a fader's knob (or anywhere on a tile), or Option-click it in any layout, to reset the app to 100%.
 - In the tiles layout, click an app's icon to mute or unmute it.
