@@ -90,11 +90,12 @@ import Testing
         h.store.toggleMute(for: "b")
         let engineA = try #require(h.factory.live("a"))
         let engineB = try #require(h.factory.live("b"))
-        #expect(engineB.mode == .muteOnly)
+        #expect(engineB.mode == .control)
+        #expect(engineB.initialGain == 0)
 
         h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
         #expect(engineA.rebuiltDeviceIDs == [2])
-        #expect(engineB.rebuiltDeviceIDs == [2], "the store asks every engine; mute-only engines treat it as a no-op")
+        #expect(engineB.rebuiltDeviceIDs == [2])
         #expect(h.factory.made.count == 2)
         #expect(h.store.outputDevice?.name == "USB DAC")
     }
@@ -305,50 +306,57 @@ import Testing
         #expect(isApproximatelyEqual(second.initialGain, 0.64))
     }
 
-    @Test func mutedAppThatIsNotPlayingGetsMuteOnlyEngine() throws {
+    @Test func mutedAppThatIsNotPlayingGetsNoEngineUntilItPlays() throws {
         let h = Harness(document: SettingsDocument(apps: ["chat": mutedSetting()]))
         h.processes.emit([makeApp("chat", playing: false)])
+        #expect(h.factory.made.isEmpty, "a tap nobody reads doesn't silence anything")
 
+        h.processes.emit([makeApp("chat")])
         let engine = try #require(h.factory.live("chat"))
-        #expect(engine.mode == .muteOnly)
+        #expect(engine.mode == .control)
+        #expect(engine.initialGain == 0)
     }
 
-    @Test func mutedPlayingAppGetsMuteOnlyEngineNotControl() throws {
+    @Test func mutedPlayingAppGetsControlEngineAtZeroGain() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
         h.store.toggleMute(for: "a")
         let engine = try #require(h.factory.live("a"))
-        #expect(engine.mode == .muteOnly)
+        #expect(engine.mode == .control)
+        #expect(engine.initialGain == 0)
         #expect(h.store.engineCount == 1)
     }
 
-    @Test func stoppingPlaybackKeepsMuteOnlyEngine() throws {
+    @Test func stoppingPlaybackTearsDownMutedAppsEngineAndKeepsMute() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
         h.store.toggleMute(for: "a")
-        let engine = try #require(h.factory.live("a"))
+        let first = try #require(h.factory.live("a"))
 
         h.processes.emit([makeApp("a", playing: false)])
+        #expect(first.isStopped)
+        #expect(h.store.engineCount == 0)
+
         h.processes.emit([makeApp("a")])
-        #expect(!engine.isStopped)
-        #expect(h.factory.made.count == 1, "the mute tap was already in place when playback resumed")
+        let second = try #require(h.factory.live("a"))
+        #expect(second !== first)
+        #expect(second.initialGain == 0)
     }
 
-    @Test func unmutingAt50WhilePlayingSwapsToControlAtQuarterGain() throws {
+    @Test func unmutingAt50WhilePlayingRestoresQuarterGainOnTheSameEngine() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(percent: 50)]))
         h.processes.emit([makeApp("a")])
-        let mute = try #require(h.factory.live("a"))
-        #expect(mute.mode == .muteOnly)
+        let engine = try #require(h.factory.live("a"))
+        #expect(engine.mode == .control)
+        #expect(engine.initialGain == 0)
 
         h.store.toggleMute(for: "a")
-        #expect(mute.isStopped)
-        let control = try #require(h.factory.live("a"))
-        #expect(control.mode == .control)
-        #expect(isApproximatelyEqual(control.initialGain, 0.25))
+        #expect(h.factory.made.count == 1, "mute is just gain 0, so no engine swap")
+        #expect(isApproximatelyEqual(engine.currentGain, 0.25))
 
         h.store.toggleMute(for: "a")
-        #expect(control.isStopped)
-        #expect(h.factory.live("a")?.mode == .muteOnly)
+        #expect(h.factory.made.count == 1)
+        #expect(engine.currentGain == 0)
     }
 
     @Test func loweredAppGetsNoEngineWhileIdleAndControlWhilePlaying() throws {
@@ -362,22 +370,16 @@ import Testing
         #expect(isApproximatelyEqual(engine.initialGain, 0.25))
     }
 
-    @Test func mutingAndUnmutingIdleAppAddsAndRemovesMuteOnlyEngine() throws {
+    @Test func mutingAndUnmutingIdleAppCreatesNoEngine() {
         let h = Harness()
         h.processes.emit([makeApp("a", playing: false)])
         h.store.setShowInactiveApps(true)
         h.store.popoverDidAppear()
 
-        h.store.setPercent(50, for: "a")
-        #expect(h.factory.made.isEmpty, "idle and lowered: nothing to process yet")
-
         h.store.toggleMute(for: "a")
-        let engine = try #require(h.factory.live("a"))
-        #expect(engine.mode == .muteOnly)
-
+        #expect(h.factory.made.isEmpty)
         h.store.toggleMute(for: "a")
-        #expect(engine.isStopped)
-        #expect(h.store.engineCount == 0)
+        #expect(h.factory.made.isEmpty)
     }
 
     @Test func appWithoutSettingThatIsNotPlayingGetsNoEngineWithPopoverOpen() {
@@ -401,7 +403,7 @@ import Testing
         #expect(h.store.engineCount == 0)
     }
 
-    @Test func muteOnlyEngineSurvivesPopoverOpeningAndClosing() throws {
+    @Test func mutedAppsControlEngineSurvivesPopoverOpeningAndClosing() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a")])
         let engine = try #require(h.factory.live("a"))
@@ -412,19 +414,20 @@ import Testing
         #expect(h.factory.made.count == 1)
     }
 
-    @Test func appDisappearingTearsDownMuteOnlyEngineAndKeepsSetting() throws {
+    @Test func appDisappearingTearsDownMutedAppsEngineAndKeepsSetting() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
-        h.processes.emit([makeApp("a", playing: false)])
+        h.processes.emit([makeApp("a")])
         let first = try #require(h.factory.live("a"))
 
         h.processes.emit([])
         #expect(first.isStopped)
         #expect(h.store.engineCount == 0)
 
-        h.processes.emit([makeApp("a", playing: false)])
+        h.processes.emit([makeApp("a")])
         let second = try #require(h.factory.live("a"))
         #expect(second !== first)
-        #expect(second.mode == .muteOnly)
+        #expect(second.mode == .control)
+        #expect(second.initialGain == 0)
     }
 
     @Test func engineErrorSurvivesStoppingPlaybackAndClearsWhenAppDisappears() throws {
@@ -447,73 +450,72 @@ import Testing
         #expect(h.factory.live("a")?.mode == .control, "a relaunched app gets a fresh attempt")
     }
 
-    @Test func userChangeOnIdleErroredAppRetries() throws {
+    @Test func userChangeOnErroredAppThatStoppedPlayingRetriesWhenItPlays() throws {
         let h = Harness()
         h.store.setShowInactiveApps(true)
-        h.processes.emit([makeApp("a", playing: false)])
+        h.processes.emit([makeApp("a")])
         h.factory.error = FakeError()
         h.store.toggleMute(for: "a")
         let message = try #require(h.store.strips.first?.engineError)
-        #expect(message.contains("couldn't mute this app"))
+        #expect(message.contains("couldn't control this app's audio"))
 
         h.factory.error = nil
+        h.processes.emit([makeApp("a", playing: false)])
         h.store.setPercent(60, for: "a")
-        #expect(h.factory.live("a")?.mode == .muteOnly)
-        #expect(h.store.strips.first?.engineError == nil)
+        #expect(h.store.strips.first?.engineError == nil, "a user change clears the error")
+        #expect(h.factory.made.isEmpty, "idle: nothing to process yet")
+
+        h.processes.emit([makeApp("a")])
+        let engine = try #require(h.factory.live("a"))
+        #expect(engine.initialGain == 0, "still muted")
     }
 
-    @Test func idleMutedAppProcessListChangeReplacesEngine() throws {
+    @Test func mutedAppProcessListChangeReplacesEngine() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
-        h.processes.emit([makeApp("a", playing: false, objects: [42])])
+        h.processes.emit([makeApp("a", objects: [42])])
         let first = try #require(h.factory.live("a"))
 
-        h.processes.emit([makeApp("a", playing: false, objects: [42, 43])])
+        h.processes.emit([makeApp("a", objects: [42, 43])])
         #expect(first.isStopped)
-        #expect(h.factory.live("a")?.mode == .muteOnly)
-        #expect(h.factory.live("a")?.processObjectIDs == [42, 43])
+        let second = try #require(h.factory.live("a"))
+        #expect(second.processObjectIDs == [42, 43])
+        #expect(second.initialGain == 0)
     }
 
-    @Test func outputChangeKeepsMuteOnlyEngine() throws {
+    @Test func outputChangeRebuildsMutedAppsEngine() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
-        h.processes.emit([makeApp("a", playing: false)])
+        h.processes.emit([makeApp("a")])
         let engine = try #require(h.factory.live("a"))
-        #expect(engine.mode == .muteOnly)
 
         h.output.emit(OutputDevice(id: 2, uid: "usb", name: "USB DAC"))
-        #expect(!engine.isStopped)
+        #expect(engine.rebuiltDeviceIDs == [2])
         #expect(h.factory.made.count == 1)
-        #expect(h.store.strips.isEmpty || h.store.strips.first?.engineError == nil)
-
-        h.output.emit(nil)
-        #expect(engine.isStopped, "no output device: everything is torn down")
-        h.output.emit(OutputDevice(id: 3, uid: "bt", name: "Headphones"))
-        #expect(h.factory.live("a")?.mode == .muteOnly)
     }
 
-    @Test func meterTickSkipsMuteOnlyEnginesAndAppsThatAreNotPlaying() throws {
-        let h = Harness(document: SettingsDocument(apps: ["idle": mutedSetting(), "c": mutedSetting()]))
-        h.processes.emit([makeApp("idle", playing: false), makeApp("b", objects: [43]), makeApp("c", objects: [44])])
+    @Test func meterTickCoversEveryPlayingAppsEngine() throws {
+        let h = Harness(document: SettingsDocument(apps: ["c": mutedSetting()]))
+        h.processes.emit([makeApp("b", objects: [43]), makeApp("c", objects: [44])])
         h.store.popoverDidAppear()
-        #expect(h.store.engineCount == 3)
+        #expect(h.store.engineCount == 2)
 
         h.store.tickMeters(elapsed: 1.0 / 30.0)
-        #expect(Set(h.store.meterLevels.keys) == ["b"])
+        #expect(Set(h.store.meterLevels.keys) == ["b", "c"])
     }
 
-    @Test func revokingPermissionTearsDownEveryEngineIncludingIdleMuteOnly() throws {
+    @Test func revokingPermissionTearsDownEveryEngine() throws {
         let h = Harness(document: SettingsDocument(apps: [
             "muted": mutedSetting(),
             "lowered": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow),
         ]))
         h.processes.emit([
-            makeApp("muted", playing: false, objects: [1]),
+            makeApp("muted", objects: [1]),
             makeApp("lowered", objects: [2]),
             makeApp("plain", objects: [3]),
         ])
         h.store.popoverDidAppear()
         let engines = [h.factory.live("muted"), h.factory.live("lowered"), h.factory.live("plain")].compactMap { $0 }
         let modes = engines.map { $0.mode }
-        #expect(modes == [.muteOnly, .control, .meterOnly])
+        #expect(modes == [.control, .control, .meterOnly])
 
         h.permission.status = .denied
         h.store.refreshPermission()
@@ -706,10 +708,13 @@ import Testing
         #expect(h.processes.fastPollingCalls == [true, false])
     }
 
-    @Test func mutedOnlyAppDoesNotNeedFastPolling() {
-        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(percent: 50)]))
+    @Test func presentMutedAppTurnsFastPollingOn() {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.fastPollingCalls.isEmpty, "the mute tap is always on, so a missed start is already silent")
+        #expect(h.processes.fastPollingCalls == [true], "a muted app's missed start plays unmuted until the next poll")
+
+        h.store.toggleMute(for: "a")
+        #expect(h.processes.fastPollingCalls == [true, false])
     }
 
     @Test func loweredAppKeepsFastPollingAfterPopoverCloses() {
@@ -721,38 +726,38 @@ import Testing
         #expect(h.processes.fastPollingCalls == [true])
     }
 
-    @Test func unmutingPlayingAppMakesControlEngineBeforeStoppingMuteTap() throws {
-        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(percent: 50)]))
-        h.processes.emit([makeApp("a")])
-        let mute = try #require(h.factory.live("a"))
-        let before = h.factory.events.count
-
-        h.store.toggleMute(for: "a")
-        #expect(Array(h.factory.events.dropFirst(before)) == ["make a control", "stop a muteOnly"])
-        #expect(mute.isStopped)
-        #expect(h.factory.live("a")?.mode == .control)
-        #expect(h.store.engineCount == 1)
-    }
-
-    @Test func mutingPlayingAppMakesMuteTapBeforeStoppingControlEngine() throws {
+    @Test func mutingPlayingLoweredAppChangesGainWithoutReplacingEngine() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
         h.store.setPercent(50, for: "a")
+        let engine = try #require(h.factory.live("a"))
         let before = h.factory.events.count
 
         h.store.toggleMute(for: "a")
-        #expect(Array(h.factory.events.dropFirst(before)) == ["make a muteOnly", "stop a control"])
-        #expect(h.factory.live("a")?.mode == .muteOnly)
+        #expect(h.factory.events.count == before)
+        #expect(engine.currentGain == 0)
     }
 
-    @Test func processListChangeMakesNewMuteTapBeforeStoppingOldOne() throws {
+    @Test func controlToMeterOnlySwapIsMakeBeforeBreak() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.setPercent(50, for: "a")
+        h.store.popoverDidAppear()
+        let before = h.factory.events.count
+
+        h.store.resetVolume(for: "a")
+        #expect(Array(h.factory.events.dropFirst(before)) == ["make a meterOnly", "stop a control"])
+        #expect(h.factory.live("a")?.mode == .meterOnly)
+    }
+
+    @Test func processListChangeMakesNewControlEngineBeforeStoppingOldOne() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a", objects: [42])])
         let old = try #require(h.factory.live("a"))
         let before = h.factory.events.count
 
         h.processes.emit([makeApp("a", objects: [42, 43])])
-        #expect(Array(h.factory.events.dropFirst(before)) == ["make a muteOnly", "stop a muteOnly"])
+        #expect(Array(h.factory.events.dropFirst(before)) == ["make a control", "stop a control"])
         #expect(old.isStopped)
         #expect(h.factory.live("a")?.processObjectIDs == [42, 43])
     }
@@ -772,13 +777,14 @@ import Testing
     }
 
     @Test func failedReplacementStopsOldEngineAndRecordsError() throws {
-        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting(percent: 50)]))
+        let h = Harness()
         h.processes.emit([makeApp("a")])
-        let mute = try #require(h.factory.live("a"))
+        h.store.popoverDidAppear()
+        let meter = try #require(h.factory.live("a"))
 
         h.factory.error = FakeError()
-        h.store.toggleMute(for: "a")
-        #expect(mute.isStopped, "never keep an engine in the wrong mode")
+        h.store.setPercent(50, for: "a")
+        #expect(meter.isStopped, "never keep an engine in the wrong mode")
         #expect(h.store.engineCount == 0)
         let message = try #require(h.store.strips.first?.engineError)
         #expect(message.contains("couldn't control this app's audio"))

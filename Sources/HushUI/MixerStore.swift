@@ -207,10 +207,8 @@ public final class MixerStore {
     // MARK: Meters
 
     func tickMeters(elapsed: Double) {
-        // Mute-only taps have no level to read, and muted strips hide their meter anyway.
-        let playingIDs = Set(apps.lazy.filter(\.isPlaying).map(\.id))
         var levels: [String: Float] = [:]
-        for (id, engine) in engines where engine.mode != .muteOnly && playingIDs.contains(id) {
+        for (id, engine) in engines {
             levels[id] = MeterBallistics.next(
                 displayed: meterLevels[id] ?? 0,
                 peak: engine.currentPeak(),
@@ -288,8 +286,8 @@ public final class MixerStore {
     }
 
     /// Makes the set of running engines match the reconcile rule in spec section 4.3:
-    /// muted running apps get a `.muteOnly` tap, lowered or boosted playing apps a `.control`
-    /// engine, other playing apps a `.meterOnly` engine while the popover is open, the rest none.
+    /// muted, lowered or boosted playing apps get a `.control` engine (gain 0 when muted), other
+    /// playing apps a `.meterOnly` engine while the popover is open, the rest none.
     private func reconcile() {
         defer { updatePolling() }
         guard controlsEnabled, let device = outputDevice else {
@@ -306,12 +304,9 @@ public final class MixerStore {
 
         for (id, app) in present {
             let setting = settings[id] ?? AppVolumeSetting()
-            // Muted apps keep a cheap mute tap (no IO) while running, even when silent, so the first
-            // moment of each new sound is already silenced. Lowered or boosted apps need real
-            // processing, so they get a control engine only while they play.
-            let desired: EngineMode? = if setting.isMuted {
-                .muteOnly
-            } else if setting.needsEngine && app.isPlaying {
+            // Muting is a control engine at gain 0: a `.muted` tap that nothing reads doesn't
+            // silence the app (confirmed live), so idle apps get no engine at all.
+            let desired: EngineMode? = if setting.needsEngine && app.isPlaying {
                 .control
             } else if app.isPlaying && isPopoverVisible {
                 .meterOnly
@@ -329,7 +324,7 @@ public final class MixerStore {
                 tearDownEngine(id)
                 continue
             }
-            // Make before break: the old tap keeps the app muted or processed until the new one
+            // Make before break: the old engine keeps the app muted or processed until the new one
             // exists, so a mode or process-list change doesn't let audio through in between.
             do {
                 let replacement = try engineFactory.makeEngine(
@@ -349,12 +344,11 @@ public final class MixerStore {
     }
 
     /// Fast process polling while the popover is open (live strips) or while any present app
-    /// needs a playing-time `.control` engine: if the HAL misses that app's start, the next poll
-    /// is what starts processing it. Muted apps don't count; their mute tap is always on.
+    /// is muted, lowered or boosted: its control engine starts only once Hush sees it playing,
+    /// so if the HAL misses the start, the next poll is what starts processing it.
     private func updatePolling() {
         let needsPlayingTimeEngine = controlsEnabled && apps.contains { app in
-            guard let setting = settings[app.id] else { return false }
-            return !setting.isMuted && setting.needsEngine
+            settings[app.id]?.needsEngine ?? false
         }
         let fast = isPopoverVisible || needsPlayingTimeEngine
         guard fast != isFastPolling else { return }
@@ -375,7 +369,6 @@ public final class MixerStore {
         let summary = switch mode {
         case .control: "Hush couldn't control this app's audio, so it's playing normally."
         case .meterOnly: "Hush couldn't read this app's level."
-        case .muteOnly: "Hush couldn't mute this app, so it's playing normally."
         }
         engineErrors[id] = "\(summary) (\(error))"
         logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
