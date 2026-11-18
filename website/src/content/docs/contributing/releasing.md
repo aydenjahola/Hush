@@ -9,7 +9,6 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 
 - **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"** must be on, so release-please can open its pull request.
 - **Settings → Pages → Build and deployment → Source** must be **GitHub Actions**, so the website can deploy.
-- The first release is pinned with `"release-as": "0.1.0"` in `release-please-config.json` so that it matches `version.txt`. **Remove that line after 0.1.0 ships**, or every later release pull request will propose 0.1.0 again.
 
 ## 1. Write Conventional Commits
 

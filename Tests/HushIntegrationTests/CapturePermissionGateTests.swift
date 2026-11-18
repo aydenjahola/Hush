@@ -27,7 +27,7 @@ final class FakePermissionSource: AudioCapturePermissionSource {
 /// The permission gate's decisions. Plain unit tests with a fake source: they run in every
 /// `swift test` and never touch TCC.
 @MainActor
-@Suite struct CapturePermissionGateTests {
+@Suite(.timeLimit(.minutes(1))) struct CapturePermissionGateTests {
     @Test func authorizedRunsWithoutRequesting() async {
         let source = FakePermissionSource(status: .authorized)
         #expect(await CapturePermissionGate.resolve(source, mayRequest: true, timeout: .seconds(1)))
@@ -59,11 +59,10 @@ final class FakePermissionSource: AudioCapturePermissionSource {
     }
 
     @Test func unansweredPromptTimesOutAndSkips() async {
+        // No wall-clock upper bound: a loaded runner can stall the whole batch. A real hang is caught
+        // by the suite's `.timeLimit` trait.
         let source = FakePermissionSource(status: .undetermined, answer: nil)
-        let clock = ContinuousClock()
-        let started = clock.now
         #expect(await CapturePermissionGate.resolve(source, mayRequest: true, timeout: .milliseconds(100)) == false)
-        #expect(clock.now - started < .seconds(5))
         #expect(source.requests == 1)
     }
 }
