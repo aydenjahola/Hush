@@ -129,7 +129,16 @@ final class MeterNSView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         reveal.bounds = revealBounds(fraction)
+        sizeFill()
         CATransaction.commit()
+    }
+
+    /// The bar's fill keeps its full size so the colour bands stay put. The glow instead shrinks
+    /// with the level, so its fade ends at the level edge and never leaves a hard band beyond it.
+    private func sizeFill() {
+        var size = bounds.size
+        if style == .glow { size.width = max(revealBounds(displayedFraction).width, 1) }
+        fill.bounds = CGRect(origin: .zero, size: size)
     }
 
     /// Layer space is y-up with the origin at the bottom-left, so a clip anchored at the origin
@@ -152,7 +161,7 @@ final class MeterNSView: NSView {
         reveal.position = .zero
         reveal.bounds = revealBounds(displayedFraction)
         fill.position = .zero
-        fill.bounds = CGRect(origin: .zero, size: bounds.size)
+        sizeFill()
         CATransaction.commit()
     }
 

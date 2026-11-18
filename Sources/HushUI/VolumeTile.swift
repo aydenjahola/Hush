@@ -73,6 +73,10 @@ private struct TileSurface: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.mixerAppearance) private var appearance
 
+    /// Width of the percent label and mute button at the trailing edge. The slider's track ends
+    /// before it, so no fill edge or marker ever runs under the label, whatever the value.
+    private var labelColumn: CGFloat { appearance.isCompact ? 84 : 96 }
+
     private var scale: FaderScale { FaderScale(maxValue: maxPercent) }
 
     var body: some View {
@@ -81,7 +85,8 @@ private struct TileSurface: View {
         let boost = Palette.boost(colorScheme, contrast)
         let level = Palette.systemAccentIfChosen(appearance.accent, colorScheme, contrast)
         GeometryReader { geometry in
-            let width = geometry.size.width
+            let full = geometry.size.width
+            let width = max(full - labelColumn, 1)
             ZStack(alignment: .leading) {
                 Color.primary.opacity(contrast == .increased ? 0.12 : 0.05)
                 if appearance.showMeters {
@@ -92,7 +97,7 @@ private struct TileSurface: View {
                     .frame(width: width * scale.fraction(min(value, 100)))
                 if value > 100 {
                     // Boost: the stretch past the 100% tick, in the accent colour.
-                    boost.opacity(muted ? 0.12 : (contrast == .increased ? 0.5 : 0.32))
+                    boost.opacity(muted ? 0.14 : (contrast == .increased ? 0.6 : (colorScheme == .dark ? 0.72 : 0.5)))
                         .frame(width: width * (scale.fraction(value) - scale.fraction(100)))
                         .offset(x: width * scale.fraction(100))
                 }
@@ -120,7 +125,7 @@ private struct TileSurface: View {
                         if value != 100 { actions.reset() }
                         return
                     }
-                    let newValue = scale.percent(atPosition: drag.location.x / max(width, 1))
+                    let newValue = scale.percent(atPosition: drag.location.x / width)
                     if newValue != value { actions.setPercent(newValue) }
                 }
             )
