@@ -21,7 +21,7 @@
 		</dict>
 	</dict>
 	<!-- Settings > Presets, under a preset's name: how many apps the preset holds (one or more). -->
-	<key>%lld apps</key>
+	<key>%lld apps in preset</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
 		<string>%#@apps@</string>

@@ -12,7 +12,7 @@ package struct SettingsView: View {
     @State private var confirmingReset = false
     @State private var presetSheet: PresetSheet?
 
-    package init(store: MixerStore, updates: UpdateChecker, navigator: SettingsNavigator = SettingsNavigator()) {
+    package init(store: MixerStore, updates: UpdateChecker, navigator: SettingsNavigator) {
         self.store = store
         self.updates = updates
         self.navigator = navigator

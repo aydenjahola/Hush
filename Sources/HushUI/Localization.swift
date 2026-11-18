@@ -191,7 +191,7 @@ package enum L10n {
     )
     package static let noPresetsYet = resource("No presets yet.")
     package static func presetAppCount(_ count: Int) -> LocalizedStringResource {
-        count == 0 ? resource("Every app at 100%") : resource("\(count) apps")
+        count == 0 ? resource("Every app at 100%") : resource("\(count) apps in preset")
     }
     package static let activePreset = resource("Active")
     package static let applyPreset = resource("Apply")

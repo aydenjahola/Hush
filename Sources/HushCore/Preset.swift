@@ -31,7 +31,7 @@ package struct Preset: Codable, Equatable, Sendable, Identifiable {
             self.init(
                 displayName: try container.decode(String.self, forKey: .displayName),
                 percent: try container.decode(Int.self, forKey: .percent),
-                isMuted: try container.decode(Bool.self, forKey: .isMuted))
+                isMuted: try container.decodeIfPresent(Bool.self, forKey: .isMuted) ?? false)
         }
     }
 
@@ -61,13 +61,16 @@ package struct Preset: Codable, Equatable, Sendable, Identifiable {
     /// The settings after applying this preset to `settings`. Apps in the preset get its level
     /// (clamped to `maxPercent`); every other app goes back to the default, so it has no entry.
     /// An app whose level doesn't change keeps its `lastAdjusted`; the others get `now`.
+    /// Apps in `hidden` never get a level (hidden apps always play at 100%), so a preset that
+    /// holds a hidden app still applies to the rest.
     package func applied(
         to settings: [String: AppVolumeSetting],
         maxPercent: Int,
-        now: Date
+        now: Date,
+        excluding hidden: Set<String> = []
     ) -> [String: AppVolumeSetting] {
         var result: [String: AppVolumeSetting] = [:]
-        for (id, level) in apps {
+        for (id, level) in apps where !hidden.contains(id) {
             var setting = AppVolumeSetting(percent: level.percent, isMuted: level.isMuted, maxPercent: maxPercent)
             guard !setting.isDefault else { continue }
             if let current = settings[id], current.percent == setting.percent, current.isMuted == setting.isMuted {
@@ -81,10 +84,15 @@ package struct Preset: Codable, Equatable, Sendable, Identifiable {
     }
 
     /// True when `settings` are exactly what applying this preset would give (ignoring when each
-    /// app was last adjusted).
-    package func matches(_ settings: [String: AppVolumeSetting], maxPercent: Int) -> Bool {
-        let target = applied(to: settings, maxPercent: maxPercent, now: .distantPast)
-        let current = settings.filter { !$0.value.isDefault }
+    /// app was last adjusted). Apps in `hidden` are left out on both sides, so a preset holding a
+    /// hidden app can still be active.
+    package func matches(
+        _ settings: [String: AppVolumeSetting],
+        maxPercent: Int,
+        excluding hidden: Set<String> = []
+    ) -> Bool {
+        let target = applied(to: settings, maxPercent: maxPercent, now: .distantPast, excluding: hidden)
+        let current = settings.filter { !$0.value.isDefault && !hidden.contains($0.key) }
         guard target.count == current.count else { return false }
         return target.allSatisfy { id, setting in
             guard let other = current[id] else { return false }
@@ -183,9 +191,14 @@ package struct PresetLibrary: Equatable, Sendable {
         presets.removeAll { $0.id == id }
     }
 
-    /// The first preset that `settings` match exactly, if any. Computed, never stored.
-    package func activePreset(for settings: [String: AppVolumeSetting], maxPercent: Int) -> Preset? {
-        presets.first { $0.matches(settings, maxPercent: maxPercent) }
+    /// The first preset that `settings` match exactly, ignoring apps in `hidden`, if any.
+    /// Computed, never stored.
+    package func activePreset(
+        for settings: [String: AppVolumeSetting],
+        maxPercent: Int,
+        excluding hidden: Set<String> = []
+    ) -> Preset? {
+        presets.first { $0.matches(settings, maxPercent: maxPercent, excluding: hidden) }
     }
 
     private static func trimmed(_ name: String) -> String {

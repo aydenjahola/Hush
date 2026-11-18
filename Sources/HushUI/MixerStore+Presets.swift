@@ -10,9 +10,10 @@ package extension MixerStore {
     var presets: [Preset] { presetLibrary.presets }
 
     /// The preset the current levels match exactly, if any. Computed from the levels each time,
-    /// so it stops being active as soon as any app is adjusted.
+    /// so it stops being active as soon as any app is adjusted. Hidden apps are left out, so a
+    /// preset that holds one can still be active.
     var activePresetID: Preset.ID? {
-        presetLibrary.activePreset(for: settings, maxPercent: maxPercent)?.id
+        presetLibrary.activePreset(for: settings, maxPercent: maxPercent, excluding: hiddenApps.ids)?.id
     }
 
     func checkPresetName(_ name: String, renaming: Preset.ID? = nil) -> PresetLibrary.NameCheck {
@@ -32,10 +33,12 @@ package extension MixerStore {
 
     /// Reproduces the preset exactly: its apps get their saved level and mute, and every other
     /// adjusted app goes back to 100% and unmuted. One debounced save and one reconcile, which
-    /// creates and stops engines as usual.
+    /// creates and stops engines as usual. Hidden apps in the preset are skipped: they never get
+    /// a level, and the rest of the preset still applies.
     func applyPreset(_ id: Preset.ID) {
         guard controlsEnabled, let preset = presetLibrary.preset(id) else { return }
-        let applied = preset.applied(to: settings, maxPercent: maxPercent, now: now())
+        let applied = preset.applied(
+            to: settings, maxPercent: maxPercent, now: now(), excluding: hiddenApps.ids)
         guard applied != settings else { return }
         for id in Set(settings.keys).union(applied.keys) { engineErrors[id] = nil }
         settings = applied
@@ -59,8 +62,6 @@ package extension MixerStore {
     /// else the ID.
     private func presetDisplayName(for id: String) -> String {
         if let app = apps.first(where: { $0.id == id }) { return app.displayName }
-        let info: InstalledAppInfo? =
-            if let cached = installedAppCache[id] { cached } else { installedApp(id) }
-        return info?.displayName ?? id
+        return cachedInstalledApp(id)?.displayName ?? id
     }
 }

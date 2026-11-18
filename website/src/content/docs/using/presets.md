@@ -33,6 +33,8 @@ Applying a preset reproduces the snapshot exactly:
 
 So if you've lowered an app since saving the preset, and that app isn't in the preset, applying the preset resets it. If a preset holds a level above your current [maximum boost](/Hush/using/settings/#maximum-boost), the app gets the maximum instead. The preset itself keeps the saved level.
 
+If a preset holds an app you've since [hidden](/Hush/using/mixer/#hide-an-app), applying it skips that app, which keeps playing at its normal volume, and applies the rest. The preset still counts as active when everything else matches. Show the app again and apply the preset to give it the saved level.
+
 Applying a preset needs Audio Recording permission, like moving a fader. Without it, the presets and **Save Current Levels as Preset…** are greyed out.
 
 ## The active preset

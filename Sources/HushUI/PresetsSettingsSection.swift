@@ -26,16 +26,30 @@ struct PresetsSettingsSection: View {
     @State private var deleting: Preset?
 
     var body: some View {
+        let activeID = store.activePresetID
         Section {
             if store.presets.isEmpty {
                 Text(L10n.noPresetsYet)
                     .foregroundStyle(.secondary)
             }
             ForEach(store.presets) { preset in
-                row(preset, isActive: preset.id == store.activePresetID)
+                row(preset, isActive: preset.id == activeID)
             }
+            // The Save button is always there, so it carries the scroll anchor and the delete
+            // confirmation (attached to a row, like the Reset All Levels dialog, not the Section).
             Button(L10n.saveCurrentLevelsAsPreset) { sheet = .save }
                 .disabled(!store.controlsEnabled)
+                .id(Self.anchor)
+                .confirmationDialog(
+                    deleting.map { L10n.deletePresetTitle($0.name) } ?? L10n.presets,
+                    isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+                    presenting: deleting
+                ) { preset in
+                    Button(L10n.deletePreset, role: .destructive) { store.deletePreset(preset.id) }
+                    Button(L10n.cancel, role: .cancel) {}
+                } message: { _ in
+                    Text(L10n.deletePresetMessage)
+                }
         } header: {
             Text(L10n.presets)
         } footer: {
@@ -43,17 +57,6 @@ struct PresetsSettingsSection: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-        .id(Self.anchor)
-        .confirmationDialog(
-            deleting.map { L10n.deletePresetTitle($0.name) } ?? L10n.presets,
-            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-            presenting: deleting
-        ) { preset in
-            Button(L10n.deletePreset, role: .destructive) { store.deletePreset(preset.id) }
-            Button(L10n.cancel, role: .cancel) {}
-        } message: { _ in
-            Text(L10n.deletePresetMessage)
         }
     }
 
@@ -112,10 +115,12 @@ struct PresetsNavigation: ViewModifier {
             content
                 .onChange(of: navigator.pending, initial: true) {
                     guard let destination = navigator.take() else { return }
-                    if destination == .savePreset { sheet = .save }
-                    // A window that's just opening lays out first, so scroll on the next turn.
+                    // A window that's just opening lays out first, so scroll and open the sheet on
+                    // the next turn, once the window is up. The anchor is the Save button at the
+                    // end of the section, so scrolling it to the bottom shows the presets above it.
                     Task { @MainActor in
-                        withAnimation { proxy.scrollTo(PresetsSettingsSection.anchor, anchor: .top) }
+                        withAnimation { proxy.scrollTo(PresetsSettingsSection.anchor, anchor: .bottom) }
+                        if destination == .savePreset { sheet = .save }
                     }
                 }
                 .sheet(item: $sheet) { mode in
