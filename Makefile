@@ -48,7 +48,7 @@ app:
 	cp Resources/Hush.icns $(APP)/Contents/Resources/Hush.icns
 	codesign --force --sign "$(SIGN_IDENTITY)" $(SIGN_FLAGS) --entitlements Resources/Hush.entitlements $(APP)
 
-# `diskutil image create from` exists from macOS 27; older systems fall back to hdiutil.
+# Uses `diskutil image create from` when available, otherwise hdiutil (e.g. the macos-26 CI runner).
 dmg: app
 	rm -rf $(DMG_ROOT)
 	mkdir -p $(DMG_ROOT)
@@ -68,10 +68,10 @@ dmg: app
 # so `app` doesn't depend on this.
 icon:
 	rm -rf build/icon
-	mkdir -p build/icon website-assets
+	mkdir -p build/icon website/public
 	swift scripts/make-icon.swift build/icon
 	iconutil -c icns build/icon/AppIcon.iconset -o Resources/Hush.icns
-	cp build/icon/favicon-32.png build/icon/logo-512.png website-assets/
+	cp build/icon/favicon-32.png build/icon/logo-512.png website/public/
 
 run: app
 	open $(APP)
