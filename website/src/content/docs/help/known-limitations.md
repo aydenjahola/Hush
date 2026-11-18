@@ -17,7 +17,7 @@ When Hush starts adjusting an app that's already playing, there can be a tiny (~
 
 When you change the output device, for example by connecting headphones, Hush rebuilds each adjusted app's tap on the new device. For that moment, apps play at their normal level.
 
-Waking your Mac from sleep doesn't cause this when the output device stays the same: Hush keeps the taps it already has. It still happens after a wake if the output device actually changed while the Mac slept, for example when Bluetooth headphones or a display's speakers reconnect late and macOS switches to the built-in speakers and back.
+Waking your Mac from sleep doesn't cause this when the output device stays the same: Hush keeps the taps it already has. It still happens after a wake if the output device actually changed while the Mac slept, for example when Bluetooth headphones or a display's speakers reconnect late and macOS switches to the built-in speakers and back. It also happens if an app's tap stops working across sleep. Hush checks each tap after a wake, and rebuilds any tap that is still not working about 2 seconds later. Until then, that app may be silent or play at its normal level.
 
 ## Command-line audio is listed under the terminal
 

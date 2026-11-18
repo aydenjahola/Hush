@@ -90,7 +90,16 @@ The main thread and the IOProc share three atomics: the target gain, the gain ap
 
 `DefaultOutputMonitor` listens for changes to the default output device. When the device's UID changes, `MixerStore` rebuilds every engine on the new device (`beginRebuild` on all of them, then `finishRebuild`), which tears down each tap and aggregate and builds them again. While that happens, the tap is briefly gone and apps play at their normal level. If a rebuild fails, that engine is torn down and its strip shows a warning.
 
-A change that keeps the device's object ID, such as a rename or a new data source, only reconciles. The same device coming back under a new object ID with the same UID, which can happen across sleep, doesn't rebuild either: the aggregates name their sub-device by UID. Instead, `MixerStore` runs a health check, and it does the same when the Mac wakes (`NSWorkspace.didWakeNotification`). It notes each engine's IO cycle count (incremented by the IOProc on every cycle), waits 300 ms, and rebuilds only the engines whose count hasn't moved. Engines that are still running are never touched, so they don't blip.
+A change that keeps the device's object ID, such as a rename or a new data source, only reconciles. The same device coming back under a new object ID with the same UID, which can happen across sleep, doesn't rebuild either: the aggregates name their sub-device by UID. Instead, `MixerStore` runs a health check, and it does the same when the Mac wakes (`NSWorkspace.didWakeNotification`).
+
+The check works in two stages:
+
+1. It notes each engine's IO cycle count (incremented by the IOProc on every cycle). After 300 ms, it marks as suspects the engines whose count hasn't moved, or whose aggregate doesn't list the current output in `kAudioAggregateDevicePropertyActiveSubDeviceList`.
+2. About 2 seconds after the start, it rebuilds only the suspects that are still unhealthy.
+
+Devices often take longer than 300 ms to resume IO after a wake, so a single early check would rebuild healthy engines and bring the blip back. Engines that are healthy at either stage are never touched.
+
+A stall rebuild can fail because the device isn't ready yet. Such a failure doesn't wait for the user like other engine failures do. It's cleared, and the engine built again, on the next output or device-list change, or once after 3 seconds.
 
 ## Finding apps: `AudioProcessMonitor`
 
