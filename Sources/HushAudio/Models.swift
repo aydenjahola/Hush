@@ -2,18 +2,18 @@ import AppKit
 import CoreAudio
 
 /// An app currently known to Core Audio, with its helper processes grouped in.
-public struct AudioApp: Identifiable, Equatable {
+package struct AudioApp: Identifiable, Equatable {
     /// Bundle ID, or executable name when there is no bundle ID.
-    public let id: String
-    public var displayName: String
-    public var icon: NSImage?
+    package let id: String
+    package var displayName: String
+    package var icon: NSImage?
     /// Core Audio process objects for the app and its helpers, sorted.
-    public var processObjectIDs: [AudioObjectID]
-    public var isPlaying: Bool
+    package var processObjectIDs: [AudioObjectID]
+    package var isPlaying: Bool
     /// True when the owning app is a regular (Dock) app rather than a daemon, agent or CLI tool.
-    public var isRegularApp: Bool
+    package var isRegularApp: Bool
 
-    public init(
+    package init(
         id: String,
         displayName: String,
         icon: NSImage? = nil,
@@ -30,7 +30,7 @@ public struct AudioApp: Identifiable, Equatable {
     }
 
     /// Icons are ignored: they don't change identity or behavior.
-    public static func == (lhs: AudioApp, rhs: AudioApp) -> Bool {
+    package static func == (lhs: AudioApp, rhs: AudioApp) -> Bool {
         lhs.id == rhs.id
             && lhs.displayName == rhs.displayName
             && lhs.processObjectIDs == rhs.processObjectIDs
@@ -39,26 +39,26 @@ public struct AudioApp: Identifiable, Equatable {
     }
 }
 
-public struct OutputDevice: Equatable, Sendable {
-    public let id: AudioObjectID
-    public let uid: String
-    public let name: String
+package struct OutputDevice: Equatable, Sendable {
+    package let id: AudioObjectID
+    package let uid: String
+    package let name: String
 
-    public init(id: AudioObjectID, uid: String, name: String) {
+    package init(id: AudioObjectID, uid: String, name: String) {
         self.id = id
         self.uid = uid
         self.name = name
     }
 }
 
-public enum EngineMode: Sendable, Equatable {
+package enum EngineMode: Sendable, Equatable {
     /// The app is muted at the source and replayed with gain applied.
     case control
     /// The app plays normally; the tap only measures its level.
     case meterOnly
 }
 
-public enum AudioCapturePermissionStatus: Sendable, Equatable {
+package enum AudioCapturePermissionStatus: Sendable, Equatable {
     case authorized
     case denied
     case undetermined

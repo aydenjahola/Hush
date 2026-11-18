@@ -4,20 +4,20 @@ import HushCore
 /// Asks GitHub's public API for Hush's latest release: one anonymous GET with only generic headers
 /// (a "Hush/<version>" user agent, which GitHub requires, Accept, Accept-Language: en, the API
 /// version and, after the first response, If-None-Match). No cookies, cache or credentials.
-nonisolated public struct GitHubReleaseFetcher: ReleaseFetching {
-    public static let endpoint = URL(string: "https://api.github.com/repos/aydenjahola/Hush/releases/latest")!
+nonisolated package struct GitHubReleaseFetcher: ReleaseFetching {
+    package static let endpoint = URL(string: "https://api.github.com/repos/aydenjahola/Hush/releases/latest")!
 
     private static let maximumRetryAfter: TimeInterval = 24 * 60 * 60
 
     private let session: URLSession
     private let userAgent: String
 
-    public init(appVersion: String, session: URLSession = GitHubReleaseFetcher.makeSession()) {
+    package init(appVersion: String, session: URLSession = GitHubReleaseFetcher.makeSession()) {
         self.session = session
         self.userAgent = "Hush/\(appVersion)"
     }
 
-    public static func makeSession() -> URLSession {
+    package static func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
@@ -41,7 +41,7 @@ nonisolated public struct GitHubReleaseFetcher: ReleaseFetching {
         return request
     }
 
-    @concurrent public func latestRelease(ifNoneMatch etag: String?) async throws -> ReleaseFetchResult {
+    @concurrent package func latestRelease(ifNoneMatch etag: String?) async throws -> ReleaseFetchResult {
         let (data, response) = try await session.data(for: makeRequest(ifNoneMatch: etag))
         return try Self.result(from: data, response: response, now: Date())
     }

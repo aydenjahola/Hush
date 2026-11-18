@@ -30,9 +30,9 @@ final class EngineSharedState: Sendable {
 /// of an existing tap."). Rebuilding instead would destroy a `.mutedWhenTapped` tap, which lets the
 /// app through at full level until the replacement's IO is running, even with make-before-break.
 @MainActor
-public final class AppAudioEngine: AudioEngineHandle {
-    public private(set) var mode: EngineMode
-    public private(set) var processObjectIDs: [AudioObjectID]
+package final class AppAudioEngine: AudioEngineHandle {
+    package private(set) var mode: EngineMode
+    package private(set) var processObjectIDs: [AudioObjectID]
 
     private let appID: String
     private let state: EngineSharedState
@@ -42,7 +42,7 @@ public final class AppAudioEngine: AudioEngineHandle {
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
 
-    public init(appID: String, processObjectIDs: [AudioObjectID], mode: EngineMode, initialGain: Float, outputDeviceID: AudioObjectID) {
+    package init(appID: String, processObjectIDs: [AudioObjectID], mode: EngineMode, initialGain: Float, outputDeviceID: AudioObjectID) {
         self.appID = appID
         self.processObjectIDs = processObjectIDs
         self.mode = mode
@@ -53,7 +53,7 @@ public final class AppAudioEngine: AudioEngineHandle {
     /// The live tap object, or `kAudioObjectUnknown` when stopped (for integration tests).
     var tapObjectID: AudioObjectID { tapID }
 
-    public func start() throws {
+    package func start() throws {
         guard tapID == kAudioObjectUnknown else { return }
         do {
             try build()
@@ -63,7 +63,7 @@ public final class AppAudioEngine: AudioEngineHandle {
         }
     }
 
-    public func stop() {
+    package func stop() {
         if aggregateID != kAudioObjectUnknown {
             if let ioProcID {
                 AudioDeviceStop(aggregateID, ioProcID)
@@ -80,21 +80,21 @@ public final class AppAudioEngine: AudioEngineHandle {
         state.peakBits.store(0, ordering: .relaxed)
     }
 
-    public func setGain(_ gain: Float) {
+    package func setGain(_ gain: Float) {
         state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
     }
 
-    public func currentPeak() -> Float {
+    package func currentPeak() -> Float {
         Float(bitPattern: state.peakBits.exchange(0, ordering: .relaxed))
     }
 
-    public func rebuild(outputDeviceID: AudioObjectID) throws {
+    package func rebuild(outputDeviceID: AudioObjectID) throws {
         stop()
         self.outputDeviceID = outputDeviceID
         try start()
     }
 
-    public func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws {
+    package func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws {
         guard processObjectIDs != self.processObjectIDs else { return }
         if tapID != kAudioObjectUnknown {
             try applyTapDescription(makeDescription(processes: processObjectIDs, mode: mode))
@@ -102,7 +102,7 @@ public final class AppAudioEngine: AudioEngineHandle {
         self.processObjectIDs = processObjectIDs
     }
 
-    public func switchMode(to newMode: EngineMode, gain: Float) throws {
+    package func switchMode(to newMode: EngineMode, gain: Float) throws {
         guard newMode != mode else {
             if newMode == .control { setGain(gain) }
             return
@@ -270,10 +270,10 @@ public final class AppAudioEngine: AudioEngineHandle {
 }
 
 @MainActor
-public final class AppAudioEngineFactory: AudioEngineFactory {
-    public init() {}
+package final class AppAudioEngineFactory: AudioEngineFactory {
+    package init() {}
 
-    public func makeEngine(
+    package func makeEngine(
         appID: String,
         processObjectIDs: [AudioObjectID],
         mode: EngineMode,

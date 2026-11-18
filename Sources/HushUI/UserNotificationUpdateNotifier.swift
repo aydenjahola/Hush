@@ -6,7 +6,7 @@ import UserNotifications
 /// Skip This Version actions. Create it at launch, so the delegate is in place for a response
 /// that relaunches Hush; creating it doesn't ask for authorization.
 @MainActor
-public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, UNUserNotificationCenterDelegate {
+package final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, UNUserNotificationCenterDelegate {
     static let categoryIdentifier = "\(HushIdentity.bundleID).update"
     private static let actionPrefix = "\(HushIdentity.bundleID).update."
 
@@ -21,22 +21,22 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, UN
         return UNNotificationCategory(identifier: categoryIdentifier, actions: actions, intentIdentifiers: [])
     }
 
-    public var onAction: (@MainActor (UpdateAction, String, URL?) -> Void)?
+    package var onAction: (@MainActor (UpdateAction, String, URL?) -> Void)?
 
     private let center: UNUserNotificationCenter
 
-    public init(center: UNUserNotificationCenter = .current()) {
+    package init(center: UNUserNotificationCenter = .current()) {
         self.center = center
         super.init()
         center.delegate = self
         center.setNotificationCategories([Self.category])
     }
 
-    public func requestAuthorization() async -> Bool {
+    package func requestAuthorization() async -> Bool {
         (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
-    public func post(_ update: AvailableUpdate) async {
+    package func post(_ update: AvailableUpdate) async {
         let request = UNNotificationRequest(
             identifier: "\(Self.categoryIdentifier).\(update.version)",
             content: Self.content(for: update),
@@ -45,7 +45,7 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, UN
     }
 
     /// Update notifications are the only ones Hush posts, so this clears them all.
-    public func removeDelivered() {
+    package func removeDelivered() {
         center.removeAllDeliveredNotifications()
     }
 
@@ -67,7 +67,7 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, UN
 
     // MARK: UNUserNotificationCenterDelegate
 
-    public func userNotificationCenter(
+    package func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
@@ -81,7 +81,7 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, UN
     }
 
     /// Hush is a menu bar app and often "active" while its popover is open; show the banner anyway.
-    public func userNotificationCenter(
+    package func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {

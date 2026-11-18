@@ -6,7 +6,7 @@ import HushCore
 /// The dot is drawn into the same template image (with a knocked-out ring around it), so the
 /// whole icon is tinted by the menu bar and works in light, dark and tinted menu bars.
 @MainActor
-public enum MenuBarIcon {
+package enum MenuBarIcon {
     static let badgeRadius: CGFloat = 2.75
     static let badgeGap: CGFloat = 1.25
     private static let pointSize: CGFloat = 14
@@ -18,7 +18,7 @@ public enum MenuBarIcon {
         var badged: Bool
     }
 
-    public static func image(style: MenuBarIconStyle = .speaker, attenuated: Bool, badged: Bool) -> NSImage {
+    package static func image(style: MenuBarIconStyle = .speaker, attenuated: Bool, badged: Bool) -> NSImage {
         let key = Key(style: style, attenuated: attenuated, badged: badged)
         if let cached = cache[key] { return cached }
         let image = switch style {

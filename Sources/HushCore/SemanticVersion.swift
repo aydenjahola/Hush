@@ -1,22 +1,22 @@
 /// A Semantic Versioning 2.0 version: MAJOR.MINOR.PATCH with optional prerelease identifiers.
 /// A leading "v" (as in git tags) is accepted; build metadata ("+…") is accepted and ignored.
-public struct SemanticVersion: Comparable, Hashable, Sendable, CustomStringConvertible {
-    public let major: Int
-    public let minor: Int
-    public let patch: Int
+package struct SemanticVersion: Comparable, Hashable, Sendable, CustomStringConvertible {
+    package let major: Int
+    package let minor: Int
+    package let patch: Int
     /// Dot-separated prerelease identifiers, e.g. ["beta", "2"] for "1.0.0-beta.2". Empty for a release.
-    public let prerelease: [String]
+    package let prerelease: [String]
 
-    public var isPrerelease: Bool { !prerelease.isEmpty }
+    package var isPrerelease: Bool { !prerelease.isEmpty }
 
-    public init(major: Int, minor: Int, patch: Int, prerelease: [String] = []) {
+    package init(major: Int, minor: Int, patch: Int, prerelease: [String] = []) {
         self.major = major
         self.minor = minor
         self.patch = patch
         self.prerelease = prerelease
     }
 
-    public init?(_ text: String) {
+    package init?(_ text: String) {
         var rest = Substring(text)
         if let first = rest.first, first == "v" || first == "V" { rest = rest.dropFirst() }
         if let plus = rest.firstIndex(of: "+") {
@@ -43,12 +43,12 @@ public struct SemanticVersion: Comparable, Hashable, Sendable, CustomStringConve
         self.init(major: major, minor: minor, patch: patch, prerelease: prerelease)
     }
 
-    public var description: String {
+    package var description: String {
         let core = "\(major).\(minor).\(patch)"
         return prerelease.isEmpty ? core : core + "-" + prerelease.joined(separator: ".")
     }
 
-    public static func < (lhs: SemanticVersion, rhs: SemanticVersion) -> Bool {
+    package static func < (lhs: SemanticVersion, rhs: SemanticVersion) -> Bool {
         if lhs.major != rhs.major { return lhs.major < rhs.major }
         if lhs.minor != rhs.minor { return lhs.minor < rhs.minor }
         if lhs.patch != rhs.patch { return lhs.patch < rhs.patch }

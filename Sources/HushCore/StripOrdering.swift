@@ -1,13 +1,13 @@
 import Foundation
 
-public struct StripSortKey: Equatable, Sendable {
-    public var id: String
-    public var displayName: String
-    public var isPlaying: Bool
+package struct StripSortKey: Equatable, Sendable {
+    package var id: String
+    package var displayName: String
+    package var isPlaying: Bool
     /// nil when the app has no saved setting.
-    public var lastAdjusted: Date?
+    package var lastAdjusted: Date?
 
-    public init(id: String, displayName: String, isPlaying: Bool, lastAdjusted: Date?) {
+    package init(id: String, displayName: String, isPlaying: Bool, lastAdjusted: Date?) {
         self.id = id
         self.displayName = displayName
         self.isPlaying = isPlaying
@@ -16,8 +16,8 @@ public struct StripSortKey: Equatable, Sendable {
 }
 
 /// Playing apps first, then most recently adjusted (apps with no setting last), then by name.
-public enum StripOrdering {
-    public static func areInIncreasingOrder(_ a: StripSortKey, _ b: StripSortKey) -> Bool {
+package enum StripOrdering {
+    package static func areInIncreasingOrder(_ a: StripSortKey, _ b: StripSortKey) -> Bool {
         if a.isPlaying != b.isPlaying { return a.isPlaying }
         switch (a.lastAdjusted, b.lastAdjusted) {
         case let (left?, right?) where left != right:
@@ -34,18 +34,18 @@ public enum StripOrdering {
         return a.id < b.id
     }
 
-    public static func sorted(_ keys: [StripSortKey]) -> [StripSortKey] {
+    package static func sorted(_ keys: [StripSortKey]) -> [StripSortKey] {
         keys.sorted(by: areInIncreasingOrder)
     }
 
     /// By name (Finder-style, so "App 2" comes before "App 10"), then by ID.
-    public static func alphabeticallyInIncreasingOrder(_ a: StripSortKey, _ b: StripSortKey) -> Bool {
+    package static func alphabeticallyInIncreasingOrder(_ a: StripSortKey, _ b: StripSortKey) -> Bool {
         let byName = a.displayName.localizedStandardCompare(b.displayName)
         if byName != .orderedSame { return byName == .orderedAscending }
         return a.id < b.id
     }
 
-    public static func sorted(_ keys: [StripSortKey], mode: StripSortMode) -> [StripSortKey] {
+    package static func sorted(_ keys: [StripSortKey], mode: StripSortMode) -> [StripSortKey] {
         switch mode {
         case .activity: keys.sorted(by: areInIncreasingOrder)
         case .alphabetical: keys.sorted(by: alphabeticallyInIncreasingOrder)

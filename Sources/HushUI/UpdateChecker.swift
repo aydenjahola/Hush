@@ -4,18 +4,18 @@ import Observation
 import os
 
 /// What the user can do about an available update, from the popover banner or the notification.
-nonisolated public enum UpdateAction: String, Sendable, CaseIterable {
+nonisolated package enum UpdateAction: String, Sendable, CaseIterable {
     case download, later, skip
 }
 
-nonisolated public enum ReleaseFetchResult: Equatable, Sendable {
+nonisolated package enum ReleaseFetchResult: Equatable, Sendable {
     /// The latest release (nil when the repository has none yet) and its ETag, if any.
     case release(GitHubRelease?, etag: String?)
     /// 304: unchanged since the ETag sent with the request.
     case notModified
 }
 
-nonisolated public enum ReleaseFetchError: Error, Equatable {
+nonisolated package enum ReleaseFetchError: Error, Equatable {
     case notHTTP
     /// Anything but 200, 304, 404 or a rate limit.
     case status(Int)
@@ -24,13 +24,13 @@ nonisolated public enum ReleaseFetchError: Error, Equatable {
 }
 
 /// Fetches the latest published release. Injected so tests never touch the network.
-nonisolated public protocol ReleaseFetching: Sendable {
+nonisolated package protocol ReleaseFetching: Sendable {
     func latestRelease(ifNoneMatch etag: String?) async throws -> ReleaseFetchResult
 }
 
 /// Posts the "update available" notification. Injected so tests never touch UserNotifications.
 @MainActor
-public protocol UpdateNotifying: AnyObject {
+package protocol UpdateNotifying: AnyObject {
     /// Called when the user picks one of the notification's actions: action, version, download URL.
     var onAction: (@MainActor (UpdateAction, String, URL?) -> Void)? { get set }
     /// Asks for permission to notify (prompting only the first time). Returns whether it's granted.
@@ -44,9 +44,9 @@ public protocol UpdateNotifying: AnyObject {
 /// once a day, and tells the user when a newer version exists. It never downloads or installs anything.
 @MainActor
 @Observable
-public final class UpdateChecker {
+package final class UpdateChecker {
     /// The inline status for Settings → "Check Now". Automatic checks never change it.
-    public enum CheckStatus: Equatable, Sendable {
+    package enum CheckStatus: Equatable, Sendable {
         case idle, checking, upToDate, failed
         case available(SemanticVersion)
     }
@@ -56,19 +56,19 @@ public final class UpdateChecker {
         case available(AvailableUpdate)
     }
 
-    public static let snoozeInterval: TimeInterval = 24 * 60 * 60
+    package static let snoozeInterval: TimeInterval = 24 * 60 * 60
 
     /// The newest release that's newer than this copy, whether or not the user silenced it.
-    public private(set) var latestUpdate: AvailableUpdate?
+    package private(set) var latestUpdate: AvailableUpdate?
     /// `latestUpdate` unless it's snoozed or skipped: drives the banner and the menu bar badge.
-    public private(set) var pendingUpdate: AvailableUpdate?
-    public private(set) var checkStatus: CheckStatus = .idle
+    package private(set) var pendingUpdate: AvailableUpdate?
+    package private(set) var checkStatus: CheckStatus = .idle
     private var settings: UpdateSettings
 
-    public var hasPendingUpdate: Bool { pendingUpdate != nil }
-    public var lastUpdateCheck: Date? { settings.lastUpdateCheck }
+    package var hasPendingUpdate: Bool { pendingUpdate != nil }
+    package var lastUpdateCheck: Date? { settings.lastUpdateCheck }
 
-    public var automaticChecks: Bool {
+    package var automaticChecks: Bool {
         get { settings.automaticUpdateChecks }
         set {
             guard newValue != settings.automaticUpdateChecks else { return }
@@ -102,7 +102,7 @@ public final class UpdateChecker {
     @ObservationIgnored private let logger = Logger(subsystem: HushIdentity.bundleID, category: "updates")
 
     /// - Parameter currentVersion: this copy's version; nil (an unversioned dev build) disables checking.
-    public init(
+    package init(
         currentVersion: SemanticVersion?,
         fetcher: any ReleaseFetching,
         notifier: any UpdateNotifying,
@@ -128,7 +128,7 @@ public final class UpdateChecker {
 
     /// Starts the schedule. A build without a version (the bare binary, or a non-semver bundle
     /// version) has nothing to compare against, so it never schedules checks.
-    public func start() {
+    package func start() {
         guard !isStarted, currentVersion != nil else { return }
         isStarted = true
         launchedAt = now()
@@ -138,7 +138,7 @@ public final class UpdateChecker {
         reschedule()
     }
 
-    public func stop() {
+    package func stop() {
         isStarted = false
         scheduleTask?.cancel()
         scheduleTask = nil
@@ -147,7 +147,7 @@ public final class UpdateChecker {
     // MARK: Checking
 
     /// Settings → "Check Now": checks immediately and reports the result in `checkStatus`.
-    public func checkNow() async {
+    package func checkNow() async {
         checkStatus = .checking
         checkStatus = switch await check() {
         case .upToDate: .upToDate
@@ -226,13 +226,13 @@ public final class UpdateChecker {
     // MARK: User actions
 
     /// Opens the DMG (or the release page) in the browser. Hush never downloads or replaces itself.
-    public func download() {
+    package func download() {
         guard let update = pendingUpdate ?? latestUpdate else { return }
         open(update.downloadURL)
     }
 
     /// Hides the banner, badge and notification for 24 hours.
-    public func remindLater() {
+    package func remindLater() {
         settings.snoozedUntil = now().addingTimeInterval(Self.snoozeInterval)
         checkStatus = .idle
         persist()
@@ -241,13 +241,13 @@ public final class UpdateChecker {
     }
 
     /// Stays silent about this version until a newer one exists.
-    public func skipThisVersion() {
+    package func skipThisVersion() {
         guard let update = pendingUpdate ?? latestUpdate else { return }
         skip(update.version.description)
     }
 
     /// Re-evaluates the snooze against the clock (call when the popover opens).
-    public func refresh() {
+    package func refresh() {
         let current = now()
         pendingUpdate = latestUpdate.flatMap { update in
             UpdatePolicy.isSuppressed(update, settings: settings, now: current) ? nil : update

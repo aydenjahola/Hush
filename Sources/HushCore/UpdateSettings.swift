@@ -2,18 +2,18 @@ import Foundation
 
 /// Persisted update-notifier state, stored under "updates" in settings.json. Every field is
 /// optional on disk, so settings files written before the notifier existed still decode.
-public struct UpdateSettings: Codable, Equatable, Sendable {
-    public var automaticUpdateChecks: Bool
+package struct UpdateSettings: Codable, Equatable, Sendable {
+    package var automaticUpdateChecks: Bool
     /// The version the user chose to skip; that version and older ones stay silent.
-    public var skippedVersion: String?
+    package var skippedVersion: String?
     /// "Later": the banner, badge and notification stay hidden until this time.
-    public var snoozedUntil: Date?
+    package var snoozedUntil: Date?
     /// When a check last completed successfully.
-    public var lastUpdateCheck: Date?
+    package var lastUpdateCheck: Date?
     /// The last version a macOS notification was posted for, so each version notifies once.
-    public var notifiedVersion: String?
+    package var notifiedVersion: String?
 
-    public init(
+    package init(
         automaticUpdateChecks: Bool = true,
         skippedVersion: String? = nil,
         snoozedUntil: Date? = nil,
@@ -31,7 +31,7 @@ public struct UpdateSettings: Codable, Equatable, Sendable {
         case automaticUpdateChecks, skippedVersion, snoozedUntil, lastUpdateCheck, notifiedVersion
     }
 
-    public init(from decoder: any Decoder) throws {
+    package init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         automaticUpdateChecks = try container.decodeIfPresent(Bool.self, forKey: .automaticUpdateChecks) ?? true
         skippedVersion = try container.decodeIfPresent(String.self, forKey: .skippedVersion)

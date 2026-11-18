@@ -2,7 +2,7 @@ import HushCore
 
 /// Settable views of Settings → Appearance, so SettingsView can bind to them with `@Bindable`.
 /// Every write goes through `updateAppearance`, which persists it and updates meters and order.
-public extension MixerStore {
+package extension MixerStore {
     var layout: MixerLayout {
         get { preferences.appearance.layout }
         set { updateAppearance { $0.layout = newValue } }

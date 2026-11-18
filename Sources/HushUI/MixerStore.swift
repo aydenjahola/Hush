@@ -8,33 +8,33 @@ import os
 
 @MainActor
 @Observable
-public final class MixerStore {
-    public struct Strip: Identifiable, Equatable {
-        public let id: String
-        public var displayName: String
-        public var icon: NSImage?
-        public var isPlaying: Bool
+package final class MixerStore {
+    package struct Strip: Identifiable, Equatable {
+        package let id: String
+        package var displayName: String
+        package var icon: NSImage?
+        package var isPlaying: Bool
         /// False for saved apps that aren't running (only shown with "show inactive apps").
-        public var isRunning: Bool
-        public var setting: AppVolumeSetting
+        package var isRunning: Bool
+        package var setting: AppVolumeSetting
         /// Tooltip text for the warning badge when the engine failed.
-        public var engineError: String?
+        package var engineError: String?
     }
 
     // MARK: Published state
 
-    public private(set) var strips: [Strip] = []
+    package private(set) var strips: [Strip] = []
     /// Ballistics state for the meters. Not observed: views read their `StripMeter` instead.
-    @ObservationIgnored public private(set) var meterLevels: [String: Float] = [:]
-    public private(set) var preferences: Preferences
-    public private(set) var permission: AudioCapturePermissionStatus = .undetermined
-    public private(set) var outputDevice: OutputDevice?
-    public private(set) var isPopoverVisible = false
+    @ObservationIgnored package private(set) var meterLevels: [String: Float] = [:]
+    package private(set) var preferences: Preferences
+    package private(set) var permission: AudioCapturePermissionStatus = .undetermined
+    package private(set) var outputDevice: OutputDevice?
+    package private(set) var isPopoverVisible = false
 
-    public var controlsEnabled: Bool { permission == .authorized }
-    public var playingCount: Int { apps.filter(\.isPlaying).count }
-    public var maxPercent: Int { preferences.maxBoostPercent.rawValue }
-    public var isAnyAppAttenuated: Bool {
+    package var controlsEnabled: Bool { permission == .authorized }
+    package var playingCount: Int { apps.filter(\.isPlaying).count }
+    package var maxPercent: Int { preferences.maxBoostPercent.rawValue }
+    package var isAnyAppAttenuated: Bool {
         apps.contains { app in
             guard let setting = settings[app.id] else { return false }
             return setting.isMuted || setting.percent < 100
@@ -70,7 +70,7 @@ public final class MixerStore {
     @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
 
-    public init(
+    package init(
         processSource: any AudioProcessSource,
         outputSource: any OutputDeviceSource,
         engineFactory: any AudioEngineFactory,
@@ -93,7 +93,7 @@ public final class MixerStore {
         self.settings = document.apps
     }
 
-    public func start() {
+    package func start() {
         permission = permissionSource.currentStatus()
         outputSource.start { [weak self] device in self?.outputDidChange(device) }
         processSource.start { [weak self] apps in self?.appsDidChange(apps) }
@@ -108,7 +108,7 @@ public final class MixerStore {
 
     // MARK: User actions
 
-    public func setPercent(_ percent: Int, for id: String) {
+    package func setPercent(_ percent: Int, for id: String) {
         guard controlsEnabled else { return }
         var setting = settings[id] ?? AppVolumeSetting()
         setting.setPercent(percent, maxPercent: maxPercent)
@@ -116,11 +116,11 @@ public final class MixerStore {
         commit(setting, for: id)
     }
 
-    public func resetVolume(for id: String) {
+    package func resetVolume(for id: String) {
         setPercent(100, for: id)
     }
 
-    public func toggleMute(for id: String) {
+    package func toggleMute(for id: String) {
         guard controlsEnabled else { return }
         var setting = settings[id] ?? AppVolumeSetting()
         setting.isMuted.toggle()
@@ -128,24 +128,24 @@ public final class MixerStore {
         commit(setting, for: id)
     }
 
-    public func setMaxBoost(_ limit: BoostLimit) {
+    package func setMaxBoost(_ limit: BoostLimit) {
         preferences.maxBoostPercent = limit
         settings = SettingsDocument(preferences: preferences, apps: settings).normalized().apps
         settingsDidChange()
     }
 
-    public func setShowInactiveApps(_ show: Bool) {
+    package func setShowInactiveApps(_ show: Bool) {
         preferences.showInactiveApps = show
         settingsDidChange()
     }
 
     /// Settable views of the preferences, so Settings can bind to them with `@Bindable`.
-    public var maxBoost: BoostLimit {
+    package var maxBoost: BoostLimit {
         get { preferences.maxBoostPercent }
         set { setMaxBoost(newValue) }
     }
 
-    public var showInactiveApps: Bool {
+    package var showInactiveApps: Bool {
         get { preferences.showInactiveApps }
         set { setShowInactiveApps(newValue) }
     }
@@ -174,7 +174,7 @@ public final class MixerStore {
         settingsDidChange()
     }
 
-    public func resetAllLevels() {
+    package func resetAllLevels() {
         settings = [:]
         engineErrors = [:]
         meterOnlyErrorIDs = []
@@ -183,7 +183,7 @@ public final class MixerStore {
 
     // MARK: Popover lifecycle
 
-    public func popoverDidAppear() {
+    package func popoverDidAppear() {
         guard !isPopoverVisible else { return }
         refreshPermission()
         rebuildStrips()          // fresh order while still "closed"
@@ -193,7 +193,7 @@ public final class MixerStore {
         if preferences.appearance.showLevelMeters { startMeterPolling() }
     }
 
-    public func popoverDidDisappear() {
+    package func popoverDidDisappear() {
         guard isPopoverVisible else { return }
         isPopoverVisible = false
         stopMeterPolling()
@@ -203,13 +203,13 @@ public final class MixerStore {
         rebuildStrips()
     }
 
-    public func refreshPermission() {
+    package func refreshPermission() {
         permissionDidChange(permissionSource.currentStatus())
     }
 
     // MARK: Persistence
 
-    public func flushPendingSave() {
+    package func flushPendingSave() {
         saveTask?.cancel()
         saveTask = nil
         guard hasPendingSave else { return }
@@ -222,7 +222,7 @@ public final class MixerStore {
         }
     }
 
-    public func shutdown() {
+    package func shutdown() {
         flushPendingSave()
         stopMeterPolling()
         tearDownAllEngines()

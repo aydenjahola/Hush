@@ -11,10 +11,10 @@ import os
 /// ID once per object (they never change for an object ID), and re-reads running state only for
 /// objects that notified or are new. Polling reads only the objects `setPolling` asks for.
 @MainActor
-public final class AudioProcessMonitor: AudioProcessSource {
-    public typealias Scheduler = @MainActor (@escaping @MainActor () -> Void) -> Void
+package final class AudioProcessMonitor: AudioProcessSource {
+    package typealias Scheduler = @MainActor (@escaping @MainActor () -> Void) -> Void
 
-    public private(set) var apps: [AudioApp] = []
+    package private(set) var apps: [AudioApp] = []
 
     /// Attempts per object at reading its PID/bundle ID, or at adding its running listener, before
     /// giving up until the next list change.
@@ -60,7 +60,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
         return RunningStatePoller(interval: .seconds(1), read: read, onChange: onChange)
     }()
 
-    public convenience init() {
+    package convenience init() {
         self.init(
             hal: CoreAudioProcessHAL(),
             resolver: AppIdentityResolver(),
@@ -89,7 +89,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
     /// Runs the work once, `delay` after the first request. The HAL posts a playback start's
     /// notifications (list, running) separately but within a few milliseconds, so one short window
     /// catches them all while adding at most `delay` before a muted app's engine starts.
-    public static func coalescing(within delay: Duration) -> Scheduler {
+    package static func coalescing(within delay: Duration) -> Scheduler {
         let nanoseconds = Int(delay.components.seconds) * 1_000_000_000 + Int(delay.components.attoseconds / 1_000_000_000)
         return { work in
             DispatchQueue.main.asyncAfter(deadline: .now() + .nanoseconds(nanoseconds)) {
@@ -98,7 +98,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
         }
     }
 
-    public func start(onChange: @escaping @MainActor ([AudioApp]) -> Void) {
+    package func start(onChange: @escaping @MainActor ([AudioApp]) -> Void) {
         self.onChange = onChange
         listListener = hal.addListener(CoreAudioProperty.systemObject, kAudioHardwarePropertyProcessObjectList) { [weak self] in
             self?.listDidChange()
@@ -111,12 +111,12 @@ public final class AudioProcessMonitor: AudioProcessSource {
         onChange(apps)  // exactly once, even when the list is empty
     }
 
-    public func setPolling(_ polling: ProcessPolling) {
+    package func setPolling(_ polling: ProcessPolling) {
         self.polling = polling
         updatePollTargets()
     }
 
-    public func stop() {
+    package func stop() {
         poller.stop()
         resolver.stopObserving()
         resolver.onInvalidate = nil

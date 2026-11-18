@@ -1,12 +1,12 @@
 import Foundation
 
 /// The subset of GitHub's "get the latest release" response that Hush reads.
-public struct GitHubRelease: Decodable, Equatable, Sendable {
-    public struct Asset: Decodable, Equatable, Sendable {
-        public var name: String
-        public var browserDownloadURL: URL
+package struct GitHubRelease: Decodable, Equatable, Sendable {
+    package struct Asset: Decodable, Equatable, Sendable {
+        package var name: String
+        package var browserDownloadURL: URL
 
-        public init(name: String, browserDownloadURL: URL) {
+        package init(name: String, browserDownloadURL: URL) {
             self.name = name
             self.browserDownloadURL = browserDownloadURL
         }
@@ -17,13 +17,13 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
         }
     }
 
-    public var tagName: String
-    public var htmlURL: URL
-    public var draft: Bool
-    public var prerelease: Bool
-    public var assets: [Asset]
+    package var tagName: String
+    package var htmlURL: URL
+    package var draft: Bool
+    package var prerelease: Bool
+    package var assets: [Asset]
 
-    public init(tagName: String, htmlURL: URL, draft: Bool, prerelease: Bool, assets: [Asset]) {
+    package init(tagName: String, htmlURL: URL, draft: Bool, prerelease: Bool, assets: [Asset]) {
         self.tagName = tagName
         self.htmlURL = htmlURL
         self.draft = draft
@@ -37,7 +37,7 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
         case draft, prerelease, assets
     }
 
-    public init(from decoder: any Decoder) throws {
+    package init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         tagName = try container.decode(String.self, forKey: .tagName)
         htmlURL = try container.decode(URL.self, forKey: .htmlURL)
@@ -46,19 +46,19 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
         assets = try container.decodeIfPresent([Asset].self, forKey: .assets) ?? []
     }
 
-    public static func decode(from data: Data) throws -> GitHubRelease {
+    package static func decode(from data: Data) throws -> GitHubRelease {
         try JSONDecoder().decode(GitHubRelease.self, from: data)
     }
 }
 
 /// A release newer than the running copy of Hush.
-public struct AvailableUpdate: Equatable, Sendable {
-    public var version: SemanticVersion
+package struct AvailableUpdate: Equatable, Sendable {
+    package var version: SemanticVersion
     /// The versioned DMG, or the release page when that asset is missing.
-    public var downloadURL: URL
-    public var releasePageURL: URL
+    package var downloadURL: URL
+    package var releasePageURL: URL
 
-    public init(version: SemanticVersion, downloadURL: URL, releasePageURL: URL) {
+    package init(version: SemanticVersion, downloadURL: URL, releasePageURL: URL) {
         self.version = version
         self.downloadURL = downloadURL
         self.releasePageURL = releasePageURL
@@ -66,17 +66,17 @@ public struct AvailableUpdate: Equatable, Sendable {
 }
 
 /// Pure decisions for the update notifier.
-public enum UpdatePolicy {
-    public static let releasesPageURL = URL(string: "https://github.com/aydenjahola/Hush/releases/latest")!
+package enum UpdatePolicy {
+    package static let releasesPageURL = URL(string: "https://github.com/aydenjahola/Hush/releases/latest")!
 
     /// Drafts, prereleases (by flag or by a "-beta"-style tag) and unparseable tags carry no update.
-    public static func isIgnored(_ release: GitHubRelease) -> Bool {
+    package static func isIgnored(_ release: GitHubRelease) -> Bool {
         guard !release.draft, !release.prerelease, let version = SemanticVersion(release.tagName) else { return true }
         return version.isPrerelease
     }
 
     /// The update `release` offers over `current`, or nil if it's ignored or not newer.
-    public static func availableUpdate(in release: GitHubRelease, current: SemanticVersion) -> AvailableUpdate? {
+    package static func availableUpdate(in release: GitHubRelease, current: SemanticVersion) -> AvailableUpdate? {
         guard !isIgnored(release), let version = SemanticVersion(release.tagName), version > current else { return nil }
         let page = isTrusted(release.htmlURL) ? release.htmlURL : releasesPageURL
         let dmgName = "Hush-\(version).dmg"
@@ -86,7 +86,7 @@ public enum UpdatePolicy {
     }
 
     /// True while the user has asked not to hear about `update`: snoozed, or this version (or a newer one) skipped.
-    public static func isSuppressed(_ update: AvailableUpdate, settings: UpdateSettings, now: Date) -> Bool {
+    package static func isSuppressed(_ update: AvailableUpdate, settings: UpdateSettings, now: Date) -> Bool {
         if let snoozedUntil = settings.snoozedUntil, now < snoozedUntil { return true }
         if let skipped = settings.skippedVersion.flatMap(SemanticVersion.init), update.version <= skipped { return true }
         return false
@@ -96,12 +96,12 @@ public enum UpdatePolicy {
 
     /// Hush only opens its own release pages: `https://github.com/aydenjahola/Hush/releases/…`, with
     /// no port, no user or password, and no ".." segments (checked on the standardized, decoded path).
-    public static func isTrusted(_ url: URL) -> Bool {
+    package static func isTrusted(_ url: URL) -> Bool {
         trustedPath(of: url) != nil
     }
 
     /// A release asset: a trusted URL under `/releases/download/`.
-    public static func isTrustedDownload(_ url: URL) -> Bool {
+    package static func isTrustedDownload(_ url: URL) -> Bool {
         trustedPath(of: url)?.hasPrefix(releasesPathPrefix + "download/") == true
     }
 
@@ -125,16 +125,16 @@ public enum UpdatePolicy {
 
 /// When the next automatic check is due: shortly after launch, then once a day. After a failure it
 /// retries sooner (1 h, then 4 h, then daily) and returns to daily after a success.
-public struct UpdateSchedule: Equatable, Sendable {
+package struct UpdateSchedule: Equatable, Sendable {
     /// Consecutive attempts are never closer than this, whatever else the schedule says.
-    public static let minimumGap: TimeInterval = 60
+    package static let minimumGap: TimeInterval = 60
 
-    public var launchDelay: TimeInterval
-    public var interval: TimeInterval
+    package var launchDelay: TimeInterval
+    package var interval: TimeInterval
     /// Delay after the 1st, 2nd, … consecutive failure; the last value repeats.
-    public var retryIntervals: [TimeInterval]
+    package var retryIntervals: [TimeInterval]
 
-    public init(
+    package init(
         launchDelay: TimeInterval = 30,
         interval: TimeInterval = 24 * 60 * 60,
         retryIntervals: [TimeInterval] = [60 * 60, 4 * 60 * 60, 24 * 60 * 60]
@@ -148,7 +148,7 @@ public struct UpdateSchedule: Equatable, Sendable {
     ///   - lastAttempt: this session's last check attempt (successful or not), nil before the first.
     ///   - consecutiveFailures: failed attempts since the last success.
     ///   - notBefore: a server-requested earliest retry (Retry-After / rate-limit reset).
-    public func nextCheck(
+    package func nextCheck(
         lastAttempt: Date?,
         consecutiveFailures: Int = 0,
         notBefore: Date? = nil,

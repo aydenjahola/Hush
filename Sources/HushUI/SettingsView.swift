@@ -2,7 +2,7 @@ import HushCore
 import ServiceManagement
 import SwiftUI
 
-public struct SettingsView: View {
+package struct SettingsView: View {
     @Bindable var store: MixerStore
     @Bindable var updates: UpdateChecker
 
@@ -11,12 +11,12 @@ public struct SettingsView: View {
     @State private var launchError: String?
     @State private var confirmingReset = false
 
-    public init(store: MixerStore, updates: UpdateChecker) {
+    package init(store: MixerStore, updates: UpdateChecker) {
         self.store = store
         self.updates = updates
     }
 
-    public var body: some View {
+    package var body: some View {
         Form {
             Section("General") {
                 Toggle("Launch at login", isOn: $launchAtLogin)

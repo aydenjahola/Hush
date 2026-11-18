@@ -3,19 +3,19 @@ import HushAudio
 import AppKit
 import SwiftUI
 
-public struct MixerPopover: View {
+package struct MixerPopover: View {
     let store: MixerStore
     let updates: UpdateChecker
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var overflow = EdgeOverflow()
 
-    public init(store: MixerStore, updates: UpdateChecker) {
+    package init(store: MixerStore, updates: UpdateChecker) {
         self.store = store
         self.updates = updates
     }
 
-    public var body: some View {
+    package var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
             if let update = updates.pendingUpdate {

@@ -1,11 +1,11 @@
 import CoreAudio
 import Foundation
 
-public struct CoreAudioError: Error, CustomStringConvertible, Sendable {
-    public let operation: String
-    public let status: OSStatus
+package struct CoreAudioError: Error, CustomStringConvertible, Sendable {
+    package let operation: String
+    package let status: OSStatus
 
-    public var description: String { "\(operation) failed (OSStatus \(status))" }
+    package var description: String { "\(operation) failed (OSStatus \(status))" }
 }
 
 /// Small helpers for reading Core Audio object properties. Main-thread use only, never in an IOProc.

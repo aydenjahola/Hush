@@ -1,21 +1,21 @@
 import Foundation
 
 /// The persisted root stored at ~/Library/Application Support/Hush/settings.json.
-public struct SettingsDocument: Codable, Equatable, Sendable {
-    public static let currentVersion = 1
+package struct SettingsDocument: Codable, Equatable, Sendable {
+    package static let currentVersion = 1
 
-    public enum DecodingFailure: Error, Equatable {
+    package enum DecodingFailure: Error, Equatable {
         case unsupportedVersion(Int)
     }
 
-    public var version: Int
-    public var preferences: Preferences
+    package var version: Int
+    package var preferences: Preferences
     /// Keyed by bundle ID, or executable name when there is no bundle ID.
-    public var apps: [String: AppVolumeSetting]
+    package var apps: [String: AppVolumeSetting]
     /// Added after version 1 shipped; optional on disk, so it didn't need a version bump.
-    public var updates: UpdateSettings
+    package var updates: UpdateSettings
 
-    public init(
+    package init(
         preferences: Preferences = Preferences(),
         apps: [String: AppVolumeSetting] = [:],
         updates: UpdateSettings = UpdateSettings()
@@ -30,7 +30,7 @@ public struct SettingsDocument: Codable, Equatable, Sendable {
         case version, preferences, apps, updates
     }
 
-    public init(from decoder: any Decoder) throws {
+    package init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decode(Int.self, forKey: .version)
         preferences = try container.decode(Preferences.self, forKey: .preferences)
@@ -42,7 +42,7 @@ public struct SettingsDocument: Codable, Equatable, Sendable {
         let version: Int
     }
 
-    public static func decode(from data: Data) throws -> SettingsDocument {
+    package static func decode(from data: Data) throws -> SettingsDocument {
         let probe = try JSONDecoder().decode(VersionProbe.self, from: data)
         guard probe.version == currentVersion else {
             throw DecodingFailure.unsupportedVersion(probe.version)
@@ -52,7 +52,7 @@ public struct SettingsDocument: Codable, Equatable, Sendable {
         return try decoder.decode(SettingsDocument.self, from: data).normalized()
     }
 
-    public func encoded() throws -> Data {
+    package func encoded() throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -60,7 +60,7 @@ public struct SettingsDocument: Codable, Equatable, Sendable {
     }
 
     /// Clamps every app to the current maximum boost and drops default entries.
-    public func normalized() -> SettingsDocument {
+    package func normalized() -> SettingsDocument {
         let maxPercent = preferences.maxBoostPercent.rawValue
         var copy = self
         copy.apps = apps.compactMapValues { setting in

@@ -1,9 +1,9 @@
 /// Realtime-safe sample loops. No allocation, no locks, no Objective-C.
-public enum SampleProcessor {
+package enum SampleProcessor {
     /// Multiplies `frameCount` samples by a gain that ramps linearly from
     /// `startGain` toward `endGain`, soft-limits when boosting, writes them to
     /// `output`, and returns the largest output magnitude.
-    public static func apply(
+    package static func apply(
         startGain: Float,
         endGain: Float,
         input: UnsafePointer<Float>,
@@ -28,7 +28,7 @@ public enum SampleProcessor {
     }
 
     /// Largest magnitude among `frameCount` samples spaced `stride` apart.
-    public static func peak(input: UnsafePointer<Float>, stride: Int, frameCount: Int) -> Float {
+    package static func peak(input: UnsafePointer<Float>, stride: Int, frameCount: Int) -> Float {
         guard frameCount > 0 else { return 0 }
         var peak: Float = 0
         for frame in 0..<frameCount {

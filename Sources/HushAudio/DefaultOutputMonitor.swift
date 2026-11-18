@@ -5,15 +5,15 @@ import os
 
 /// Tracks the system default output device.
 @MainActor
-public final class DefaultOutputMonitor: OutputDeviceSource {
+package final class DefaultOutputMonitor: OutputDeviceSource {
     private var onChange: (@MainActor (OutputDevice?) -> Void)?
     private var listener: AudioObjectPropertyListenerBlock?
     private var lastPublished: OutputDevice?
     private let logger = Logger(subsystem: HushIdentity.bundleID, category: "output")
 
-    public init() {}
+    package init() {}
 
-    public func start(onChange: @escaping @MainActor (OutputDevice?) -> Void) {
+    package func start(onChange: @escaping @MainActor (OutputDevice?) -> Void) {
         self.onChange = onChange
         var propertyAddress = CoreAudioProperty.address(kAudioHardwarePropertyDefaultOutputDevice)
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
@@ -30,7 +30,7 @@ public final class DefaultOutputMonitor: OutputDeviceSource {
         onChange(lastPublished)
     }
 
-    public func current() -> OutputDevice? {
+    package func current() -> OutputDevice? {
         guard let id = try? CoreAudioProperty.scalar(
             CoreAudioProperty.systemObject,
             kAudioHardwarePropertyDefaultOutputDevice,

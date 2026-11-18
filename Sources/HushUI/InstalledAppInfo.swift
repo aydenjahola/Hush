@@ -1,11 +1,11 @@
 import AppKit
 
 /// Name and icon of an installed app, used for strips of saved apps that aren't running.
-public struct InstalledAppInfo {
-    public var displayName: String
-    public var icon: NSImage?
+package struct InstalledAppInfo {
+    package var displayName: String
+    package var icon: NSImage?
 
-    public init(displayName: String, icon: NSImage?) {
+    package init(displayName: String, icon: NSImage?) {
         self.displayName = displayName
         self.icon = icon
     }
@@ -13,7 +13,7 @@ public struct InstalledAppInfo {
     /// Looks the app up by bundle ID through Launch Services. Returns nil when it isn't installed
     /// (or the ID is an executable name rather than a bundle ID).
     @MainActor
-    public static func lookUp(bundleID: String) -> InstalledAppInfo? {
+    package static func lookUp(bundleID: String) -> InstalledAppInfo? {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
         let bundle = Bundle(url: url)
         let name = bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
