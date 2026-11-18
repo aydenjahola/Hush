@@ -110,7 +110,7 @@ Turn the switch off and Hush makes no network requests at all. To see exactly wh
 
 ### Check Now
 
-Runs a check straight away and shows the result next to the button: **Checking…**, then **Hush is up to date**, **Hush X.Y.Z is available** (with a **Download** link) or **Couldn't check for updates**. When Hush isn't checking, the status reads **Last checked** followed by a relative time, such as "Last checked yesterday". It works even when automatic checks are off.
+Runs a check straight away and shows the result next to the button: **Checking…**, then **Hush is up to date**, **Hush X.Y.Z is available** (with a **Download** link) or **Couldn't check for updates**. When no result is showing and Hush has checked before (the idle state after a previous check), the status reads **Last checked** followed by a relative time, such as "Last checked yesterday". It works even when automatic checks are off.
 
 ## About
 
