@@ -9,6 +9,8 @@ import HushCore
 package enum MenuBarIcon {
     static let badgeRadius: CGFloat = 2.75
     static let badgeGap: CGFloat = 1.25
+    /// Extra room the fader glyph's badge sits to the right, so its clear ring doesn't bite the third cap.
+    static let faderBadgeClearance: CGFloat = 3
     private static let pointSize: CGFloat = 14
     private static var cache: [Key: NSImage] = [:]
 
@@ -56,7 +58,7 @@ package enum MenuBarIcon {
     /// The attenuated variant has its knobs lower (short fills, not just caps), like the speaker's fewer waves.
     private static func renderFaders(attenuated: Bool, badged: Bool) -> NSImage {
         let glyph = NSSize(width: 17.5, height: 14)
-        let size = NSSize(width: ceil(glyph.width + badgeRadius), height: glyph.height)
+        let size = NSSize(width: ceil(glyph.width + badgeRadius + faderBadgeClearance), height: glyph.height)
         let levels = faderLevels(attenuated: attenuated)
         return templateImage(size: size, badged: badged) {
             let trackWidth: CGFloat = 1.5, fillWidth: CGFloat = 2.25, knob = NSSize(width: 4.5, height: 3.5)

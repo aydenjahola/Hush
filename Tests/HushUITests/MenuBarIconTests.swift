@@ -1,4 +1,5 @@
 import AppKit
+import HushCore
 import Testing
 @testable import HushUI
 
@@ -44,6 +45,14 @@ import Testing
         let ring = MenuBarIcon.badgeRadius + MenuBarIcon.badgeGap / 2
         // Just left of the dot, inside the knocked-out ring.
         #expect(try alpha(of: badged, atX: dot.x - ring, y: dot.y) < 0.1)
+    }
+
+    @Test func faderBadgeLeavesTheThirdCapIntact() throws {
+        let plain = MenuBarIcon.image(style: .fader, attenuated: false, badged: false)
+        let badged = MenuBarIcon.image(style: .fader, attenuated: false, badged: true)
+        // The third fader's cap: centered at x = 14.5 (3 + 2 * 5.75), 4.5 wide, centered at y = 3.125.
+        #expect(try alpha(of: plain, atX: 16.4, y: 3.1) > 0.9)
+        #expect(try alpha(of: badged, atX: 16.4, y: 3.1) > 0.9, "the badge's ring must not clip the cap")
     }
 
     @Test func imagesAreCached() {

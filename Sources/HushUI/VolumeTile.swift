@@ -36,6 +36,8 @@ struct VolumeTile: View {
                     .allowsHitTesting(false)
                 if appearance.showPercentages || strip.setting.isMuted {
                     StripPercentLabel(strip: strip, boostInPrimary: true)
+                        // Air between the label and the volume edge line, which can sit right under it.
+                        .padding(.horizontal, compact ? 4 : 2)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
