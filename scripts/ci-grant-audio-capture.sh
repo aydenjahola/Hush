@@ -1,32 +1,37 @@
 #!/bin/bash
-# Experimental, CI only: tries to grant Audio Recording (kTCCServiceAudioCapture) to the processes
-# that run `make integration-test` on a GitHub-hosted macOS runner, by writing TCC.db directly.
+# DANGER: this script writes persistent Audio Recording (kTCCServiceAudioCapture) grants into
+# TCC.db for generic clients such as /bin/bash, /bin/zsh, /bin/sh and /usr/bin/env. On a real
+# Mac that would let EVERY script on the machine record all system audio, silently and for good.
+# It refuses to do anything unless it's on a GitHub Actions macOS runner (GITHUB_ACTIONS=true and
+# RUNNER_OS=macOS) with SIP fully disabled. Never run it, or remove those guards, on your own Mac:
+# grant permission in System Settings instead
+# (https://aydenjahola.github.io/Hush/contributing/testing/#integration-tests).
 #
-# This only works when System Integrity Protection is disabled (the system TCC.db is SIP-protected)
-# and the TCC.db schema matches what's written below. It never fails the job: if the grant doesn't
-# take, the integration tests skip themselves with the permission message instead of prompting.
-#
-# Never run this on your own Mac. Grant permission in System Settings instead (see https://aydenjahola.github.io/Hush/contributing/testing/#integration-tests).
+# Experimental, CI only: tries to grant Audio Recording to the processes that run
+# `make integration-test` on a hosted runner, by writing TCC.db directly. It only works when
+# System Integrity Protection is disabled (the system TCC.db is SIP-protected) and the TCC.db
+# schema matches what's written below. It never fails the job: if the grant doesn't take, the
+# integration tests skip themselves with the permission message instead of prompting.
 
 set -u
+
+log() { printf '[grant-audio-capture] %s\n' "$*"; }
+
+# Guards, before any TCC.db access.
+[ "${GITHUB_ACTIONS:-}" = "true" ] || { echo "Refusing: this script only runs on GitHub Actions runners."; exit 0; }
+[ "${RUNNER_OS:-}" = "macOS" ] || { echo "Refusing: this script only runs on GitHub Actions macOS runners (RUNNER_OS=${RUNNER_OS:-unset})."; exit 0; }
 
 SERVICE="kTCCServiceAudioCapture"
 SYSTEM_DB="/Library/Application Support/com.apple.TCC/TCC.db"
 USER_DB="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
 
-log() { printf '[grant-audio-capture] %s\n' "$*"; }
-
-if [ "$(uname -s)" != "Darwin" ]; then
-    log "Not macOS; nothing to do."
-    exit 0
-fi
-
-sip_status="$(csrutil status 2>&1 || true)"
+# Only a fully disabled SIP counts; "unknown (Custom Configuration)" and anything else don't.
+sip_status="$(csrutil status 2>&1 | head -n 1 || true)"
 log "csrutil: $sip_status"
 case "$sip_status" in
-    *disabled*) ;;
+    "System Integrity Protection status: disabled" | "System Integrity Protection status: disabled.") ;;
     *)
-        log "SIP is enabled, so TCC.db can't be written. Skipping; the integration tests will report themselves as skipped."
+        log "SIP isn't fully disabled, so TCC.db won't be written. Skipping; the integration tests will report themselves as skipped."
         exit 0
         ;;
 esac
