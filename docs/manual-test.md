@@ -1,6 +1,18 @@
 # Hush manual test checklist
 
-Run before every release. `make run` builds `Hush.app` and launches it. Test the app bundle, not the bare binary from Xcode's Run button: without the bundle there's no bundle ID or usage description, so permission and Settings misbehave.
+## Before every release
+
+`make integration-test` must pass. It runs Hush's real engines against real Core Audio: process taps, aggregate devices, the process monitor, and what actually reaches the output, including the mute regression test. A plain `make test` uses fake engines and can't catch those bugs.
+
+1. **Install BlackHole 2ch** (a virtual loopback device the end-to-end tests play into and record from): `brew install --cask blackhole-2ch`. If it doesn't show up in Audio MIDI Setup, run `sudo killall coreaudiod` or log out and back in. You don't need to select it as your output: the tests never change the system default output.
+2. **Grant Audio Recording** to the app you run the tests from (Terminal, iTerm or VS Code): System Settings → Privacy & Security → Screen & System Audio Recording, in the System Audio Recording Only list. Quit and reopen that app afterwards. The tests only read this permission and never ask for it, so without it every test is reported as skipped with that instruction.
+3. **Run `make integration-test`.** Every test must pass, none skipped. Without BlackHole the engine-level tests still run, on your default output with a -60 dBFS tone, and the end-to-end tests skip.
+
+Leave the Mac alone while it runs (about a minute): other audio from the terminal app can disturb the level checks.
+
+## Manual checks
+
+Run these before every release too. `make run` builds `Hush.app` and launches it. Test the app bundle, not the bare binary from Xcode's Run button: without the bundle there's no bundle ID or usage description, so permission and Settings misbehave.
 
 - [ ] **Two apps at different levels.** Play audio in two apps (e.g. Music and a browser video). Set one to 30% and the other to 150%. Each changes independently.
 - [ ] **Boost to 200%.** Play a quiet source and raise it to 200%. It's louder, with no harsh clipping on peaks.
