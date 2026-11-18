@@ -68,7 +68,7 @@ import Testing
         #expect(h.factory.live("b")?.mode == .control)
     }
 
-    @Test func adjustingMeteredAppSwapsToControlEngine() throws {
+    @Test func adjustingMeteredAppSwitchesTheSameEngineToControl() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
         h.store.popoverDidAppear()
@@ -76,11 +76,14 @@ import Testing
         #expect(meter.mode == .meterOnly)
 
         h.store.setPercent(50, for: "a")
-        #expect(meter.isStopped)
-        #expect(h.factory.live("a")?.mode == .control)
+        #expect(!meter.isStopped, "converted in place, no new aggregate")
+        #expect(meter.mode == .control)
+        #expect(meter.currentGain == VolumeCurve.gain(percent: 50))
+        #expect(h.factory.made.count == 1)
 
         h.store.setPercent(100, for: "a")
-        #expect(h.factory.live("a")?.mode == .meterOnly)
+        #expect(meter.mode == .meterOnly)
+        #expect(h.factory.made.count == 1)
     }
 
     @Test func outputChangeRebuildsEveryEngine() throws {
@@ -470,16 +473,16 @@ import Testing
         #expect(engine.initialGain == 0, "still muted")
     }
 
-    @Test func mutedAppProcessListChangeReplacesEngine() throws {
+    @Test func mutedAppProcessListChangeUpdatesTheEngineInPlace() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a", objects: [42])])
-        let first = try #require(h.factory.live("a"))
+        let engine = try #require(h.factory.live("a"))
 
         h.processes.emit([makeApp("a", objects: [42, 43])])
-        #expect(first.isStopped)
-        let second = try #require(h.factory.live("a"))
-        #expect(second.processObjectIDs == [42, 43])
-        #expect(second.initialGain == 0)
+        #expect(!engine.isStopped, "a rebuild lets the app through at full level while the old tap goes away")
+        #expect(engine.processObjectIDs == [42, 43])
+        #expect(engine.currentGain == 0, "still muted")
+        #expect(h.factory.made.count == 1)
     }
 
     @Test func outputChangeRebuildsMutedAppsEngine() throws {
@@ -524,15 +527,30 @@ import Testing
         #expect(h.store.engineCount == 0)
     }
 
-    @Test func processListChangeReplacesEngine() throws {
+    @Test func processListChangeUpdatesTheEngineInPlace() throws {
         let h = Harness()
         h.processes.emit([makeApp("a", objects: [42])])
         h.store.setPercent(80, for: "a")
-        let first = try #require(h.factory.live("a"))
+        let engine = try #require(h.factory.live("a"))
 
         h.processes.emit([makeApp("a", objects: [42, 43])])
-        #expect(first.isStopped)
-        #expect(h.factory.live("a")?.processObjectIDs == [42, 43])
+        #expect(!engine.isStopped)
+        #expect(engine.processObjectIDs == [42, 43])
+
+        h.processes.emit([makeApp("a", objects: [43])])  // a helper exited
+        #expect(engine.processObjectIDs == [43])
+        #expect(h.factory.made.count == 1)
+    }
+
+    @Test func meterOnlyProcessListChangeUpdatesTheEngineInPlace() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a", objects: [42])])
+        h.store.popoverDidAppear()
+        let before = h.factory.events.count
+
+        h.processes.emit([makeApp("a", objects: [42, 43])])
+        #expect(Array(h.factory.events.dropFirst(before)) == ["update a [42, 43]"])
+        #expect(h.factory.live("a")?.mode == .meterOnly)
     }
 
     @Test func showInactiveAppsIncludesPausedAndSavedApps() {
@@ -639,6 +657,11 @@ import Testing
         #expect(h.store.meterLevels.isEmpty)
     }
 
+    @Test func meterLoopSleepsWithATenPercentTolerance() {
+        #expect(MixerStore.meterTolerance == MixerStore.meterInterval / 10)
+        #expect(MixerStore.meterTolerance > .zero)
+    }
+
     @Test func meterPollingDoesNotWriteAfterPopoverCloses() async throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
@@ -673,57 +696,110 @@ import Testing
         #expect(h.store.playingCount == 2)
     }
 
-    @Test func popoverVisibilityTogglesFastProcessPolling() {
+    @Test func popoverVisibilityPollsEveryProcess() {
         let h = Harness()
-        #expect(h.processes.fastPollingCalls.isEmpty)
+        h.processes.emit([makeApp("a", objects: [1]), makeApp("b", playing: false, objects: [2])])
+        #expect(h.processes.pollingCalls.isEmpty, "nothing depends on running state: no polling")
 
         h.store.popoverDidAppear()
-        #expect(h.processes.fastPollingCalls == [true])
+        #expect(h.processes.pollingCalls == [.all], "live strips")
 
         h.store.popoverDidDisappear()
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.all, .off])
     }
 
-    @Test func presentLoweredAppTurnsFastPollingOnAndResetTurnsItOff() {
+    @Test func idleLoweredAppPollsOnlyItsOwnObjects() {
         let h = Harness()
-        h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.fastPollingCalls.isEmpty)
+        h.processes.emit([makeApp("a", playing: false, objects: [5, 6]), makeApp("b", playing: false, objects: [7])])
 
         h.store.setPercent(60, for: "a")
-        #expect(h.processes.fastPollingCalls == [true], "a missed start would otherwise play unprocessed for up to the slow interval")
+        #expect(h.processes.pollingCalls == [.objects([5, 6])], "a missed start would otherwise play unprocessed")
 
         h.store.setPercent(70, for: "a")
-        #expect(h.processes.fastPollingCalls == [true], "pushed only when it changes")
+        #expect(h.processes.pollingCalls == [.objects([5, 6])], "pushed only when it changes")
 
         h.store.resetVolume(for: "a")
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.objects([5, 6]), .off])
     }
 
-    @Test func savedLoweredSettingTurnsFastPollingOnWhenAppAppearsAndOffWhenItLeaves() {
+    @Test func playingAdjustedAppIsPolledSoAMissedStopIsCaught() {
+        // The HAL often skips IsRunningOutput on a browser pause; without polling, the control
+        // engine would keep running on silence (device and Bluetooth awake, isPlaying stale).
+        let h = Harness()
+        h.processes.emit([makeApp("a", objects: [5])])
+        h.store.setPercent(60, for: "a")
+        #expect(h.factory.live("a")?.mode == .control)
+        #expect(h.processes.pollingCalls == [.objects([5])])
+
+        h.processes.emit([makeApp("a", playing: false, objects: [5])])
+        #expect(h.processes.pollingCalls == [.objects([5])], "still polled, so it's caught when it starts again")
+    }
+
+    @Test func aStopFoundByThePollTearsDownTheControlEngine() throws {
+        let h = Harness(document: SettingsDocument(apps: ["zen": mutedSetting()]))
+        h.processes.emit([makeApp("zen", objects: [7, 8])])
+        let engine = try #require(h.factory.live("zen"))
+        #expect(h.processes.pollingCalls == [.objects([7, 8])])
+
+        // What the monitor publishes when its poll reads IsRunningOutput = 0 for both objects.
+        h.processes.emit([makeApp("zen", playing: false, objects: [7, 8])])
+        #expect(engine.isStopped)
+        #expect(h.store.engineCount == 0)
+    }
+
+    @Test func staleProcessListAndModeChangeUpdateThenSwitchAndRebuildCleanlyIfTheSwitchFails() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a", objects: [42, 43])])
+        h.store.popoverDidAppear()
+        let meter = try #require(h.factory.live("a"))
+        meter.forceProcessObjectIDs([42])  // as if a helper joined since the engine was last updated
+        meter.switchError = FakeError()
+        let before = h.factory.events.count
+
+        h.store.setPercent(50, for: "a")
+        #expect(Array(h.factory.events.dropFirst(before)) == ["update a [42, 43]", "switch a control", "make a control", "stop a meterOnly"])
+        #expect(meter.isStopped)
+        let replacement = try #require(h.factory.live("a"))
+        #expect(replacement.mode == .control)
+        #expect(replacement.processObjectIDs == [42, 43])
+        #expect(replacement.initialGain == VolumeCurve.gain(percent: 50))
+        #expect(h.store.strips.first?.engineError == nil)
+    }
+
+    @Test func savedLoweredSettingPollsWhenTheAppAppearsAndStopsWhenItLeaves() {
         let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 150, lastAdjusted: Harness.fixedNow)]))
-        h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.fastPollingCalls == [true])
+        h.processes.emit([makeApp("a", playing: false, objects: [9])])
+        #expect(h.processes.pollingCalls == [.objects([9])])
+
+        h.processes.emit([makeApp("a", playing: false, objects: [9, 10])])
+        #expect(h.processes.pollingCalls == [.objects([9]), .objects([9, 10])], "a new helper is polled too")
 
         h.processes.emit([])
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.objects([9]), .objects([9, 10]), .off])
     }
 
-    @Test func presentMutedAppTurnsFastPollingOn() {
+    @Test func idleMutedAppIsPolled() {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.fastPollingCalls == [true], "a muted app's missed start plays unmuted until the next poll")
+        #expect(h.processes.pollingCalls == [.objects([42])], "a muted app's missed start plays unmuted until the next poll")
 
         h.store.toggleMute(for: "a")
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.objects([42]), .off])
     }
 
-    @Test func loweredAppKeepsFastPollingAfterPopoverCloses() {
+    @Test func idleLoweredAppKeepsBeingPolledAfterThePopoverCloses() {
         let h = Harness()
-        h.processes.emit([makeApp("a")])
+        h.processes.emit([makeApp("a", playing: false)])
         h.store.setPercent(60, for: "a")
         h.store.popoverDidAppear()
         h.store.popoverDidDisappear()
-        #expect(h.processes.fastPollingCalls == [true])
+        #expect(h.processes.pollingCalls == [.objects([42]), .all, .objects([42])])
+    }
+
+    @Test func withoutPermissionAdjustedAppsAreNotPolled() {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]), permission: .denied)
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(h.processes.pollingCalls.isEmpty, "no engine can start, so nothing depends on it")
     }
 
     @Test func mutingPlayingLoweredAppChangesGainWithoutReplacingEngine() throws {
@@ -738,7 +814,7 @@ import Testing
         #expect(engine.currentGain == 0)
     }
 
-    @Test func controlToMeterOnlySwapIsMakeBeforeBreak() throws {
+    @Test func controlToMeterOnlySwitchesInPlace() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
         h.store.setPercent(50, for: "a")
@@ -746,33 +822,62 @@ import Testing
         let before = h.factory.events.count
 
         h.store.resetVolume(for: "a")
-        #expect(Array(h.factory.events.dropFirst(before)) == ["make a meterOnly", "stop a control"])
+        #expect(Array(h.factory.events.dropFirst(before)) == ["switch a meterOnly"])
         #expect(h.factory.live("a")?.mode == .meterOnly)
     }
 
-    @Test func processListChangeMakesNewControlEngineBeforeStoppingOldOne() throws {
+    @Test func processListChangeUpdatesInsteadOfRebuilding() throws {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a", objects: [42])])
-        let old = try #require(h.factory.live("a"))
         let before = h.factory.events.count
 
         h.processes.emit([makeApp("a", objects: [42, 43])])
-        #expect(Array(h.factory.events.dropFirst(before)) == ["make a control", "stop a control"])
-        #expect(old.isStopped)
-        #expect(h.factory.live("a")?.processObjectIDs == [42, 43])
+        #expect(Array(h.factory.events.dropFirst(before)) == ["update a [42, 43]"])
     }
 
-    @Test func meterToControlSwapIsMakeBeforeBreakAndClearsMeterLevel() throws {
+    @Test func failedInPlaceUpdateFallsBackToMakeBeforeBreak() throws {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
+        h.processes.emit([makeApp("a", objects: [42])])
+        let old = try #require(h.factory.live("a"))
+        old.updateError = FakeError()
+        let before = h.factory.events.count
+
+        h.processes.emit([makeApp("a", objects: [42, 43])])
+        #expect(Array(h.factory.events.dropFirst(before)) == ["update a [42, 43]", "make a control", "stop a control"])
+        #expect(old.isStopped)
+        let replacement = try #require(h.factory.live("a"))
+        #expect(replacement.processObjectIDs == [42, 43])
+        #expect(replacement.initialGain == 0)
+    }
+
+    @Test func meterToControlSwitchesInPlaceAndKeepsTheMeter() throws {
         let h = Harness()
         h.processes.emit([makeApp("a")])
         h.store.popoverDidAppear()
         let meter = try #require(h.factory.live("a"))
         meter.peak = 0.5
         h.store.tickMeters(elapsed: 1.0 / 30.0)
+        let level = h.store.meterLevels["a"]
         let before = h.factory.events.count
 
         h.store.setPercent(50, for: "a")
-        #expect(Array(h.factory.events.dropFirst(before)) == ["make a control", "stop a meterOnly"])
+        #expect(Array(h.factory.events.dropFirst(before)) == ["switch a control"])
+        #expect(h.store.meterLevels["a"] == level, "the same tap keeps metering")
+    }
+
+    @Test func failedModeSwitchFallsBackToMakeBeforeBreakAndClearsMeterLevel() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a")])
+        h.store.popoverDidAppear()
+        let meter = try #require(h.factory.live("a"))
+        meter.switchError = FakeError()
+        meter.peak = 0.5
+        h.store.tickMeters(elapsed: 1.0 / 30.0)
+        let before = h.factory.events.count
+
+        h.store.setPercent(50, for: "a")
+        #expect(Array(h.factory.events.dropFirst(before)) == ["switch a control", "make a control", "stop a meterOnly"])
+        #expect(h.factory.live("a")?.mode == .control)
         #expect(h.store.meterLevels["a"] == nil, "the new engine starts with a fresh meter")
     }
 
@@ -782,6 +887,7 @@ import Testing
         h.store.popoverDidAppear()
         let meter = try #require(h.factory.live("a"))
 
+        meter.switchError = FakeError()
         h.factory.error = FakeError()
         h.store.setPercent(50, for: "a")
         #expect(meter.isStopped, "never keep an engine in the wrong mode")

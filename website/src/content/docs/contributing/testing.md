@@ -31,7 +31,9 @@ Fakes for the `MixerStore` dependencies live in `Tests/HushUITests/`. New behavi
 
 ## Integration tests
 
-The unit tests use fake engines, so they keep passing even when real muting breaks. The `HushIntegrationTests` target plays a real tone from a helper process (`HushToneGenerator`), lets Hush tap it, and checks what Core Audio does: that taps receive audio, that gain and boost scale the output, that `stop()` leaves no aggregate device behind, that the process monitor notices playback starting and stopping, and, through the BlackHole loopback, that mute really silences the app, that 50% is 12 dB down, and that swapping engines never lets a burst or a gap through.
+The unit tests use fake engines, so they keep passing even when real muting breaks. The `HushIntegrationTests` target plays a real tone from a helper process (`HushToneGenerator`), lets Hush tap it, and checks what Core Audio does: that taps receive audio, that gain and boost scale the output, that `stop()` leaves no aggregate device behind, that the process monitor notices playback starting and stopping, and, through the BlackHole loopback, that mute really silences the app, that 50% is 12 dB down, and that changing a running engine in place (a helper process joining or leaving, or a metered app being adjusted) never lets a burst or a gap through.
+
+Gaps are measured as runs of digital silence, and most changes must not leave one longer than one audio buffer. The takeover tests (a metered app being adjusted, and a first adjust that creates a control engine on a playing app) allow one buffer plus 8 frames: when a tap starts muting a process that's already playing, Core Audio drops one buffer of it, whatever Hush does. That's a [known limitation](/Hush/help/known-limitations/#a-tiny-dropout-when-hush-takes-over-a-playing-app): a tiny (~10 ms) dropout when Hush starts adjusting an app that's already playing. Each swap test prints a `[swap]` line with the longest zero run and how long the level sat above baseline.
 
 A plain `swift test` (and CI's build job) reports these tests as skipped. To run them:
 

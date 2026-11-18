@@ -23,8 +23,8 @@ final class FakeProcessSource: AudioProcessSource {
         onChange?(apps)
     }
 
-    private(set) var fastPollingCalls: [Bool] = []
-    func setFastPolling(_ fast: Bool) { fastPollingCalls.append(fast) }
+    private(set) var pollingCalls: [ProcessPolling] = []
+    func setPolling(_ polling: ProcessPolling) { pollingCalls.append(polling) }
 }
 
 @MainActor
@@ -46,13 +46,16 @@ final class FakeOutputSource: OutputDeviceSource {
 @MainActor
 final class FakeEngine: AudioEngineHandle {
     let appID: String
-    let mode: EngineMode
-    let processObjectIDs: [AudioObjectID]
+    private(set) var mode: EngineMode
+    private(set) var processObjectIDs: [AudioObjectID]
     let initialGain: Float
     private(set) var currentGain: Float
     private(set) var isStopped = false
     private(set) var rebuiltDeviceIDs: [AudioObjectID] = []
     var rebuildError: (any Error)?
+    /// Thrown by `updateProcesses` / `switchMode`, to exercise the make-before-break fallback.
+    var updateError: (any Error)?
+    var switchError: (any Error)?
     var peak: Float = 0
     /// Shared ordered event log, set by the factory.
     var log: ((String) -> Void)?
@@ -76,6 +79,22 @@ final class FakeEngine: AudioEngineHandle {
     func rebuild(outputDeviceID: AudioObjectID) throws {
         if let rebuildError { throw rebuildError }
         rebuiltDeviceIDs.append(outputDeviceID)
+    }
+
+    /// Test hook: makes the engine's list differ from the app's without going through the store.
+    func forceProcessObjectIDs(_ ids: [AudioObjectID]) { processObjectIDs = ids }
+
+    func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws {
+        log?("update \(appID) \(processObjectIDs)")
+        if let updateError { throw updateError }
+        self.processObjectIDs = processObjectIDs
+    }
+
+    func switchMode(to mode: EngineMode, gain: Float) throws {
+        log?("switch \(appID) \(mode)")
+        if let switchError { throw switchError }
+        self.mode = mode
+        currentGain = gain
     }
 }
 

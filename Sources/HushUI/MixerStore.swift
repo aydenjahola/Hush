@@ -62,8 +62,8 @@ public final class MixerStore {
     @ObservationIgnored private var hasPendingSave = false
     @ObservationIgnored private var meterTask: Task<Void, Never>?
     @ObservationIgnored let meterBank = MeterBank()
-    /// Last value pushed to `processSource.setFastPolling`.
-    @ObservationIgnored private var isFastPolling = false
+    /// Last value pushed to `processSource.setPolling`.
+    @ObservationIgnored private var currentPolling: ProcessPolling = .off
     /// The first-launch permission request, if one was made (exposed for tests).
     @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
@@ -247,6 +247,8 @@ public final class MixerStore {
 
     /// About 30 Hz. Engines report the peak since the last read, so no peak is missed between ticks.
     static let meterInterval: Duration = .milliseconds(33)
+    /// About 10%: lets the system coalesce meter wakeups; the ballistics use the real elapsed time.
+    static let meterTolerance: Duration = meterInterval / 10
 
     private func startMeterPolling() {
         meterTask?.cancel()
@@ -254,7 +256,7 @@ public final class MixerStore {
             let clock = ContinuousClock()
             var last = clock.now
             while !Task.isCancelled {
-                try? await Task.sleep(for: Self.meterInterval, tolerance: .milliseconds(10))
+                try? await Task.sleep(for: Self.meterInterval, tolerance: Self.meterTolerance)
                 guard !Task.isCancelled, let self else { break }
                 let current = clock.now
                 let elapsed = (current - last) / .seconds(1)
@@ -355,8 +357,15 @@ public final class MixerStore {
                 tearDownEngine(id)
                 continue
             }
-            // Make before break: the old engine keeps the app muted or processed until the new one
-            // exists, so a mode or process-list change doesn't let audio through in between.
+            // Change the running engine in place when possible: destroying a muted tap lets the
+            // app through at full level until a replacement's IO runs, and a new aggregate starts
+            // with a gap. A helper spawning (process list) or the user adjusting a metered app
+            // (mode) therefore keeps the same tap, aggregate and IOProc.
+            if let existing, applyInPlace(to: existing, id: id, processObjectIDs: app.processObjectIDs, mode: mode, setting: setting) {
+                continue
+            }
+            // Fallback, make before break: the old engine keeps the app muted or processed until
+            // the new one exists.
             do {
                 let replacement = try engineFactory.makeEngine(
                     appID: id,
@@ -374,17 +383,55 @@ public final class MixerStore {
         }
     }
 
-    /// Fast process polling while the popover is open (live strips) or while any present app
-    /// is muted, lowered or boosted: its control engine starts only once Hush sees it playing,
-    /// so if the HAL misses the start, the next poll is what starts processing it.
-    private func updatePolling() {
-        let needsPlayingTimeEngine = controlsEnabled && apps.contains { app in
-            settings[app.id]?.needsEngine ?? false
+    /// Updates the process list first, then the mode. Returns false (after logging) if the engine
+    /// refused either change, so the caller replaces it.
+    private func applyInPlace(
+        to engine: any AudioEngineHandle,
+        id: String,
+        processObjectIDs: [AudioObjectID],
+        mode: EngineMode,
+        setting: AppVolumeSetting
+    ) -> Bool {
+        do {
+            if engine.processObjectIDs != processObjectIDs {
+                try engine.updateProcesses(processObjectIDs)
+            }
+            if engine.mode != mode {
+                try engine.switchMode(to: mode, gain: setting.effectiveGain)
+            } else if mode == .control {
+                engine.setGain(setting.effectiveGain)
+            }
+            return true
+        } catch {
+            logger.error("In-place change for \(id, privacy: .public) failed, rebuilding: \(String(describing: error), privacy: .public)")
+            return false
         }
-        let fast = isPopoverVisible || needsPlayingTimeEngine
-        guard fast != isFastPolling else { return }
-        isFastPolling = fast
-        processSource.setFastPolling(fast)
+    }
+
+    /// Polls only what decisions depend on:
+    /// - every process while the popover is open (live strips);
+    /// - otherwise the objects of every present muted, lowered or boosted app, playing or not. Its
+    ///   control engine starts only once Hush sees it play and stops once Hush sees it stop. The HAL
+    ///   often skips both notifications (a browser pausing and resuming), so the poll catches a
+    ///   missed start (audio unprocessed) and a missed stop (an IOProc running on silence keeps the
+    ///   output device and Bluetooth awake).
+    /// - nothing otherwise; the HAL listeners still give best-effort updates.
+    private func updatePolling() {
+        let polling: ProcessPolling
+        if isPopoverVisible {
+            polling = .all
+        } else {
+            var objects: Set<AudioObjectID> = []
+            if controlsEnabled {
+                for app in apps where settings[app.id]?.needsEngine ?? false {
+                    objects.formUnion(app.processObjectIDs)
+                }
+            }
+            polling = objects.isEmpty ? .off : .objects(objects)
+        }
+        guard polling != currentPolling else { return }
+        currentPolling = polling
+        processSource.setPolling(polling)
     }
 
     private func tearDownEngine(_ id: String) {

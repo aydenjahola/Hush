@@ -17,9 +17,8 @@ extension CoreAudioIntegration {
         func controlEngineReceivesAudio() async throws {
             IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
-            let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
+            let (tone, object) = try await ToneProcess.launch(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
-            let object = try await tone.processObject()
 
             let engine = AppAudioEngine(
                 appID: "tone", processObjectIDs: [object], mode: .control, initialGain: 1,
@@ -37,9 +36,8 @@ extension CoreAudioIntegration {
         func gainScalesOutputPeak() async throws {
             IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
-            let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
+            let (tone, object) = try await ToneProcess.launch(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
-            let object = try await tone.processObject()
 
             let engine = AppAudioEngine(
                 appID: "tone", processObjectIDs: [object], mode: .control, initialGain: 1,
@@ -73,9 +71,8 @@ extension CoreAudioIntegration {
             // Into BlackHole a -3 dBFS tone doubled would reach +3 dBFS without the limiter.
             // On real speakers it stays at -60 dBFS, so only the 2x scaling is checked.
             let level = output.isBlackHole ? -3.0 : output.quietLevel
-            let tone = try ToneProcess(deviceUID: output.device.uid, level: level)
+            let (tone, object) = try await ToneProcess.launch(deviceUID: output.device.uid, level: level)
             defer { tone.terminate() }
-            let object = try await tone.processObject()
 
             let engine = AppAudioEngine(
                 appID: "tone", processObjectIDs: [object], mode: .control,
@@ -102,9 +99,8 @@ extension CoreAudioIntegration {
         func meterOnlyLeavesSourcePlaying() async throws {
             IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
-            let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
+            let (tone, object) = try await ToneProcess.launch(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
-            let object = try await tone.processObject()
 
             let capture = output.isBlackHole ? BlackHoleCapture(device: output.device.id) : nil
             defer { capture?.stop() }
@@ -136,9 +132,8 @@ extension CoreAudioIntegration {
         func stopTearsEverythingDown() async throws {
             IntegrationEnvironment.recordRun(group: "A")
             let output = try TestOutput.resolve()
-            let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
+            let (tone, object) = try await ToneProcess.launch(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
-            let object = try await tone.processObject()
 
             let aggregatesBefore = Set(AudioDevices.hushAggregateUIDs())
             let tapsBefore = AudioDevices.tapIDs().map(Set.init)
@@ -181,11 +176,10 @@ extension CoreAudioIntegration {
             let latest = AppsBox()
             monitor.start { latest.apps = $0 }
             defer { monitor.stop() }
-            monitor.setFastPolling(true)
+            monitor.setPolling(.all)
 
-            let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
+            let (tone, _) = try await ToneProcess.launch(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }
-            _ = try await tone.processObject()
 
             func toneApp() -> AudioApp? {
                 // Re-resolve each time: the process object can change when playback restarts.

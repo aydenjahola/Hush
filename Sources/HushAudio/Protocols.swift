@@ -1,15 +1,25 @@
 import CoreAudio
 
+/// Which process objects to poll for running-state changes the HAL may not notify.
+public enum ProcessPolling: Equatable, Sendable {
+    /// No polling; listeners still give best-effort updates.
+    case off
+    /// Only these objects (ones that don't exist are ignored).
+    case objects(Set<AudioObjectID>)
+    /// Every process object, including ones that appear later.
+    case all
+}
+
 @MainActor
 public protocol AudioProcessSource: AnyObject {
     /// Begins monitoring. Calls `onChange` immediately with the current list, then on every change.
     func start(onChange: @escaping @MainActor ([AudioApp]) -> Void)
-    /// Polls running state more often or less often. The caller decides when fast polling is worth it.
-    func setFastPolling(_ fast: Bool)
+    /// Chooses what to poll. The caller knows which running states decisions depend on.
+    func setPolling(_ polling: ProcessPolling)
 }
 
 public extension AudioProcessSource {
-    func setFastPolling(_ fast: Bool) {}
+    func setPolling(_ polling: ProcessPolling) {}
 }
 
 @MainActor
@@ -28,6 +38,14 @@ public protocol AudioEngineHandle: AnyObject {
     /// Returns the peak level seen since the previous call, then resets it.
     func currentPeak() -> Float
     func rebuild(outputDeviceID: AudioObjectID) throws
+    /// Retargets the running tap at a new process list in place (same tap, aggregate and IOProc),
+    /// so processes already tapped stay muted throughout. Throws if the change can't be applied;
+    /// the engine is then unchanged and the caller can rebuild instead.
+    func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws
+    /// Converts the running engine between `.meterOnly` and `.control` in place. `gain` is the
+    /// control gain (ignored for `.meterOnly`). Throws if the change can't be applied; the engine
+    /// is then unchanged and the caller can rebuild instead.
+    func switchMode(to mode: EngineMode, gain: Float) throws
 }
 
 @MainActor
