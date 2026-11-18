@@ -155,7 +155,7 @@ package final class MixerStore {
     // MARK: User actions
 
     package func setPercent(_ percent: Int, for id: String) {
-        guard controlsEnabled else { return }
+        guard controlsEnabled, !isHidden(id) else { return }
         var setting = settings[id] ?? AppVolumeSetting()
         setting.setPercent(percent, maxPercent: maxPercent)
         setting.lastAdjusted = now()
@@ -272,7 +272,12 @@ package final class MixerStore {
         settings = result.settings
         engineErrors[id] = nil
         meterOnlyErrorIDs.remove(id)
+        stallRetryIDs.remove(id)
         hiddenAppsDidChange()
+    }
+
+    func isHidden(_ id: String) -> Bool {
+        hiddenApps.contains { $0.bundleID == id }
     }
 
     /// Shows a hidden app in the mixer again, at 100% and unmuted.
@@ -394,7 +399,9 @@ package final class MixerStore {
 
     // MARK: Core logic
 
+    /// Hidden apps always play at 100%, so nothing may write a level for one.
     private func commit(_ setting: AppVolumeSetting, for id: String) {
+        guard !isHidden(id) else { return }
         settings[id] = setting.isDefault ? nil : setting
         engineErrors[id] = nil
         settingsDidChange()

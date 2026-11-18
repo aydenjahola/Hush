@@ -78,14 +78,30 @@ struct StripContextMenu: ViewModifier {
         if isPreview {
             content
         } else {
-            content.contextMenu {
-                Button(L10n.hideApp(strip.displayName)) {
-                    actions.hide(displayName: strip.displayName)
+            content
+                .contextMenu {
+                    Button(L10n.hideApp(strip.displayName)) {
+                        actions.hide(displayName: strip.displayName)
+                    }
+                    .help(Text(L10n.hideAppHelp(strip.displayName)))
                 }
-                .help(Text(L10n.hideAppHelp(strip.displayName)))
-            }
+                // The strip's container isn't an accessibility element, so VoiceOver can't open the
+                // menu; the "<App> volume" control offers the same action instead.
+                .environment(\.stripHideAction, StripHideAction(appName: strip.displayName, actions: actions))
         }
     }
+}
+
+/// "Hide <App>" for the strip's volume control to offer as a VoiceOver action.
+struct StripHideAction {
+    let appName: String
+    let actions: StripActions
+
+    @MainActor func perform() { actions.hide(displayName: appName) }
+}
+
+extension EnvironmentValues {
+    @Entry var stripHideAction: StripHideAction?
 }
 
 extension View {
