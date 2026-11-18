@@ -44,6 +44,9 @@ package struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
         /// Only ⌘ or ⌘⇧ on an ordinary key, such as ⌘C or ⌘⇧4. Apps use these for their own
         /// commands, and a global shortcut would take them over in every app.
         case standardShortcut
+        /// A combination macOS keeps for itself whatever the settings: ⌥⌘Esc (Force Quit) and
+        /// ⌥⌘⇧Esc (force quit the front app).
+        case reservedByMacOS
     }
 
     /// A function key is allowed on its own or with any modifiers. Any other key needs ⌥ or ⌃,
@@ -52,11 +55,10 @@ package struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
         if Self.isFunctionKey(keyCode) { return .ok }
         if modifiers.isDisjoint(with: [.command, .option, .control]) { return .needsModifier }
         if modifiers.isSubset(of: [.command, .shift]) { return .standardShortcut }
-        // ⌥⌘Esc opens Force Quit (⌥⌘⇧Esc force quits the front app), so leave it to macOS.
         if keyCode == KeyCode.escape, modifiers.isSuperset(of: [.command, .option]),
             modifiers.isSubset(of: [.command, .option, .shift])
         {
-            return .standardShortcut
+            return .reservedByMacOS
         }
         return .ok
     }

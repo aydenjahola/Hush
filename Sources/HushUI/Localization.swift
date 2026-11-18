@@ -109,6 +109,8 @@ package enum L10n {
     package static let shortcutInUse = resource("That shortcut is in use. Try another.")
     package static let shortcutNeedsModifier = resource("Include ⌥ or ⌃, or use a function key.")
     package static let shortcutIsStandard = resource("That's a standard app shortcut. Add ⌥ or ⌃.")
+    package static let shortcutReservedByMacOS = resource("macOS uses that shortcut. Try another.")
+    package static let shortcutCleared = resource("Keyboard shortcut cleared")
     package static let spaceKey = resource("Space")
     package static func unknownKey(_ keyCode: Int) -> LocalizedStringResource { resource("Key \(keyCode)") }
     package static let showInactiveApps = resource("Show apps that aren't playing")
@@ -195,7 +197,8 @@ package enum L10n {
             launchAtLoginUnavailableHelp, openLoginItems, maximumBoost, keyboardShortcut,
             recordShortcut, typeShortcut, noShortcut, clearShortcut, shortcutRecordHint, shortcutSaved("x"),
             shortcutRecordingHint,
-            shortcutInUse, shortcutNeedsModifier, shortcutIsStandard, spaceKey, unknownKey(50), showInactiveApps,
+            shortcutInUse, shortcutNeedsModifier, shortcutIsStandard, shortcutReservedByMacOS, shortcutCleared,
+            spaceKey, unknownKey(50), showInactiveApps,
             levels,
             resetAllLevelsButton, resetAllLevelsTitle, resetAllLevels, resetAllLevelsMessage, updates,
             checkAutomatically, checkNow, about, version, localVersion("x", commit: "y"),

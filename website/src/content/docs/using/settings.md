@@ -39,10 +39,10 @@ Strips for apps that aren't playing are dimmed. An app that isn't running is sho
 
 ### Keyboard shortcut
 
-A key combination that opens the mixer from any app, as if you'd clicked the Hush icon. Press it again to close the mixer. There's none by default.
+A key combination that opens the mixer from any app, as if you'd clicked the Hush icon. Press it again to close the mixer. There's none by default. It works in full-screen apps too, and does nothing only when the Hush icon is turned off in **System Settings → Menu Bar**.
 
 - To set one, click **Record Shortcut**, then press the combination, such as **⌥⌘H**. It's saved straight away and shown with the standard key symbols.
-- The combination must include **⌥** or **⌃** (with or without **⌘** and **⇧**). **⌘** or **⌘⇧** on their own aren't enough, because apps use those for their own commands, such as **⌘C** or **⌘⇧4**. **⌥⌘Esc** (Force Quit) is left to macOS too. For these, Hush shows **"That's a standard app shortcut. Add ⌥ or ⌃."** A function key (**F1** to **F20**) can be used on its own or with any modifiers.
+- The combination must include **⌥** or **⌃** (with or without **⌘** and **⇧**). **⌘** or **⌘⇧** on their own aren't enough, because apps use those for their own commands, such as **⌘C** or **⌘⇧4**. For these, Hush shows **"That's a standard app shortcut. Add ⌥ or ⌃."** **⌥⌘Esc** (Force Quit) is left to macOS: Hush shows **"macOS uses that shortcut. Try another."** A function key (**F1** to **F20**) can be used on its own or with any modifiers.
 - Press **Esc** while recording to cancel and keep the current shortcut.
 - To remove the shortcut, click the **ⓧ** button next to it.
 

@@ -89,8 +89,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     }
 
     /// Opens or closes the mixer, as a left-click on the icon does; the global shortcut calls
-    /// this. The popover hangs off the icon, so it doesn't open while the icon isn't on screen
-    /// (hidden by the system, for example).
+    /// this. The popover hangs off the icon, so it doesn't open while the icon is turned off in
+    /// System Settings → Menu Bar. While the menu bar itself is hidden (in a full-screen app, or
+    /// set to hide automatically), it still opens, anchored where the icon sits at the top of
+    /// the screen.
     func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
@@ -100,9 +102,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     }
 
     private var isIconOnScreen: Bool {
-        guard statusItem.isVisible, let window = statusItem.button?.window, window.isVisible,
-            window.occlusionState.contains(.visible)
-        else { return false }
+        // Not occlusionState: a hidden menu bar reports the icon as occluded, and the shortcut
+        // must still work then.
+        guard statusItem.isVisible, let window = statusItem.button?.window, window.isVisible else { return false }
         return NSScreen.screens.contains { $0.frame.intersects(window.frame) }
     }
 

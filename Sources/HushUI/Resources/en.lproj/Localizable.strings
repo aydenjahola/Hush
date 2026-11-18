@@ -240,6 +240,12 @@
 /* Settings > General: shown when the recorded shortcut uses only ⌘ or ⌘⇧, like an app's own menu commands (⌘C, ⌘Q). Keep the key symbols as they are. */
 "That's a standard app shortcut. Add ⌥ or ⌃." = "That's a standard app shortcut. Add ⌥ or ⌃.";
 
+/* Settings > General: shown when the recorded shortcut is one macOS always keeps, such as ⌥⌘Esc for Force Quit. */
+"macOS uses that shortcut. Try another." = "macOS uses that shortcut. Try another.";
+
+/* VoiceOver announcement after the keyboard shortcut is removed with the clear button. */
+"Keyboard shortcut cleared" = "Keyboard shortcut cleared";
+
 /* Name of the space bar in a keyboard shortcut, as in "⌥⌘Space". */
 "Space" = "Space";
 

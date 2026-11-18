@@ -124,7 +124,7 @@ The optional shortcut that toggles the popover uses Carbon's `RegisterEventHotKe
 - "In use" detection is best effort. Registration is refused when an enabled system shortcut (`CopySymbolicHotKeys`) already uses the combination, or when `RegisterEventHotKey` fails, which happens only against another app's exclusive registration. Non-exclusive registrations by other apps aren't detected and can overlap. Hush registers non-exclusively itself (no `kEventHotKeyExclusive`). The previous shortcut is kept.
 - A saved shortcut that the current rules don't allow stays saved but isn't registered, and Settings shows why.
 - While recording, the Settings recorder uses a local `NSEvent` key-down monitor. It only takes events for the Settings window, so the popover and menus keep their keys, and recording stops when that window resigns key. The shortcut is unregistered meanwhile, so pressing it records it.
-- `StatusItemController.togglePopover()` is what the shortcut calls. It does nothing unless the icon's window is visible, unoccluded and on a screen.
+- `StatusItemController.togglePopover()` is what the shortcut calls. It does nothing unless the status item is visible and its window is visible and on a screen, which fails only when the icon is turned off in System Settings → Menu Bar. Occlusion isn't checked, so the shortcut still works while the menu bar is hidden (in full-screen apps, or with auto-hide), and the popover appears anchored at the top of the screen.
 
 ## Update notifier: `UpdateChecker`
 

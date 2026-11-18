@@ -28,17 +28,62 @@ private final class FakeHotKey: HotKeyRegistering {
     func press() { if registered != nil { onPress?() } }
 }
 
+/// Collects VoiceOver announcements instead of posting them.
+@MainActor
+private final class Spoken {
+    private(set) var lines: [String] = []
+    func say(_ line: String) { lines.append(line) }
+}
+
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct GlobalShortcutControllerTests {
     private let optionCommandH = GlobalShortcut(keyCode: 0x04, modifiers: [.option, .command])
     private let controlF5 = GlobalShortcut(keyCode: GlobalShortcut.KeyCode.f5, modifiers: .control)
+    private let spoken = Spoken()
+
+    @Test func forceQuitIsReservedByMacOSNotAStandardShortcut() {
+        let (controller, hotKey, persister) = make(saved: optionCommandH)
+        controller.start()
+        controller.beginRecording()
+        let forceQuit = GlobalShortcut(keyCode: GlobalShortcut.KeyCode.escape, modifiers: [.command, .option])
+        #expect(!controller.record(forceQuit))
+        #expect(controller.problem == .reservedByMacOS)
+        #expect(controller.isRecording)
+        #expect(hotKey.registrations == [optionCommandH])
+        #expect(persister.saved.isEmpty)
+        #expect(spoken.lines == ["macOS uses that shortcut. Try another."])
+    }
+
+    @Test func everyRejectedAttemptIsAnnouncedEvenWhenRepeated() {
+        let (controller, _, _) = make()
+        controller.start()
+        controller.beginRecording()
+        let plainH = GlobalShortcut(keyCode: 0x04, modifiers: [])
+        controller.record(plainH)
+        controller.record(plainH)
+        #expect(spoken.lines == Array(repeating: "Include ⌥ or ⌃, or use a function key.", count: 2))
+    }
+
+    @Test func savingAndClearingAreAnnounced() {
+        let (controller, hotKey, _) = make()
+        hotKey.taken = [controlF5]
+        controller.start()
+        controller.beginRecording()
+        controller.record(controlF5)
+        controller.beginRecording()
+        controller.record(optionCommandH)
+        controller.clear()
+        let saved = String(localized: L10n.shortcutSaved(ShortcutFormatter.string(for: optionCommandH)))
+        #expect(
+            spoken.lines == ["That shortcut is in use. Try another.", saved, "Keyboard shortcut cleared"])
+    }
 
     private func make(
         saved: GlobalShortcut? = nil
     ) -> (GlobalShortcutController, FakeHotKey, FakePersister) {
         let persister = FakePersister(document: SettingsDocument(globalShortcut: saved))
         let hotKey = FakeHotKey()
-        let controller = GlobalShortcutController(persister: persister, hotKey: hotKey)
+        let controller = GlobalShortcutController(persister: persister, hotKey: hotKey, announce: spoken.say)
         return (controller, hotKey, persister)
     }
 
@@ -134,7 +179,7 @@ private final class FakeHotKey: HotKeyRegistering {
         #expect(hotKey.registrations == [optionCommandH])  // only the one from start()
         #expect(persister.saved.isEmpty)
         #expect(
-            String(localized: KeyboardShortcutRow.message(for: .standardShortcut))
+            String(localized: GlobalShortcutController.Problem.standardShortcut.message)
                 == "That's a standard app shortcut. Add ⌥ or ⌃.")
     }
 
@@ -185,7 +230,7 @@ private final class FakeHotKey: HotKeyRegistering {
             keyCode: Int(GlobalShortcut.KeyCode.upArrow), carbonModifiers: controlKey, isEnabled: true)
         let hotKey = GlobalHotKey(symbolicHotKeys: { [missionControl] })
         let persister = FakePersister(document: SettingsDocument())
-        let controller = GlobalShortcutController(persister: persister, hotKey: hotKey)
+        let controller = GlobalShortcutController(persister: persister, hotKey: hotKey, announce: spoken.say)
         controller.start()
         controller.beginRecording()
         #expect(controlUp.validity == .ok)
@@ -215,7 +260,7 @@ private final class FakeHotKey: HotKeyRegistering {
     @Test func savingLeavesTheRestOfTheDocumentAlone() {
         let persister = FakePersister(
             document: SettingsDocument(preferences: Preferences(maxBoostPercent: .percent150)))
-        let controller = GlobalShortcutController(persister: persister, hotKey: FakeHotKey())
+        let controller = GlobalShortcutController(persister: persister, hotKey: FakeHotKey(), announce: spoken.say)
         controller.start()
         controller.beginRecording()
         controller.record(optionCommandH)

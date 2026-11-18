@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import HushCore
 import Observation
+import SwiftUI
 
 /// The global shortcut that opens the mixer: what's saved, whether it's registered, and the
 /// message Settings shows when a combination can't be used. Off until the user records one.
@@ -16,6 +17,28 @@ package final class GlobalShortcutController {
         case needsModifier
         /// Only ⌘ or ⌘⇧ on an ordinary key, which apps use for their own commands.
         case standardShortcut
+        /// macOS always keeps it, such as ⌥⌘Esc for Force Quit.
+        case reservedByMacOS
+
+        /// The problem for a combination the rules don't allow, or nil when they do.
+        init?(_ validity: GlobalShortcut.Validity) {
+            switch validity {
+            case .ok: return nil
+            case .needsModifier: self = .needsModifier
+            case .standardShortcut: self = .standardShortcut
+            case .reservedByMacOS: self = .reservedByMacOS
+            }
+        }
+
+        /// The note Settings shows under the recorder, which VoiceOver also announces.
+        package var message: LocalizedStringResource {
+            switch self {
+            case .inUse: L10n.shortcutInUse
+            case .needsModifier: L10n.shortcutNeedsModifier
+            case .standardShortcut: L10n.shortcutIsStandard
+            case .reservedByMacOS: L10n.shortcutReservedByMacOS
+            }
+        }
     }
 
     package private(set) var shortcut: GlobalShortcut?
@@ -29,10 +52,17 @@ package final class GlobalShortcutController {
 
     @ObservationIgnored private let persister: any SettingsPersisting
     @ObservationIgnored private let hotKey: any HotKeyRegistering
+    /// Speaks feedback to VoiceOver. Tests capture it instead.
+    @ObservationIgnored private let announce: @MainActor (String) -> Void
 
-    package init(persister: any SettingsPersisting, hotKey: any HotKeyRegistering) {
+    package init(
+        persister: any SettingsPersisting,
+        hotKey: any HotKeyRegistering,
+        announce: @escaping @MainActor (String) -> Void = { AccessibilityNotification.Announcement($0).post() }
+    ) {
         self.persister = persister
         self.hotKey = hotKey
+        self.announce = announce
         hotKey.onPress = { [weak self] in self?.onPress?() }
     }
 
@@ -47,10 +77,10 @@ package final class GlobalShortcutController {
     /// version with looser rules) stays saved but inactive, with the reason shown in Settings.
     private func registerSaved() {
         guard let shortcut else { return }
-        switch shortcut.validity {
-        case .ok: if !hotKey.register(shortcut) { problem = .inUse }
-        case .needsModifier: problem = .needsModifier
-        case .standardShortcut: problem = .standardShortcut
+        if let invalid = Problem(shortcut.validity) {
+            problem = invalid
+        } else if !hotKey.register(shortcut) {
+            problem = .inUse
         }
     }
 
@@ -75,27 +105,24 @@ package final class GlobalShortcutController {
 
     /// Saves and registers a combination the user pressed while recording. A combination that
     /// isn't allowed keeps recording; one that can't be registered ends it. Either way the
-    /// previous shortcut is kept and the result is false.
+    /// previous shortcut is kept and the result is false. Every attempt is announced to
+    /// VoiceOver, so pressing the same rejected combination again is announced again.
     @discardableResult
     package func record(_ candidate: GlobalShortcut) -> Bool {
-        switch candidate.validity {
-        case .ok: break
-        case .needsModifier:
-            problem = .needsModifier
-            return false
-        case .standardShortcut:
-            problem = .standardShortcut
+        if let invalid = Problem(candidate.validity) {
+            report(invalid)
             return false
         }
         isRecording = false
         guard hotKey.register(candidate) else {
-            problem = .inUse
             // Trying the candidate cleared the previous registration; put it back.
             if let shortcut, shortcut.isValid { _ = hotKey.register(shortcut) }
+            report(.inUse)
             return false
         }
         problem = nil
         save(candidate)
+        announce(String(localized: L10n.shortcutSaved(ShortcutFormatter.string(for: candidate))))
         return true
     }
 
@@ -104,6 +131,12 @@ package final class GlobalShortcutController {
         hotKey.unregister()
         problem = nil
         save(nil)
+        announce(String(localized: L10n.shortcutCleared))
+    }
+
+    private func report(_ problem: Problem) {
+        self.problem = problem
+        announce(String(localized: problem.message))
     }
 
     private func save(_ shortcut: GlobalShortcut?) {

@@ -16,18 +16,10 @@ package struct KeyboardShortcutRow: View {
                 ShortcutRecorder(controller: controller)
             }
             if let problem = controller.problem {
-                Text(Self.message(for: problem))
+                Text(problem.message)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    static func message(for problem: GlobalShortcutController.Problem) -> LocalizedStringResource {
-        switch problem {
-        case .inUse: L10n.shortcutInUse
-        case .needsModifier: L10n.shortcutNeedsModifier
-        case .standardShortcut: L10n.shortcutIsStandard
         }
     }
 }
@@ -68,16 +60,7 @@ struct ShortcutRecorder: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             stopRecording()
         }
-        .onChange(of: controller.problem) { _, problem in
-            if let problem { announce(String(localized: KeyboardShortcutRow.message(for: problem))) }
-        }
-        .onChange(of: controller.shortcut) { _, shortcut in
-            if let shortcut { announce(String(localized: L10n.shortcutSaved(ShortcutFormatter.string(for: shortcut)))) }
-        }
-    }
-
-    private func announce(_ text: String) {
-        AccessibilityNotification.Announcement(text).post()
+        // VoiceOver announcements come from the controller, once per attempt.
     }
 
     private var title: String {
