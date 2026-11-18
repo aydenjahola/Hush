@@ -70,12 +70,26 @@ extension MixerStore {
     /// Rebuilds every running engine on a new output device, dropping (and recording) any that fail.
     func rebuildEngines(onOutputDevice device: OutputDevice) {
         engineErrors = [:]
+        // Two phases so control engines overlap their start-up: every engine restarts first (a
+        // control one meter-only), then each is switched back once its IOProc has run, so the
+        // waits overlap instead of adding up.
+        var started: [(id: String, engine: any AudioEngineHandle, mode: EngineMode)] = []
         for (id, engine) in engines {
+            let mode = engine.mode
             do {
-                try engine.rebuild(outputDeviceID: device.id)
+                try engine.beginRebuild(outputDeviceID: device.id)
+                started.append((id, engine, mode))
             } catch {
                 tearDownEngine(id)
-                recordFailure(error, for: id, mode: engine.mode)
+                recordFailure(error, for: id, mode: mode)
+            }
+        }
+        for (id, engine, mode) in started {
+            do {
+                try engine.finishRebuild()
+            } catch {
+                tearDownEngine(id)
+                recordFailure(error, for: id, mode: mode)
             }
         }
     }

@@ -235,6 +235,32 @@ extension CoreAudioIntegration {
         }
 
         @Test(
+            "Takeover: an output rebuild of a control engine at 50% (headphones plugged in)",
+            .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
+        func outputRebuildOfAControlEngine() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
+            let rig = try await LoopbackRig()
+            defer { rig.tearDown() }
+            let engine = rig.makeEngine(.control, gain: VolumeCurve.gain(percent: 50))
+            defer { engine.stop() }
+            try engine.start()
+            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the control engine didn't attenuate")
+
+            // The BlackHole rig has one output device, so rebuild onto the same ID.
+            let mark = rig.capture.frameCount
+            try engine.rebuild(outputDeviceID: rig.blackHole.id)
+            #expect(engine.mode == .control)
+            let check = try await swapCheck(
+                rig, after: mark, "output rebuild of a control engine", zeroRunAllowance: takeoverAllowance)
+            #expect(
+                check.loudestWindow(from: 0) <= meterToControlLimit(rig),
+                "the rebuild reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
+            #expect(
+                await rig.waitForLevel(rig.baseline * 0.25),
+                "the level didn't settle at -12 dB (now \(rig.capture.recentLevel()))")
+        }
+
+        @Test(
             "In place: control → meter-only (back to 100%) never gaps",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func controlToMeterOnlySwap() async throws {

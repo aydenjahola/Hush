@@ -38,6 +38,10 @@ package protocol AudioEngineHandle: AnyObject {
     /// Returns the peak level seen since the previous call, then resets it.
     func currentPeak() -> Float
     func rebuild(outputDeviceID: AudioObjectID) throws
+    /// Two-phase `rebuild`, so several engines can overlap their start-up: begin all, then finish
+    /// all. The default does the whole rebuild in `beginRebuild`.
+    func beginRebuild(outputDeviceID: AudioObjectID) throws
+    func finishRebuild() throws
     /// Retargets the running tap at a new process list in place (same tap, aggregate and IOProc),
     /// so processes already tapped stay muted throughout. Throws if the change can't be applied;
     /// the engine is then unchanged and the caller can rebuild instead.
@@ -46,6 +50,11 @@ package protocol AudioEngineHandle: AnyObject {
     /// control gain (ignored for `.meterOnly`). Throws if the change can't be applied; the engine
     /// is then unchanged and the caller can rebuild instead.
     func switchMode(to mode: EngineMode, gain: Float) throws
+}
+
+extension AudioEngineHandle {
+    package func beginRebuild(outputDeviceID: AudioObjectID) throws { try rebuild(outputDeviceID: outputDeviceID) }
+    package func finishRebuild() throws {}
 }
 
 @MainActor

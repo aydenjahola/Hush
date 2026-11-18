@@ -111,4 +111,35 @@ import Testing
         #expect(switched, "switches anyway")
         #expect(clock >= 0.2 && clock < 0.21, "waits about the limit, no longer")
     }
+
+    @Test func rebuiltControlEngineRestartsMeterOnlyUntilTheIOProcRuns() throws {
+        // The state a rebuilt control engine starts in: no replay, nothing applied, not yet run.
+        let state = EngineSharedState(gain: 0.5, mode: .meterOnly)
+        var clock = 0.0
+        var sleeps = 0
+        var replayingAtSwitch: Bool?
+        let ran = try AppAudioEngine.takeOver(
+            state: state,
+            sleep: {
+                clock += $0; sleeps += 1; if sleeps == 2 { state.hasRun.store(true, ordering: .relaxed) }
+            },
+            now: { clock },
+            switchToControl: { replayingAtSwitch = state.replaying.load(ordering: .relaxed) })
+        #expect(ran)
+        #expect(replayingAtSwitch == false, "the source is still unmuted when the switch starts")
+    }
+
+    @Test func overlappedTakeoversWaitOnceInTotal() throws {
+        // Engines started together share one wait: once the first is up, the rest are already running.
+        let states = (0..<4).map { _ in EngineSharedState(gain: 1, mode: .meterOnly) }
+        var clock = 0.0
+        var sleeps = 0
+        let sleep: (TimeInterval) -> Void = {
+            clock += $0; sleeps += 1; if sleeps == 5 { for s in states { s.hasRun.store(true, ordering: .relaxed) } }
+        }
+        for state in states {
+            _ = try AppAudioEngine.takeOver(state: state, sleep: sleep, now: { clock }, switchToControl: {})
+        }
+        #expect(sleeps == 5, "only the first engine waits")
+    }
 }

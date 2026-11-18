@@ -44,6 +44,8 @@ package final class AppAudioEngine: AudioEngineHandle {
     private var tapUUID = UUID()
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
+    /// Set between `beginRebuild` and `finishRebuild` for an engine that was `.control`.
+    private var pendingTakeoverGain: Float?
     private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
 
     package init(
@@ -123,9 +125,40 @@ package final class AppAudioEngine: AudioEngineHandle {
     }
 
     package func rebuild(outputDeviceID: AudioObjectID) throws {
+        try beginRebuild(outputDeviceID: outputDeviceID)
+        try finishRebuild()
+    }
+
+    /// Restarts on the new output. A `.control` engine restarts meter-only (an unmuted tap, no
+    /// replay) so the app isn't muted while `AudioDeviceStart` runs; `finishRebuild` then switches
+    /// it back in place once the IOProc has run.
+    package func beginRebuild(outputDeviceID: AudioObjectID) throws {
+        let wasControl = mode == .control
+        let gain = Float(bitPattern: state.targetGainBits.load(ordering: .relaxed))
         stop()
         self.outputDeviceID = outputDeviceID
-        try start()
+        if wasControl {
+            mode = .meterOnly
+            pendingTakeoverGain = gain
+        }
+        do {
+            try start()
+        } catch {
+            if wasControl { mode = .control }  // the caller reports the mode that failed
+            pendingTakeoverGain = nil
+            throw error
+        }
+    }
+
+    package func finishRebuild() throws {
+        guard let gain = pendingTakeoverGain else { return }
+        pendingTakeoverGain = nil
+        do {
+            try takeOver(gain: gain)
+        } catch {
+            mode = .control  // the caller tears this engine down and reports the mode that failed
+            throw error
+        }
     }
 
     package func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws {
@@ -215,6 +248,7 @@ package final class AppAudioEngine: AudioEngineHandle {
 
     private func build() throws {
         tapUUID = UUID()
+        state.hasRun.store(false, ordering: .relaxed)
         let description = makeDescription(processes: processObjectIDs, mode: mode)
         if mode == .meterOnly { state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed) }
         state.replaying.store(mode == .control, ordering: .releasing)
