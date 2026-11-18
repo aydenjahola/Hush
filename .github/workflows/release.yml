@@ -4,11 +4,26 @@ name: Release
 # doesn't trigger other workflows (no `release: published`, no tag `push`), so a
 # separate "build on release" workflow would never run. The DMG build and the
 # website redeploy are therefore downstream jobs here, gated on release_created.
+#
+# Releases are immutable once published (Settings → "Enable release immutability"),
+# so release-please creates a *draft* (release-please-config.json: "draft": true,
+# "force-tag-creation": true so the vX.Y.Z tag exists straight away). build-dmg uploads
+# every asset to the draft, verifies the checksums, and only then publishes it. pages
+# runs after publishing, so the site sees the new latest release.
+#
+# workflow_dispatch finishes an existing draft (for example after a failed build):
+# it skips release-please and rebuilds, uploads and publishes the given tag. It refuses
+# a release that's already published: that can't be changed, so ship a new patch release.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of an existing draft release to build and publish (for example v0.2.0)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -19,6 +34,7 @@ concurrency:
 
 jobs:
   release-please:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -37,20 +53,57 @@ jobs:
 
   build-dmg:
     needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    # On dispatch release-please is skipped, so `!cancelled()` stops that skip from
+    # skipping this job too. On push, a failed release-please leaves release_created empty.
+    if: >-
+      !cancelled() && (
+        github.event_name == 'workflow_dispatch' ||
+        needs.release-please.outputs.release_created == 'true'
+      )
     runs-on: macos-26
     permissions:
+      # Drafts are only visible to, and editable by, a token with write access.
       contents: write
     env:
-      TAG: ${{ needs.release-please.outputs.tag_name }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+      GH_REPO: ${{ github.repository }}
       # Secrets can't be used in `if:` directly, so expose whether they exist.
       # Without them the release ships an ad-hoc-signed DMG (the free route).
       HAS_SIGNING: ${{ secrets.MACOS_CERT_P12_BASE64 != '' && secrets.MACOS_CERT_PASSWORD != '' }}
       HAS_NOTARY: ${{ secrets.NOTARY_APPLE_ID != '' && secrets.NOTARY_TEAM_ID != '' && secrets.NOTARY_PASSWORD != '' }}
     steps:
+      - name: Check the release is an unpublished draft
+        # bash (not the default `bash -e`) adds pipefail, so a failed API call isn't read as zero releases.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$TAG' isn't a release tag like v1.2.3"
+            exit 1
+          fi
+          # Only a token with write access sees drafts; the list includes them, the
+          # releases/tags endpoint doesn't.
+          COUNT="$(gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
+            --jq "[.[] | select(.tag_name == \"$TAG\")] | length" | awk '{ n += $1 } END { print n + 0 }')"
+          if [ "$COUNT" = "0" ]; then
+            echo "::error::No release exists for $TAG. Merge the release PR (release-please creates the draft), or pass the tag of an existing draft."
+            exit 1
+          fi
+          if [ "$COUNT" != "1" ]; then
+            echo "::error::$COUNT releases exist for $TAG. Delete the extra drafts in the Releases page, then run this workflow again with tag $TAG."
+            exit 1
+          fi
+          IS_DRAFT="$(gh release view "$TAG" --json isDraft --jq .isDraft)"
+          if [ "$IS_DRAFT" != "true" ]; then
+            echo "::error::$TAG is already published. Published releases are immutable, so its assets can't be replaced. Fix the problem on main and ship a new patch release instead."
+            exit 1
+          fi
+          echo "$TAG is a draft; building it."
+
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: refs/tags/${{ env.TAG }}
           # Full history, so CFBundleVersion (git rev-list --count HEAD) is right.
           fetch-depth: 0
           # This job never pushes; uploads go through gh with GH_TOKEN.
@@ -161,8 +214,11 @@ jobs:
           shasum -a 256 "Hush-$VERSION.dmg" > "Hush-$VERSION.dmg.sha256"
           shasum -a 256 Hush.dmg > Hush.dmg.sha256
           cat "Hush-$VERSION.dmg.sha256" Hush.dmg.sha256
+          shasum -a 256 -c "Hush-$VERSION.dmg.sha256" Hush.dmg.sha256
 
-      - name: Upload to release
+      - name: Upload to the draft release
+        # --clobber replaces assets left by an earlier attempt, so a re-run on the same
+        # draft works. Replacing assets is allowed on drafts; it would fail once published.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -171,16 +227,55 @@ jobs:
             build/Hush.dmg \
             "build/Hush-$VERSION.dmg.sha256" \
             build/Hush.dmg.sha256 \
-            --repo "$GITHUB_REPOSITORY" --clobber
+            --clobber
+
+      - name: Verify the uploaded assets
+        # Download what the draft actually holds and check it against the checksums, so a
+        # truncated or stale upload can't be published (and then never fixed).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CHECK="$RUNNER_TEMP/release-check"
+          mkdir -p "$CHECK"
+          gh release download "$TAG" --dir "$CHECK" --clobber \
+            --pattern "Hush-$VERSION.dmg" --pattern Hush.dmg \
+            --pattern "Hush-$VERSION.dmg.sha256" --pattern Hush.dmg.sha256
+          cd "$CHECK"
+          shasum -a 256 -c "Hush-$VERSION.dmg.sha256" Hush.dmg.sha256
+          cmp "Hush-$VERSION.dmg.sha256" "$GITHUB_WORKSPACE/build/Hush-$VERSION.dmg.sha256"
+          cmp Hush.dmg.sha256 "$GITHUB_WORKSPACE/build/Hush.dmg.sha256"
+
+      - name: Publish the release
+        # The point of no return: once published, the release and its assets are immutable.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Don't take "Latest" from a newer release if an older draft is finished late.
+          LATEST="$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null || true)"
+          # No published release yet (404) leaves something that isn't a tag; ignore it.
+          [[ "$LATEST" =~ ^v[0-9] ]] || LATEST=""
+          HIGHEST="$(printf '%s\n%s\n' "$TAG" "$LATEST" | sed '/^$/d' | sort -V | tail -1)"
+          if [ -n "$LATEST" ] && [ "$HIGHEST" != "$TAG" ]; then
+            echo "::warning::$LATEST is newer than $TAG, so $TAG is published without becoming the latest release."
+            gh release edit "$TAG" --draft=false --latest=false
+          else
+            gh release edit "$TAG" --draft=false --latest
+          fi
+          gh release view "$TAG" --json isDraft,url --jq '"Published: \(.url) (draft: \(.isDraft))"'
 
       - name: Remove signing keychain
         if: always() && env.HAS_SIGNING == 'true'
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
 
-  # Redeploys the website so it shows the new version. A skipped build-dmg skips this too.
+  # Redeploys the website once the release is published, so the download label (which
+  # reads the latest *published* release) shows the new version. A skipped or failed
+  # build-dmg skips this. The explicit `if` is needed because on dispatch release-please is
+  # skipped, and a skipped ancestor would otherwise skip this job. The github-pages
+  # environment only deploys from main, so a dispatch from another branch skips it too.
   # Pages deploys need these permissions granted by the caller.
   pages:
     needs: build-dmg
+    if: ${{ !cancelled() && needs.build-dmg.result == 'success' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
       pages: write
