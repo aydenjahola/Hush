@@ -21,22 +21,27 @@ endif
 DMG := build/Hush-$(VERSION).dmg
 DMG_ROOT := build/dmg-root
 
-# Command Line Tools (no Xcode) don't load the Swift Testing macro plugin on their own.
-CLT := /Library/Developer/CommandLineTools
-TESTING_PLUGIN := $(CLT)/usr/lib/swift/host/plugins/testing/libTestingMacros.dylib
-ifeq ($(shell xcode-select -p),$(CLT))
-TEST_FLAGS := -Xswiftc -load-plugin-library -Xswiftc $(TESTING_PLUGIN)
-endif
+# Building needs a full Xcode (26+), not just the Command Line Tools: Swift Testing and the
+# SwiftUI/Observation macros ship with Xcode. DEVELOPER_DIR, when set, wins over xcode-select.
+DEV_DIR := $(or $(DEVELOPER_DIR),$(shell xcode-select -p 2>/dev/null))
 
-.PHONY: build test app dmg icon run clean
+.PHONY: require-xcode build test app dmg icon run clean
 
-build:
+require-xcode:
+	@case "$(DEV_DIR)" in \
+		*.app/Contents/Developer|*.app/Contents/Developer/) ;; \
+		*) echo "Hush needs Xcode 26+ to build. Install Xcode, then run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer (or set DEVELOPER_DIR)" >&2; \
+		   echo "Current developer directory: $(or $(DEV_DIR),none)" >&2; \
+		   exit 1 ;; \
+	esac
+
+build: require-xcode
 	swift build
 
-test:
-	swift test $(TEST_FLAGS)
+test: require-xcode
+	swift test
 
-app:
+app: require-xcode
 	$(SWIFT_BUILD)
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
