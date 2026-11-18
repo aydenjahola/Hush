@@ -24,12 +24,12 @@ final class LoopbackRig {
         guard let blackHole = AudioDevices.blackHole() else { throw IntegrationError("BlackHole 2ch disappeared") }
         self.blackHole = blackHole
         capture = BlackHoleCapture(device: blackHole.id)
-        let tone = try ToneProcess(deviceUID: blackHole.uid, level: Self.toneLevel)
+        let (tone, toneObject) = try await ToneProcess.launch(deviceUID: blackHole.uid, level: Self.toneLevel)
         self.tone = tone
+        self.toneObject = toneObject
         let capture = self.capture
         do {
             try capture.start()
-            toneObject = try await tone.processObject()
         } catch {
             tone.terminate()
             capture.stop()
@@ -164,7 +164,7 @@ extension CoreAudioIntegration {
             let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
             defer { engine.stop() }
             // Full volume is expected until the mute lands; after that it must not come back.
-            let onset = try #require(check.firstWindowBelowThreshold, "the level never dropped below baseline × 0.75 during the swap")
+            let onset = try #require(check.sustainedOnset, "the level never stayed attenuated (below baseline × 0.75, above silence) for 3 windows during the swap")
             #expect(check.loudestWindow(from: onset) <= check.threshold,
                     "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
             #expect(check.loudestWindow(in: 0..<onset) <= meterToControlLimit(rig),
@@ -187,6 +187,24 @@ extension CoreAudioIntegration {
                     "the swap reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay")
             // Positive control: an unmuted source plus the replay would settle near +6 dB.
             #expect(await rig.waitForLevel(rig.baseline * gain), "the level didn't settle at 99% (now \(rig.capture.recentLevel()))")
+        }
+
+        @Test(
+            "Takeover: first adjust with the popover closed (a new control engine on a playing app at 50%)",
+            .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
+        func firstAdjustOfAPlayingApp() async throws {
+            IntegrationEnvironment.recordRun(group: "B")
+            let rig = try await LoopbackRig()
+            defer { rig.tearDown() }
+            let mark = rig.capture.frameCount
+            let engine = rig.makeEngine(.control, gain: VolumeCurve.gain(percent: 50))
+            defer { engine.stop() }
+            try engine.start()  // what MixerStore does on the first setPercent with no engine yet
+
+            let check = try await swapCheck(rig, after: mark, "first adjust (new control engine) at 0.25", zeroRunAllowance: takeoverAllowance)
+            #expect(check.loudestWindow(from: 0) <= meterToControlLimit(rig),
+                    "the takeover reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
+            #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't settle at -12 dB (now \(rig.capture.recentLevel()))")
         }
 
         @Test(
@@ -215,13 +233,17 @@ extension CoreAudioIntegration {
             #expect(await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 }, "the converted engine stopped metering")
         }
 
-        /// switchMode mutes once the IOProc has rendered one replay buffer, so the mute and the first
-        /// replayed buffer (ramping up from g/1000) reach the output together: measured on hardware,
-        /// an immediate mute landed exactly one cycle before the replay, and the level stayed at
-        /// 1.00× baseline. 1.15× leaves headroom for a partial crossfade. A mute one cycle late
-        /// would overlap the source with the whole ramp (about 1 + 0.77g in the last 5 ms window if
-        /// in phase) and is meant to fail here.
+        /// Measured on hardware, the level before the takeover stayed at 1.00× baseline (the source
+        /// is cut, a buffer is dropped, then the replay fades in). 1.15× leaves headroom for a
+        /// partial crossfade; source plus a full-gain replay (a real bump) fails.
         private func meterToControlLimit(_ rig: LoopbackRig) -> Float { rig.baseline * 1.15 }
+
+        /// Known limitation, accepted by the owner: when a tap starts muting a process that's already
+        /// playing (meter-only → control, or a fresh control engine on a playing app), Core Audio
+        /// drops exactly one IO buffer of it, whatever Hush's order or timing (measured: 513 frames
+        /// at 512-frame buffers, with and without waiting for the replay first). A few frames of
+        /// slack cover the samples at the gap's edges. Every other swap stays at one buffer.
+        private var takeoverAllowance: Int { 8 }
 
         /// Starts a meter-only engine, switches it to control at `gain`, and returns it (the caller
         /// stops it) with the analysed 600 ms after the switch (zero runs already checked).
@@ -246,7 +268,7 @@ extension CoreAudioIntegration {
             }
             #expect(engine.mode == .control)
             do {
-                return (engine, try await swapCheck(rig, after: mark, "meter-only → control at \(gain)"))
+                return (engine, try await swapCheck(rig, after: mark, "meter-only → control at \(gain)", zeroRunAllowance: takeoverAllowance))
             } catch {
                 engine.stop()
                 throw error
@@ -255,14 +277,14 @@ extension CoreAudioIntegration {
 
         /// Analyses the 600 ms after `mark`, checks the zero run, and logs how long the level sat
         /// above the unprocessed baseline (the source/replay overlap while the mute changes).
-        private func swapCheck(_ rig: LoopbackRig, after mark: Int, _ what: String) async throws -> SwapCheck {
+        private func swapCheck(_ rig: LoopbackRig, after mark: Int, _ what: String, zeroRunAllowance: Int = 0) async throws -> SwapCheck {
             let swap = try await rig.samples(after: mark, .milliseconds(600))
             let check = SwapCheck(samples: swap, baseline: rig.baseline, bufferFrames: rig.capture.bufferFrameSize, window: windowFrames(rig))
             let windowMS = Double(windowFrames(rig)) / rig.capture.sampleRate * 1000
             let above = Double(check.windowCount(above: rig.baseline * 1.05)) * windowMS
             print("[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames))")
-            #expect(check.longestZeroRun <= check.bufferFrames,
-                    "\(what): \(check.longestZeroRun) frames of digital silence (one buffer is \(check.bufferFrames))")
+            #expect(check.longestZeroRun <= check.bufferFrames + zeroRunAllowance,
+                    "\(what): \(check.longestZeroRun) frames of digital silence (limit: one buffer, \(check.bufferFrames), + \(zeroRunAllowance))")
             return check
         }
 
@@ -280,9 +302,9 @@ extension CoreAudioIntegration {
 
             // A helper process appears (a browser spawning one): it has a process object but isn't
             // playing yet. A different frequency keeps the two tones from interfering.
-            let helper = try ToneProcess(deviceUID: rig.blackHole.uid, level: LoopbackRig.toneLevel, frequency: 440, paused: true)
+            let (helper, helperObject) = try await ToneProcess.launch(
+                deviceUID: rig.blackHole.uid, level: LoopbackRig.toneLevel, frequency: 440, paused: true)
             defer { helper.terminate() }
-            let helperObject = try await helper.processObject(playing: false)
 
             // What MixerStore.reconcile does for a process-list change: update the same tap.
             var mark = rig.capture.frameCount
@@ -403,7 +425,17 @@ struct SwapCheck {
         self.bufferFrames = bufferFrames
     }
 
-    var firstWindowBelowThreshold: Int? { windows.firstIndex { $0 < threshold } }
+    /// The first window from which the level stays attenuated (below the threshold but above
+    /// silence) for 3 windows. Requiring "above silence" keeps windows inside a zero-run gap from
+    /// counting as the onset of attenuation.
+    var sustainedOnset: Int? {
+        let floor = threshold * 0.05
+        let run = 3
+        guard windows.count >= run else { return nil }
+        return (0...(windows.count - run)).first { start in
+            windows[start..<(start + run)].allSatisfy { $0 < threshold && $0 > floor }
+        }
+    }
 
     func loudestWindow(from index: Int) -> Float {
         windows[min(index, windows.count)...].max() ?? 0
