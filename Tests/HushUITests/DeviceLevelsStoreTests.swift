@@ -357,6 +357,75 @@ import Testing
         #expect(changes.count == 1, "only the change to 60% touched the book")
     }
 
+    // MARK: Launch and first device
+
+    @Test func atLaunchTheCurrentDevicesSavedSetLoads() {
+        let h = Harness(
+            document: SettingsDocument(
+                preferences: Preferences(rememberLevelsPerDevice: true),
+                apps: ["a": setting(120)],
+                deviceLevels: ["built-in": DeviceLevels(name: speakers.name, apps: ["a": setting(40)])]))
+        h.processes.emit([makeApp("a")])
+        #expect(percent(h, "a") == 40, "the launch device's own set, not the last device's levels")
+        #expect(h.factory.live("a")?.initialGain == VolumeCurve.gain(percent: 40))
+    }
+
+    @Test func turnedOnWithNoOutputThenTheFirstDeviceLoadsItsSet() {
+        let h = Harness(
+            document: SettingsDocument(
+                apps: ["a": setting(40)],
+                deviceLevels: ["airpods": DeviceLevels(name: headphones.name, apps: ["a": setting(150)])]))
+        h.processes.emit([makeApp("a")])
+        h.output.emit(nil)
+
+        h.store.rememberLevelsPerDevice = true
+        #expect(h.store.savedLevelDevices.map(\.uid) == ["airpods"], "nothing to seed without an output")
+
+        h.output.emit(headphones)
+        #expect(percent(h, "a") == 150)
+        #expect(h.factory.live("a")?.initialGain == VolumeCurve.gain(percent: 150))
+    }
+
+    // MARK: Pending wake work
+
+    @Test func aSwitchCancelsAPendingHealthCheckAndRebuildsOnce() throws {
+        let h = harness(speakers: ["a": setting(40)], headphones: ["a": setting(150)])
+        h.processes.emit([makeApp("a")])
+        let engine = try #require(h.factory.live("a"))
+        h.simulateWake()
+        let check = try #require(h.store.healthCheckTask)
+
+        h.output.emit(headphones)
+
+        #expect(check.isCancelled)
+        #expect(h.store.healthCheckTask == nil)
+        #expect(engine.rebuiltDeviceIDs == [2], "rebuilt once, for the switch")
+        #expect(engine.gainsAtRebuild == [VolumeCurve.gain(percent: 150)])
+        h.store.checkHealth(confirming: true)  // a stage that was already running bails out
+        #expect(engine.rebuiltDeviceIDs == [2])
+    }
+
+    @Test func aSwitchClearsAPendingStallRetryAndBuildsOnceAtTheNewGain() throws {
+        let h = harness(speakers: ["a": setting(40)], headphones: ["a": setting(150)])
+        h.processes.emit([makeApp("a")])
+        let engine = try #require(h.factory.live("a"))
+        engine.rebuildError = FakeError()
+        h.simulateWake()
+        h.store.checkHealth(confirming: false)
+        h.store.checkHealth(confirming: true)
+        let retry = try #require(h.store.stallRetryTask)
+        let eventsBefore = h.factory.events.count
+
+        h.output.emit(headphones)
+
+        #expect(retry.isCancelled)
+        #expect(h.store.stallRetryTask == nil)
+        let made = h.factory.events.dropFirst(eventsBefore).filter { $0.hasPrefix("make") }
+        #expect(made == ["make a control"], "one fresh engine, not one per pending path")
+        #expect(h.factory.live("a")?.initialGain == VolumeCurve.gain(percent: 150))
+        #expect(h.store.strips.first?.engineError == nil)
+    }
+
     // MARK: Persistence
 
     @Test func switchingSavesBothSetsInOneDebouncedWrite() {
