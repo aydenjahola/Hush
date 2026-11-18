@@ -10,6 +10,7 @@ Hush has three kinds of tests. Automated unit tests cover all the logic that doe
 1. `make test` passes.
 2. `make integration-test` passes, with no tests skipped. See [Integration tests](#integration-tests).
 3. Every item in the [manual checklist](#manual-checklist) passes.
+4. Anything that touches polling, listeners, engines, meters or the popover stays inside the [performance budgets](/Hush/contributing/performance/).
 
 Any change to audio behaviour (engines, taps, aggregate devices, the process monitor, or how the mixer starts, swaps or stops engines) must also pass `make integration-test` before it merges.
 
@@ -65,7 +66,7 @@ Leave the Mac alone while the tests run (about a minute). Other audio from the t
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
 
-- **build-and-test** runs `swift build` and `swift test` on a macOS 26 runner. The integration tests show as skipped.
+- **build-and-test** runs `swift format lint --strict` (the same as `make lint`), a build with `-Xswiftc -warnings-as-errors`, `swift test` and `make app` on a macOS 26 runner. The integration tests show as skipped. Warnings only fail CI; `Package.swift` has no `unsafeFlags`.
 - **integration** is experimental and can't fail the build. It installs BlackHole, tries to grant Audio Recording with `scripts/ci-grant-audio-capture.sh` (only possible when SIP is off), runs `ALLOW_SKIP=1 make integration-test`, and reports how many tests passed and were skipped. It becomes required once it proves reliable.
 - **website** runs on pull requests that change `website/`. It runs `npm ci`, `npm test` and `npm run build`, and the build fails on any broken internal docs link.
 

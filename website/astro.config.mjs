@@ -51,6 +51,7 @@ export default defineConfig({
             { label: 'Build from source', slug: 'contributing/build-from-source' },
             { label: 'Architecture', slug: 'contributing/architecture' },
             { label: 'Testing', slug: 'contributing/testing' },
+            { label: 'Performance budgets', slug: 'contributing/performance' },
             { label: 'Releasing', slug: 'contributing/releasing' },
           ],
         },
