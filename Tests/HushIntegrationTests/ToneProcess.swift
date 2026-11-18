@@ -23,6 +23,29 @@ final class ToneProcess {
 
     var pid: pid_t { process.processIdentifier }
 
+    /// Launches a generator and waits until it plays (or, when `paused`, until it has a process
+    /// object). A launch that doesn't get there within `timeout` is killed and tried once more:
+    /// the owner's run once saw a first launch not playing within 3 s.
+    static func launch(
+        deviceUID: String?,
+        level: Double,
+        frequency: Double = 1000,
+        paused: Bool = false,
+        timeout: Duration = .seconds(8)
+    ) async throws -> (tone: ToneProcess, object: AudioObjectID) {
+        var lastError: (any Error)?
+        for _ in 0..<2 {
+            let tone = try ToneProcess(deviceUID: deviceUID, level: level, frequency: frequency, paused: paused)
+            do {
+                return (tone, try await tone.processObject(playing: !paused, timeout: timeout))
+            } catch {
+                tone.terminate()
+                lastError = error
+            }
+        }
+        throw lastError ?? IntegrationError("HushToneGenerator didn't start")
+    }
+
     /// The built generator next to the test bundle in the products directory, or `HUSH_TONE_GENERATOR`.
     static func executableURL() throws -> URL {
         if let override = ProcessInfo.processInfo.environment["HUSH_TONE_GENERATOR"] {
@@ -38,7 +61,7 @@ final class ToneProcess {
 
     /// Waits until the generator has a Core Audio process object and, unless `playing` is false,
     /// is running output. Throws with the generator's stderr if it exits.
-    func processObject(playing: Bool = true, timeout: Duration = .seconds(3)) async throws -> AudioObjectID {
+    func processObject(playing: Bool = true, timeout: Duration = .seconds(8)) async throws -> AudioObjectID {
         var object: AudioObjectID?
         let ready = await waitUntil(timeout: timeout) {
             guard process.isRunning else { return true }
