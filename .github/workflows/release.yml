@@ -56,8 +56,16 @@ jobs:
           # This job never pushes; uploads go through gh with GH_TOKEN.
           persist-credentials: false
 
+      - name: Select Xcode
+        # latest-stable follows the runner image, so this doesn't break when the image updates.
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - name: Toolchain
-        run: swift --version
+        run: |
+          xcodebuild -version
+          swift --version
+          swift format --version
 
       - name: Check version matches tag
         run: |
