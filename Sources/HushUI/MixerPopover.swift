@@ -1,17 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// Holds the strip-row edge overflow. Replaces `@State` (SwiftUI macro plugin unavailable under CLT).
-@MainActor
-final class PopoverModel: ObservableObject {
-    @Published var overflow = EdgeOverflow()
-}
-
 public struct MixerPopover: View {
     let store: MixerStore
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var model = PopoverModel()
+    @State private var overflow = EdgeOverflow()
 
     public init(store: MixerStore) {
         self.store = store
@@ -78,9 +72,9 @@ public struct MixerPopover: View {
                 leading: geometry.contentOffset.x > 1,
                 trailing: geometry.contentOffset.x + geometry.containerSize.width < geometry.contentSize.width - 1)
         } action: { _, newValue in
-            model.overflow = newValue
+            overflow = newValue
         }
-        .mask { EdgeFadeMask(overflow: model.overflow) }
+        .mask { EdgeFadeMask(overflow: overflow) }
     }
 
     private var emptyState: some View {

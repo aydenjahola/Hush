@@ -135,6 +135,17 @@ public final class MixerStore {
         settingsDidChange()
     }
 
+    /// Settable views of the preferences, so Settings can bind to them with `@Bindable`.
+    public var maxBoost: BoostLimit {
+        get { preferences.maxBoostPercent }
+        set { setMaxBoost(newValue) }
+    }
+
+    public var showInactiveApps: Bool {
+        get { preferences.showInactiveApps }
+        set { setShowInactiveApps(newValue) }
+    }
+
     public func resetAllLevels() {
         settings = [:]
         engineErrors = [:]

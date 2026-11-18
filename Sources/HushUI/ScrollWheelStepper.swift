@@ -6,7 +6,8 @@ import SwiftUI
 struct ScrollWheelStepper: ViewModifier {
     let onSteps: (Int) -> Void
 
-    @StateObject private var monitor = ScrollMonitor()
+    /// A plain reference held in `@State`: it owns the NSEvent monitor token, and nothing in it is observed.
+    @State private var monitor = ScrollMonitor()
 
     func body(content: Content) -> some View {
         // Keep the handler current so steps are computed from the latest value, not the one at hover start.
@@ -23,7 +24,7 @@ struct ScrollWheelStepper: ViewModifier {
 }
 
 @MainActor
-final class ScrollMonitor: ObservableObject {
+final class ScrollMonitor {
     private static let pointsPerStep: CGFloat = 12
     private var token: Any?
     private var accumulated: CGFloat = 0

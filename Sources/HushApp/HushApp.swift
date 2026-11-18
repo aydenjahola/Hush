@@ -5,7 +5,8 @@ import SwiftUI
 
 @main
 struct HushApp: App {
-    private let store: MixerStore
+    // App.init runs once, so the store (and its audio sources) is created exactly once.
+    @State private var store: MixerStore
 
     init() {
         let store = MixerStore(
@@ -31,7 +32,7 @@ struct HushApp: App {
         ) { _ in
             MainActor.assumeIsolated { store.refreshPermission() }
         }
-        self.store = store
+        _store = State(initialValue: store)
     }
 
     var body: some Scene {
