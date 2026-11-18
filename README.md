@@ -114,10 +114,12 @@ For each app you adjust, Hush creates a private process tap that mutes the app a
 
 Releases are automated with [release-please](https://github.com/googleapis/release-please):
 
-1. Write [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, …) on `main`.
+1. Pull requests are squash-merged, so the PR title becomes the commit on `main` and must be a [Conventional Commit](https://www.conventionalcommits.org/) (`feat:`, `fix:`, …). A CI check enforces it.
 2. release-please keeps a release PR open that bumps `version.txt` and updates `CHANGELOG.md`.
-3. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release.
-4. The same workflow (`.github/workflows/release.yml`) then runs the tests, builds a universal DMG and uploads `Hush-X.Y.Z.dmg`, `Hush.dmg` and a `.sha256` checksum for each to the release.
+3. Merge the release PR. release-please tags `vX.Y.Z` and creates a **draft** GitHub release.
+4. The same workflow (`.github/workflows/release.yml`) then runs the tests, builds a universal DMG, uploads `Hush-X.Y.Z.dmg`, `Hush.dmg` and a `.sha256` checksum for each to the draft, verifies them, and **publishes** the release. The website redeploys after that.
+
+Releases are immutable once published, which is why assets go onto a draft first. If the build fails, the release stays a draft: use **Re-run failed jobs** on the run, or **Actions → Release → Run workflow** with the tag (for example `v0.2.0`) to build and publish that draft. A published release can't be changed, so fix a bad release by shipping a new patch release.
 
 Version bumps follow Conventional Commits. Before 1.0, `feat:` bumps the minor version and `fix:` bumps the patch version.
 
