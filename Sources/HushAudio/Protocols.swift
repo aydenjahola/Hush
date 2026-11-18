@@ -26,6 +26,20 @@ package extension AudioProcessSource {
 package protocol OutputDeviceSource: AnyObject {
     /// Begins monitoring. Calls `onChange` immediately with the current default output, then on every change.
     func start(onChange: @escaping @MainActor (OutputDevice?) -> Void)
+    /// Begins watching the devices the user can pick as output. Calls `onChange` immediately with
+    /// the current list, then whenever a device appears, disappears or changes. The default never
+    /// calls it, so the list stays empty.
+    func observeDevices(onChange: @escaping @MainActor ([OutputDevice]) -> Void)
+    /// Makes `id` the system default output device. Every app follows, and so does `start`'s callback.
+    func setDefaultOutput(_ id: AudioObjectID) throws
+}
+
+/// Thrown by `OutputDeviceSource.setDefaultOutput` for sources that can't change the output.
+package struct OutputSelectionUnsupported: Error, Sendable {}
+
+package extension OutputDeviceSource {
+    func observeDevices(onChange: @escaping @MainActor ([OutputDevice]) -> Void) {}
+    func setDefaultOutput(_ id: AudioObjectID) throws { throw OutputSelectionUnsupported() }
 }
 
 @MainActor

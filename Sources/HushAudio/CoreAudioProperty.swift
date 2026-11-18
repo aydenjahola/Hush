@@ -12,19 +12,24 @@ package struct CoreAudioError: Error, CustomStringConvertible, Sendable {
 enum CoreAudioProperty {
     static let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
-    static func address(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
-        AudioObjectPropertyAddress(
-            mSelector: selector,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain)
+    static func address(
+        _ selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal
+    ) -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
     }
 
     static func check(_ status: OSStatus, _ operation: String) throws {
         guard status == noErr else { throw CoreAudioError(operation: operation, status: status) }
     }
 
-    static func scalar<T>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, initial: T) throws -> T {
-        var propertyAddress = address(selector)
+    static func scalar<T>(
+        _ object: AudioObjectID,
+        _ selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
+        initial: T
+    ) throws -> T {
+        var propertyAddress = address(selector, scope: scope)
         var size = UInt32(MemoryLayout<T>.size)
         var value = initial
         try withUnsafeMutablePointer(to: &value) { pointer in
@@ -62,6 +67,24 @@ enum CoreAudioProperty {
                 "Reading string property \(selector)")
         }
         return (value?.takeRetainedValue() as String?) ?? ""
+    }
+
+    /// Total channels across a device's streams in `scope`. A device with no streams there gives 0.
+    static func channelCount(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> Int {
+        var propertyAddress = address(kAudioDevicePropertyStreamConfiguration, scope: scope)
+        var size: UInt32 = 0
+        try check(
+            AudioObjectGetPropertyDataSize(device, &propertyAddress, 0, nil, &size),
+            "Sizing stream configuration")
+        guard size > 0 else { return 0 }
+        let raw = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { raw.deallocate() }
+        try check(
+            AudioObjectGetPropertyData(device, &propertyAddress, 0, nil, &size, raw),
+            "Reading stream configuration")
+        let buffers = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+        return buffers.reduce(0) { $0 + Int($1.mNumberChannels) }
     }
 
     /// Number of input streams (one IOProc buffer each) on a device. A device with no inputs gives 0.
