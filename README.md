@@ -122,7 +122,7 @@ For each app you adjust, Hush creates a private process tap that mutes the app a
 - For muted, lowered or boosted apps, up to about a second (usually much less) of each new sound can play at normal volume before Hush notices it and starts processing it. This includes a muted app's notification sounds, and the first sound after an app launches or starts a new audio helper process (common in browsers).
 - Audio from command-line tools is attributed to the terminal app that launched them.
 - When you switch output devices, muted, lowered or boosted apps briefly play at their normal level while Hush rebuilds their engines. Waking from sleep doesn't cause this unless the output device changed while the Mac slept, or an app's engine stopped working across sleep (Hush rebuilds it about 2 seconds after waking).
-- When Hush starts adjusting an app that's already playing, there can be a tiny (~10–20 ms) dropout at that moment. Core Audio drops about one buffer of the app's audio when Hush takes it over, and applies the mute on its own schedule, so the gap is occasionally closer to two buffers.
+- When Hush starts adjusting an app that's already playing, there can be a tiny (~10–20 ms) dropout at that moment. The app goes quiet the moment its mute takes effect, and Hush's replay of it starts with the next audio buffer, so depending on timing the gap is one to two buffers.
 
 ## Releasing
 

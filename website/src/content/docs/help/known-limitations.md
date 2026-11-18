@@ -11,7 +11,7 @@ The same applies when an app starts a new audio helper process, which browsers d
 
 ## A tiny dropout when Hush takes over a playing app
 
-When Hush starts adjusting an app that's already playing, there can be a tiny (~10–20 ms) dropout at that moment. It happens once, when you first lower, boost or mute a playing app (or a muted app starts playing), because Core Audio drops about one buffer of the app's audio as Hush takes it over, and applies the mute on its own schedule, so the gap is occasionally closer to two buffers. Later changes to that app's level don't cause it.
+When Hush starts adjusting an app that's already playing, there can be a tiny (~10–20 ms) dropout at that moment. It happens once, when you first lower, boost or mute a playing app (or a muted app starts playing), because the app goes quiet the moment its mute takes effect and Hush's replay of it starts with the next audio buffer, so depending on timing the gap is one to two buffers. Later changes to that app's level don't cause it.
 
 ## Switching output devices causes a short blip
 

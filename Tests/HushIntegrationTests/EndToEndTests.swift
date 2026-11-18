@@ -247,7 +247,7 @@ extension CoreAudioIntegration {
             // The BlackHole rig has one output device, so rebuild onto the same ID.
             // Documented limitation: while the engine moves devices its muted tap is destroyed, so
             // the source is briefly audible at normal (unattenuated) level. That blip is accepted.
-            // Rejected: silence longer than the takeover allowance (two buffers + 8 frames, see
+            // Rejected: silence longer than the takeover allowance (two buffers + 32 frames, see
             // `takeoverAllowance`), and anything above 1.15x the normal level (source plus replay).
             let mark = rig.capture.frameCount
             try engine.rebuild(outputDeviceID: rig.blackHole.id)
@@ -354,25 +354,26 @@ extension CoreAudioIntegration {
         /// at 512-frame buffers, with and without waiting for the replay first).
         ///
         /// The allowance is two buffers + 8 frames on hardware (issue #50): the owner's Mac has
-        /// measured 777 and 877 frames on the takeover paths, against 277–513 in most runs. The
-        /// HAL applies the tap's new mute behaviour asynchronously and nothing reports when it
-        /// lands (#38), so the source can go quiet up to a buffer before the replay's first buffer
-        /// plays, or the tap can deliver more than one buffer of zeros. Hush already turns the
-        /// replay on before it asks for the mute, and the replay never writes an exact zero for a
-        /// non-zero input; closing the rest would need a hold before the mute, which adds a
-        /// near-silent gap to every takeover (rejected in #38). A few frames of slack cover the
-        /// samples at the gap's edges. Every other swap stays at one buffer. Each takeover logs a
-        /// `[takeover]` line with the tap input's own longest zero run, so an output run longer than
-        /// it shows silence Hush wrote.
+        /// measured 701–1025 frames on the takeover paths, against 265–513 in most runs. The
+        /// `[takeover]` diagnostics on the owner's Mac (issue #50) showed the tap's input was never
+        /// silent (longest input zero run 1 frame, no all-zero buffers) and the mute landed within
+        /// the IO cycle it was issued in. So the gap isn't audio the HAL dropped: it's the phase
+        /// between the moment the mute takes effect in the hardware stream and the replay's first
+        /// buffer, which the IOProc renders one IO cycle ahead. Depending on where in the cycle the
+        /// mute lands, that spans one to two buffers. Closing it would mean replaying before the
+        /// mute (source plus replay, an overlap) or holding the mute back (a longer gap for every
+        /// takeover, rejected in #38). 32 frames of slack cover the samples at the gap's edges
+        /// (1025 was measured). Every other swap stays at one buffer. Each takeover logs a
+        /// `[takeover]` line with the tap input's own longest zero run.
         ///
         /// CI-only allowance: on the GitHub Actions VM (`GITHUB_ACTIONS=true`) the same gaps measured
         /// 1860–3720 frames at 512-frame buffers (virtualised coreaudiod and BlackHole clock), against
         /// about 512 on hardware. There the bound widens to 8 buffers in total, so silence is still
         /// bounded (a stuck engine or a dropped replay is far longer) and a `[ci-tolerance]` line
-        /// says so. Real hardware, `CI=1` included, keeps two buffers + 8 frames.
+        /// says so. Real hardware, `CI=1` included, keeps two buffers + 32 frames.
         private func takeoverAllowance(_ rig: LoopbackRig) -> Int {
             let buffer = rig.capture.bufferFrameSize
-            let strict = buffer + 8
+            let strict = buffer + 32
             guard IntegrationEnvironment.isGitHubActions else { return strict }
             let allowance = 7 * buffer + 8
             print(
