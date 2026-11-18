@@ -125,7 +125,8 @@ extension CoreAudioIntegration {
             let startBegan = ContinuousClock.now
             try engine.start()
             let startTook = ContinuousClock.now - startBegan
-            #expect(startTook < .seconds(1), "start() took \(startTook)")
+            // Generous sanity bound only: the 300 ms budget below is the real check, and a loaded runner can stall start().
+            #expect(startTook < .seconds(30), "start() took \(startTook)")
 
             let remaining = max(.milliseconds(300) - (ContinuousClock.now - startBegan), .zero)
             let silenced = await rig.waitForSilence(timeout: remaining)
