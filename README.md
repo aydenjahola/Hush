@@ -31,6 +31,7 @@ Hush has three layouts, chosen in Settings:
 - **Live level meters**, which you can turn off
 - **Three layouts:** channel strips (scroll a fader to change it), Control Center-style classic rows, or tiles you drag anywhere (in rows and tiles, scroll scrolls the list; hold Option to scroll the volume)
 - **Appearance options:** comfortable or compact size, percentages on or off, playing-first or alphabetical order, amber or your system accent colour for the fills (boost is always amber), and a speaker or fader-glyph menu bar icon
+- **Hide apps** you never want to adjust: right-click one in the mixer, and show it again from Settings
 - **Remembers** each app's level across restarts
 - Apps you haven't touched aren't processed at all (except to measure them for the level meters while the mixer is open, if meters are on)
 - **Switch your Mac's output device from the menu bar**

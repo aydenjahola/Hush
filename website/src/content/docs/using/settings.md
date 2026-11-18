@@ -1,6 +1,6 @@
 ---
 title: Settings
-description: Launch at login, maximum boost, showing idle apps, the keyboard shortcut, the mixer's layout and appearance, resetting levels, update checks, and where Hush keeps its settings.
+description: Launch at login, maximum boost, showing idle apps, the keyboard shortcut, the mixer's layout and appearance, hidden apps, resetting levels, update checks, and where Hush keeps its settings.
 ---
 
 To open Settings, click the gear button in the bottom-right corner of the mixer. The Settings window comes to the front even if another app is active.
@@ -99,9 +99,13 @@ Both follow the menu bar's light, dark or tinted appearance and show the update 
 
 ## Levels
 
+### Hidden apps
+
+Lists the apps you've [hidden from the mixer](/Hush/using/mixer/#hide-an-app), each with its icon (or a generic app icon if Hush can't find the app) and name. Click **Show** to put an app back in the mixer, at 100% and unmuted. With nothing hidden, the list reads **No hidden apps.**
+
 ### Reset All Levels…
 
-Puts every app back to 100% and unmuted, and forgets all saved levels. Hush asks you to confirm first: **"Reset all app levels?"**
+Puts every app back to 100% and unmuted, and forgets all saved levels. Hush asks you to confirm first: **"Reset all app levels?"** Hidden apps stay hidden.
 
 ## Updates
 
@@ -180,5 +184,6 @@ It looks like this:
 - The `appearance` section holds the [Appearance](#appearance) options. Every key is optional: a missing or unrecognised value uses its default, so files from older versions of Hush load unchanged. The reverse holds too: if a newer Hush wrote a value this version doesn't know, it falls back to the default after a downgrade, and the newer value is lost the next time settings are saved.
 - `globalShortcut` appears only once you've set a [keyboard shortcut](#keyboard-shortcut), for example `{ "keyCode" : 4, "modifiers" : ["option", "command"] }`. `keyCode` is the macOS virtual key code (a physical key, so the shortcut survives a keyboard layout change). If it's missing or can't be read, there's no shortcut.
 - The `updates` section remembers the update checker's state: whether automatic checks are on, the version you skipped, when "Later" ends and when Hush last checked. It may be missing or partly filled in.
+- `hiddenApps`, present only once you've [hidden an app](#hidden-apps), lists each hidden app's `bundleID` (or executable name) and `displayName`, such as `{ "bundleID" : "com.apple.Safari", "displayName" : "Safari" }`. If it can't be read, Hush ignores it and keeps the rest of the file.
 - Hush rewrites the file after every change, so quit Hush before editing it by hand.
 - If the file can't be read, for example because it isn't valid JSON or comes from a newer version of Hush, Hush moves it aside as `settings.corrupt-<number>.json` in the same folder and starts with default settings. Your old file isn't deleted.

@@ -31,6 +31,7 @@ Each build of Hush has a new ad-hoc signature, and macOS may treat a new signatu
 
 - **It isn't playing.** By default only apps that are playing audio appear. Turn on **Show apps that aren't playing** in [Settings](/Hush/using/settings/) to see idle apps with a Dock icon.
 - **It's listed under another name.** Audio from helper processes appears under the app that owns them, such as a browser. Audio from command-line tools appears under the terminal app that launched them.
+- **You hid it.** Apps you've hidden aren't listed. Click **Show** next to the app under **Hidden apps** in [Settings](/Hush/using/settings/#hidden-apps).
 - **It's Hush.** Hush doesn't list itself.
 
 ## A strip is dimmed or won't move

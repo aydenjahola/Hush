@@ -16,7 +16,7 @@ When nothing is playing, the mixer shows **Nothing is playing**. If an update is
 Right-click the Hush icon in the menu bar, click it with two fingers on a trackpad, or Control-click it, to open a short menu without opening the mixer:
 
 - **Output:** the same list of output devices as the [output pill](#output-device), with a checkmark on the current one, and **Sound Settings…** at the bottom.
-- **Mute All Playing Apps:** mutes every app that's playing right now. Each app keeps its level, so unmuting brings it back where it was. Once every playing app is muted, the item reads **Unmute All** instead, which unmutes every muted app, including ones that aren't playing or running at the moment. It's greyed out when there's nothing to mute or unmute, or when Hush doesn't have permission.
+- **Mute All Playing Apps:** mutes every app that's playing right now, except [hidden apps](#hide-an-app). Each app keeps its level, so unmuting brings it back where it was. Once every playing app is muted, the item reads **Unmute All** instead, which unmutes every muted app, including ones that aren't playing or running at the moment. It's greyed out when there's nothing to mute or unmute, or when Hush doesn't have permission.
 - **Settings…** opens [Settings](/Hush/using/settings/).
 - **Check for Updates…** checks for a new version straight away, like **Check Now** in [Settings](/Hush/using/settings/#updates).
 - **Quit Hush.**
@@ -27,7 +27,15 @@ An app gets a strip while it's playing audio. Hush groups helper processes under
 
 To also see apps that aren't playing right now, such as a chat app you want to mute before its next notification, turn on **Show apps that aren't playing** in [Settings](/Hush/using/settings/).
 
-If an app is missing, see [Troubleshooting](/Hush/help/troubleshooting/#an-app-isnt-in-the-mixer).
+If an app is missing, check that you haven't [hidden it](#hide-an-app), then see [Troubleshooting](/Hush/help/troubleshooting/#an-app-isnt-in-the-mixer).
+
+## Hide an app
+
+Right-click an app's strip, row or tile and choose **Hide _App_** to take it out of the mixer, for example a system sound or a helper you never want to adjust. It works the same in every layout.
+
+A hidden app plays at its normal volume and Hush leaves its audio alone: it isn't listed in any layout, isn't counted in "apps playing", gets no level meter, and **Mute All Playing Apps** and **Unmute All** skip it. If you'd lowered, boosted or muted the app, hiding it puts it back to 100% and unmuted.
+
+To bring an app back, click **Show** next to it under **Hidden apps** in [Settings](/Hush/using/settings/#hidden-apps). It returns at 100% and unmuted.
 
 ## Layouts
 
