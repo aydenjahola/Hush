@@ -225,7 +225,8 @@ extension CoreAudioIntegration {
             #expect(engine.mode == .control)
 
             let check = try await swapCheck(
-                rig, after: mark, "first adjust (new control engine) at 0.25", zeroRunAllowance: takeoverAllowance)
+                rig, after: mark, "first adjust (new control engine) at 0.25",
+                zeroRunAllowance: takeoverAllowance(rig))
             #expect(
                 check.loudestWindow(from: 0) <= meterToControlLimit(rig),
                 "the takeover reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
@@ -255,13 +256,27 @@ extension CoreAudioIntegration {
             try engine.rebuild(outputDeviceID: rig.blackHole.id)
             #expect(engine.mode == .control)
             let check = try await swapCheck(
-                rig, after: mark, "output rebuild of a control engine", zeroRunAllowance: takeoverAllowance)
+                rig, after: mark, "output rebuild of a control engine", zeroRunAllowance: takeoverAllowance(rig))
             #expect(
                 check.loudestWindow(from: 0) <= meterToControlLimit(rig),
                 "the rebuild reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig)))")
+            // 1 s is plenty on hardware. On the GitHub Actions VM the rebuilt aggregate (the old one
+            // destroyed and a new one started on the same device) has been seen still silent after
+            // it, so CI waits longer. The wait stays bounded: an engine that never resumes still
+            // fails, and the log line says whether its IOProc ever ran (slow start versus dead).
+            let settleTimeout: Duration = IntegrationEnvironment.isGitHubActions ? .seconds(5) : .seconds(1)
+            if IntegrationEnvironment.isGitHubActions {
+                print("[ci-tolerance] output rebuild: waiting up to \(settleTimeout) (1 s on hardware) for -12 dB")
+            }
+            let settleBegan = ContinuousClock.now
+            let settled = await rig.waitForLevel(rig.baseline * 0.25, timeout: settleTimeout)
+            print(
+                "[rebuild] settled: \(settled) after \(ContinuousClock.now - settleBegan) (window plus wait), IOProc has run: \(engine.ioProcHasRun), now \(rig.capture.recentLevel())"
+            )
             #expect(
-                await rig.waitForLevel(rig.baseline * 0.25),
-                "the level didn't settle at -12 dB (now \(rig.capture.recentLevel()))")
+                settled,
+                "the level didn't settle at -12 dB within \(settleTimeout) (now \(rig.capture.recentLevel()), IOProc has run: \(engine.ioProcHasRun))"
+            )
         }
 
         @Test(
@@ -306,7 +321,22 @@ extension CoreAudioIntegration {
         /// drops exactly one IO buffer of it, whatever Hush's order or timing (measured: 513 frames
         /// at 512-frame buffers, with and without waiting for the replay first). A few frames of
         /// slack cover the samples at the gap's edges. Every other swap stays at one buffer.
-        private var takeoverAllowance: Int { 8 }
+        ///
+        /// CI-only allowance: on the GitHub Actions VM (`GITHUB_ACTIONS=true`) the same gaps measured
+        /// 1860–3720 frames at 512-frame buffers (virtualised coreaudiod and BlackHole clock), against
+        /// about 512 on hardware. There the bound widens to 8 buffers in total, so silence is still
+        /// bounded (a stuck engine or a dropped replay is far longer) and a `[ci-tolerance]` line
+        /// says so. Real hardware, `CI=1` included, keeps one buffer + 8 frames.
+        private func takeoverAllowance(_ rig: LoopbackRig) -> Int {
+            let strict = 8
+            guard IntegrationEnvironment.isGitHubActions else { return strict }
+            let buffer = rig.capture.bufferFrameSize
+            let allowance = 7 * buffer + strict
+            print(
+                "[ci-tolerance] GITHUB_ACTIONS=true: takeover zero-run limit \(buffer + allowance) frames (8 buffers of \(buffer)) instead of \(buffer + strict)"
+            )
+            return allowance
+        }
 
         /// Starts a meter-only engine, switches it to control at `gain`, and returns it (the caller
         /// stops it) with the analysed 600 ms after the switch (zero runs already checked).
@@ -336,7 +366,7 @@ extension CoreAudioIntegration {
                 return (
                     engine,
                     try await swapCheck(
-                        rig, after: mark, "meter-only → control at \(gain)", zeroRunAllowance: takeoverAllowance)
+                        rig, after: mark, "meter-only → control at \(gain)", zeroRunAllowance: takeoverAllowance(rig))
                 )
             } catch {
                 engine.stop()
@@ -355,8 +385,10 @@ extension CoreAudioIntegration {
                 window: windowFrames(rig))
             let windowMS = Double(windowFrames(rig)) / rig.capture.sampleRate * 1000
             let above = Double(check.windowCount(above: rig.baseline * 1.05)) * windowMS
+            // Silence still running at the end of the window is a stall, not a gap that closed.
+            let trailingZeros = swap.reversed().prefix { $0 == 0 }.count
             print(
-                "[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames))"
+                "[swap] \(what): \(String(format: "%.1f", above)) ms above baseline, loudest \(String(format: "%.2f", check.loudestWindow(from: 0) / rig.baseline))× baseline, longest zero run \(check.longestZeroRun) frames (buffer \(check.bufferFrames)), \(trailingZeros) silent frames at the window's end"
             )
             #expect(
                 check.longestZeroRun <= check.bufferFrames + zeroRunAllowance,

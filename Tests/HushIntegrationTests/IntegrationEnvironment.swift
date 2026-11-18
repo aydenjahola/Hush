@@ -15,6 +15,14 @@ enum IntegrationEnvironment {
         return !(environment["CI"] ?? "").isEmpty || !(environment["GITHUB_ACTIONS"] ?? "").isEmpty
     }
 
+    /// True only on GitHub Actions (`GITHUB_ACTIONS=true`), where the macOS runner is a VM with no
+    /// audio hardware: BlackHole's clock and coreaudiod run under virtualisation, so Core Audio's
+    /// takeover gaps and restart times are several times what real hardware shows. Only the
+    /// tolerances that say so widen here; `CI=1` on a real Mac keeps every strict bound.
+    static var isGitHubActions: Bool {
+        ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true"
+    }
+
     static let disabledMessage: Comment =
         "Core Audio integration test: runs only with HUSH_INTEGRATION=1 (use `make integration-test`)"
 

@@ -62,6 +62,9 @@ package final class AppAudioEngine: AudioEngineHandle {
     /// The live tap object, or `kAudioObjectUnknown` when stopped (for integration tests).
     var tapObjectID: AudioObjectID { tapID }
 
+    /// Whether the current aggregate's IOProc has run since the last (re)build (for integration tests).
+    var ioProcHasRun: Bool { state.hasRun.load(ordering: .acquiring) }
+
     package func start() throws {
         guard tapID == kAudioObjectUnknown else { return }
         do {
