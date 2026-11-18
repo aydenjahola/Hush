@@ -1,0 +1,41 @@
+---
+import { withBase } from '../lib/paths';
+---
+<footer class="footer">
+  <nav aria-label="Footer">
+    <a href="https://github.com/aydenjahola/Hush">GitHub</a>
+    <a href={withBase('/getting-started/install/')}>Docs</a>
+    <a href={withBase('/help/privacy/')}>Privacy</a>
+    <a href={withBase('/changelog/')}>Changelog</a>
+  </nav>
+  <p>
+    Hush is free software, released under the
+    <a href="https://github.com/aydenjahola/Hush/blob/main/LICENSE">GNU General Public License v3.0</a>.
+  </p>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--hush-border);
+    padding-block: 2rem 3rem;
+    text-align: center;
+    color: var(--hush-text-muted);
+    font-size: 0.9rem;
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+  a {
+    color: var(--hush-text);
+  }
+  a:hover {
+    color: var(--hush-accent-text);
+  }
+  p {
+    margin: 0;
+  }
+</style>

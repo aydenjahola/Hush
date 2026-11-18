@@ -1,0 +1,99 @@
+---
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import DownloadButton from './DownloadButton.astro';
+import { withBase } from '../lib/paths';
+
+// npm scripts run from website/, so public/ is relative to the working directory.
+// Without the screenshot, the hero renders with no image rather than a broken one.
+const hasScreenshot = existsSync(join(process.cwd(), 'public/screenshots/popover.png'));
+---
+<header class="hero">
+  <img
+    class="logo"
+    src={withBase('/logo-512.png')}
+    width="96"
+    height="96"
+    alt="The Hush app icon: a fader knob on a rounded square."
+  />
+  <h1>Hush</h1>
+  <p class="tagline">Per-app volume control for your Mac's menu bar.</p>
+  <div class="actions">
+    <DownloadButton />
+    <a class="docs-link" href={withBase('/getting-started/install/')}>Read the docs →</a>
+  </div>
+  {hasScreenshot && (
+    <div class="shot">
+      <img
+        src={withBase('/screenshots/popover.png')}
+        width="680"
+        decoding="async"
+        alt="The Hush mixer open from the menu bar, with Spotify at 62%, a web browser at 100% and Discord boosted to 150%."
+      />
+    </div>
+  )}
+</header>
+
+<style>
+  .hero {
+    text-align: center;
+    padding-block: 4rem 3rem;
+  }
+  .logo {
+    display: block;
+    margin: 0 auto 1.25rem;
+    width: 96px;
+    height: 96px;
+    border-radius: 22%;
+  }
+  h1 {
+    font-size: clamp(3rem, 10vw, 5.5rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+  .tagline {
+    font-size: clamp(1.15rem, 3.5vw, 1.5rem);
+    color: var(--hush-text-muted);
+    margin: 0.75rem auto 2rem;
+    max-width: 30ch;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 1rem 1.5rem;
+  }
+  .docs-link {
+    color: var(--hush-text);
+    padding: 0.8rem 0.4rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .docs-link:hover {
+    color: var(--hush-accent-text);
+  }
+  .shot {
+    position: relative;
+    isolation: isolate;
+    margin: 3.5rem auto 0;
+    max-width: 440px;
+  }
+  .shot::before {
+    content: '';
+    position: absolute;
+    inset: -15% -25%;
+    z-index: -1;
+    background:
+      radial-gradient(closest-side at 30% 40%, var(--hush-glow-1), transparent),
+      radial-gradient(closest-side at 70% 60%, var(--hush-glow-2), transparent);
+    filter: blur(40px);
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--hush-radius);
+  }
+</style>
