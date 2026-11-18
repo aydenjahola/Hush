@@ -10,6 +10,7 @@ description: Control Hush from the keyboard and with VoiceOver, and how it follo
 | Raise or lower the focused fader, slider or tile by 5% | **↑** / **↓**, or **→** / **←** |
 | Move between controls | **Tab** / **Shift-Tab** |
 | Mute or unmute (mute button focused) | **Space** |
+| Open the output menu (output pill focused) | **Space**, then **↑** / **↓** and **Return** to choose |
 
 This works the same in every [layout](/Hush/using/mixer/#layouts). In the tiles layout, the tile itself is the slider and takes focus; its mute button is the next stop.
 
@@ -30,7 +31,7 @@ Every control has a spoken label:
 | Element | VoiceOver reads |
 |---|---|
 | Menu bar icon | "Hush", or "Hush, update available" when there's a new version |
-| Output pill | "Output: *device name*" |
+| Output pill | "Output: *device name*, menu". Open it with VoiceOver's press command to pick an [output device](/Hush/using/mixer/#output-device). |
 | Fader, slider or tile | "*App* volume", with the value "*62* percent". It's adjustable: use VoiceOver's increment and decrement commands to change it in 5% steps. Every layout reads the same. |
 | Mute button | "Mute *App*", or "Unmute *App*" when muted |
 | Warning badge | "Warning:" followed by the problem, for example "Hush couldn't control this app's audio, so it's playing normally." |

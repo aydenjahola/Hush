@@ -5,7 +5,7 @@ description: The three mixer layouts, and how to change each app's volume, boost
 
 Click the Hush icon in the menu bar to open the mixer. It has three parts:
 
-- **Header:** the name Hush and a pill showing your current output device, such as "MacBook Pro Speakers". If there's no output device, the pill reads "No Output".
+- **Header:** the name Hush and a pill showing your current output device, such as "MacBook Pro Speakers". Click it to [switch output device](#output-device). If there's no output device, the pill reads "No Output".
 - **Apps:** one strip, row or tile per app, depending on the [layout](#layouts).
 - **Footer:** how many apps are playing, such as "2 apps playing", and the gear button for [Settings](/Hush/using/settings/).
 
@@ -89,9 +89,21 @@ To list apps by name instead, choose **Alphabetical** under **Sort apps** in [Se
 
 With many apps, scroll the row of strips sideways (the edges fade to show there's more), or scroll classic rows and tiles up and down.
 
-## Your output device
+## Output device
 
-Hush plays adjusted apps through the system's default output device, the one you pick in Control Center or **System Settings → Sound**. When you switch, for example by connecting headphones, Hush follows automatically and the header pill shows the new device.
+Click the pill at the top right of the mixer to choose where your Mac plays sound. The menu lists every output device, each with an icon for how it's connected: built-in speakers or headphones, Bluetooth, USB, HDMI or DisplayPort, AirPlay, or a virtual device such as BlackHole. The current output has a checkmark.
+
+Choosing a device changes your Mac's output, exactly like picking it in Control Center or **System Settings → Sound**. Every app follows, not just the ones Hush adjusts, and apps you've adjusted keep their levels. The list updates by itself as you connect or disconnect devices.
+
+**Sound Settings…** at the bottom of the menu opens **System Settings → Sound**, for balance, alert sounds and input devices.
+
+If macOS refuses the switch, a short message appears under the header for a few seconds and the checkmark stays on the device that's really playing.
+
+You can also open the menu from the keyboard. See [Keyboard and accessibility](/Hush/using/keyboard-accessibility/).
+
+### When the output changes
+
+Hush plays adjusted apps through the system's default output device, whether you pick it in Hush, in Control Center or in **System Settings → Sound**. When it changes, for example because you connected headphones, Hush follows automatically and the header pill shows the new device.
 
 While Hush switches over, apps briefly play at their normal level. See [Known limitations](/Hush/help/known-limitations/).
 
