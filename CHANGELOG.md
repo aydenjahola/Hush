@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/aydenjahola/Hush/compare/v0.1.0...v0.2.0) (2026-11-18)
+
+
+### Features
+
+* **ui:** switch the system output device from the popover ([#24](https://github.com/aydenjahola/Hush/issues/24)) ([545d335](https://github.com/aydenjahola/Hush/commit/545d335a5de15e521c06643e263d1d458634c967))
+
 ## 0.1.0 (2026-11-18)
 
 
