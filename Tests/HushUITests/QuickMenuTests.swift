@@ -80,6 +80,31 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
         #expect(h.persister.saved.last?.apps["idle"] == nil)
     }
 
+    @Test func muteAllPlayingLeavesAnAlreadyMutedAppUntouched() {
+        let earlier = Date(timeIntervalSince1970: 1_700_000_000)
+        let saved = AppVolumeSetting(percent: 30, isMuted: true, lastAdjusted: earlier)
+        let h = Harness(document: SettingsDocument(apps: ["a": saved]))
+        h.processes.emit([makeApp("a"), makeApp("b", objects: [43])])
+
+        h.store.muteAllPlaying()
+        h.store.flushPendingSave()
+
+        #expect(h.persister.saved.last?.apps["a"] == saved, "percent, mute and lastAdjusted unchanged")
+        #expect(h.persister.saved.last?.apps["b"]?.isMuted == true)
+    }
+
+    @Test func unmuteAllDoesNothingWithoutPermission() {
+        let saved = mutedSetting(percent: 40)
+        let h = Harness(document: SettingsDocument(apps: ["a": saved]), permission: .denied)
+        h.processes.emit([makeApp("a")])
+
+        h.store.unmuteAll()
+        h.store.flushPendingSave()
+
+        #expect(h.store.strips.first?.setting == saved)
+        #expect(h.persister.saved.isEmpty, "nothing changed, nothing written")
+    }
+
     @Test func bulkActionsDoNothingWithoutPermission() {
         let h = Harness(permission: .denied)
         h.processes.emit([makeApp("a")])
@@ -162,10 +187,16 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
         #expect(items[6].keyEquivalentModifierMask == .command)
     }
 
-    @Test func eachItemRunsItsAction() {
+    private func item(_ title: String, in items: [NSMenuItem]) throws -> NSMenuItem {
+        try #require(items.first { $0.title == title }, "no \(title) item")
+    }
+
+    @Test func eachItemRunsItsAction() throws {
         let recorder = Recorder()
         let items = QuickMenu.items(for: model(), actions: recorder.actions)
-        for index in [1, 3, 4, 6] { ActionMenuItem.perform(items[index]) }
+        for title in ["Mute All Playing Apps", "Settings…", "Check for Updates…", "Quit Hush"] {
+            ActionMenuItem.perform(try item(title, in: items))
+        }
         #expect(recorder.calls == ["mute all", "settings", "check", "quit"])
     }
 
@@ -202,17 +233,17 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
         #expect(recorder.calls == ["unmute all"])
     }
 
-    @Test func disabledStatesFollowTheModel() {
+    @Test func disabledStatesFollowTheModel() throws {
         let menu = NSMenu()
         QuickMenu.populate(
             menu,
             model: model(bulkMute: BulkMuteAction(kind: .muteAllPlaying, isEnabled: false), canCheckForUpdates: false),
             actions: Recorder().actions)
         #expect(!menu.autoenablesItems)
-        #expect(!menu.items[1].isEnabled)
-        #expect(!menu.items[4].isEnabled)
-        #expect(menu.items[3].isEnabled)
-        #expect(menu.items[6].isEnabled)
+        #expect(try !item("Mute All Playing Apps", in: menu.items).isEnabled)
+        #expect(try !item("Check for Updates…", in: menu.items).isEnabled)
+        #expect(try item("Settings…", in: menu.items).isEnabled)
+        #expect(try item("Quit Hush", in: menu.items).isEnabled)
     }
 
     @Test func modelReadsTheStoreAndUpdateChecker() {
