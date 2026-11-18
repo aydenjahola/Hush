@@ -6,20 +6,25 @@ import SwiftUI
 struct ScrollWheelStepper: ViewModifier {
     let onSteps: (Int) -> Void
 
-    /// A plain reference held in `@State`: it owns the NSEvent monitor token, and nothing in it is observed.
-    @State private var monitor = ScrollMonitor()
+    /// Created on first hover rather than as a `@State` initial value, which SwiftUI would evaluate
+    /// (and throw away) on every init of this modifier. A plain reference: nothing in it is observed.
+    @State private var monitor: ScrollMonitor?
 
     func body(content: Content) -> some View {
         // Keep the handler current so steps are computed from the latest value, not the one at hover start.
-        monitor.handler = onSteps
+        monitor?.handler = onSteps
         return content
             .onContinuousHover { phase in
                 switch phase {
-                case .active: monitor.install(onSteps)
-                case .ended: monitor.remove()
+                case .active:
+                    let active = monitor ?? ScrollMonitor()
+                    if monitor == nil { monitor = active }
+                    active.install(onSteps)
+                case .ended:
+                    monitor?.remove()
                 }
             }
-            .onDisappear { monitor.remove() }
+            .onDisappear { monitor?.remove() }
     }
 }
 

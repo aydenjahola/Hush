@@ -6,7 +6,8 @@ public struct SettingsView: View {
     @Bindable var store: MixerStore
     @Bindable var updates: UpdateChecker
 
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    /// Read from SMAppService in onAppear, not as a `@State` initial value (evaluated on every init).
+    @State private var launchAtLogin = false
     @State private var launchError: String?
     @State private var confirmingReset = false
 
