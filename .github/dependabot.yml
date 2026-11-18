@@ -1,0 +1,25 @@
+# Keeps GitHub Actions and the website's npm packages up to date. The commit prefixes make
+# Dependabot's pull request titles Conventional Commits, so squash-merging them keeps the
+# changelog tidy (ci and chore don't trigger a release on their own).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      website:
+        patterns: ["*"]
