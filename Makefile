@@ -56,7 +56,7 @@ test: require-xcode
 	swift test
 
 # Real Core Audio tests (taps, aggregates, BlackHole loopback). Needs Audio Recording permission
-# for the app running this (Terminal/VS Code); Group B also needs BlackHole 2ch. See docs/manual-test.md.
+# for the app running this (Terminal/VS Code); Group B also needs BlackHole 2ch. See website/src/content/docs/contributing/testing.md.
 # Tests that can't run are reported as skipped with the reason.
 integration-test: require-xcode
 	swift build --product HushToneGenerator

@@ -1,0 +1,80 @@
+---
+import { withBase } from '../lib/paths';
+
+const steps = [
+  {
+    title: 'A process tap captures the app',
+    body: 'When you change an app’s level, Hush asks macOS for a private tap on that app’s audio and silences the original.',
+  },
+  {
+    title: 'A private aggregate device plays it back',
+    body: 'The captured audio plays through your current output device, via a device only Hush can see.',
+  },
+  {
+    title: 'Your gain is applied',
+    body: 'Every buffer is scaled to your fader on the way through, with a soft limiter above 100%.',
+  },
+];
+---
+<section class="how" aria-labelledby="how-heading">
+  <h2 id="how-heading">How it works</h2>
+  <ol class="steps">
+    {steps.map((step, index) => (
+      <li class="step">
+        <span class="number hush-tabular" aria-hidden="true">{index + 1}</span>
+        <h3>{step.title}</h3>
+        <p>{step.body}</p>
+      </li>
+    ))}
+  </ol>
+  <p class="note">
+    Apps you haven’t touched are left alone. If Hush quits, macOS removes its taps and every app plays normally.
+    <a href={withBase('/contributing/architecture/')}>Read the architecture notes</a>.
+  </p>
+</section>
+
+<style>
+  .how {
+    padding-block: 3rem;
+  }
+  h2 {
+    text-align: center;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    margin: 0 0 2rem;
+  }
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 1.5rem;
+  }
+  .number {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: var(--hush-surface);
+    border: 1px solid var(--hush-border);
+    color: var(--hush-accent-text);
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 1.05rem;
+    margin: 0.75rem 0 0.4rem;
+  }
+  p {
+    margin: 0;
+    color: var(--hush-text-muted);
+    line-height: 1.5;
+  }
+  .note {
+    text-align: center;
+    margin-top: 2rem;
+  }
+  .note a {
+    color: var(--hush-accent-text);
+  }
+</style>

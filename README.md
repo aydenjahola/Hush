@@ -4,6 +4,10 @@ Per-app volume control for macOS, in your menu bar.
 
 Turn Spotify down, boost a quiet call, mute a noisy tab: Hush gives every app that's playing audio its own fader, mute button and level meter. It uses Core Audio process taps, so there's **no audio driver to install** and no admin password.
 
+**[Download the latest release](https://github.com/aydenjahola/Hush/releases/latest)** · macOS 26 or later · **[Website and documentation](https://aydenjahola.github.io/Hush/)**
+
+The documentation covers [installing](https://aydenjahola.github.io/Hush/getting-started/install/) (including uninstalling), [using the mixer](https://aydenjahola.github.io/Hush/using/mixer/), [troubleshooting](https://aydenjahola.github.io/Hush/help/troubleshooting/), [building from source](https://aydenjahola.github.io/Hush/contributing/build-from-source/), [releasing](https://aydenjahola.github.io/Hush/contributing/releasing/) and [how Hush works](https://aydenjahola.github.io/Hush/contributing/architecture/). The same information is summarised below.
+
 ## Features
 
 - A fader per app, from silent up to 200% boost, with a soft limiter so boosted audio doesn't clip harshly
@@ -56,7 +60,7 @@ or set `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` for a single c
 
 ```sh
 make test     # run the unit tests
-make integration-test  # real Core Audio tests (needs Audio Recording permission; see docs/manual-test.md)
+make integration-test  # real Core Audio tests (needs Audio Recording permission; see the testing guide)
 make app      # build build/Hush.app (ad-hoc signed)
 make run      # build and launch
 make install  # build, quit Hush, replace /Applications/Hush.app and relaunch it
@@ -91,11 +95,11 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 
 The first release is pinned with `"release-as": "0.1.0"` in `release-please-config.json` so it matches `version.txt`. **Remove that line after 0.1.0 ships**, or every later release PR will propose 0.1.0 again.
 
-The repository needs Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" turned on so release-please can open its PR. Releases are ad-hoc signed. If the `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and `NOTARY_PASSWORD` secrets are ever added, the workflow signs with the Developer ID and notarizes too. Before merging a release PR, run through [docs/manual-test.md](docs/manual-test.md).
+The repository needs Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" turned on so release-please can open its PR. Releases are ad-hoc signed. If the `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and `NOTARY_PASSWORD` secrets are ever added, the workflow signs with the Developer ID and notarizes too. Before merging a release PR, run through the [manual checklist](https://aydenjahola.github.io/Hush/contributing/testing/#manual-checklist). The full release guide is [on the website](https://aydenjahola.github.io/Hush/contributing/releasing/).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Any change to audio behaviour (engines, taps, the process monitor, how the mixer starts or swaps engines) must pass `make integration-test` before it merges, not just `make test`: the unit tests use fake engines and can't see what reaches the speakers. CI runs the integration tests only experimentally, so run them on your Mac and say so in the pull request.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Any change to audio behaviour (engines, taps, the process monitor, how the mixer starts or swaps engines) must pass `make integration-test` before it merges, not just `make test`: the unit tests use fake engines and can't see what reaches the speakers. CI runs the integration tests only experimentally, so run them on your Mac and say so in the pull request. Setup (BlackHole 2ch and the Audio Recording permission) is in the [testing guide](https://aydenjahola.github.io/Hush/contributing/testing/#integration-tests).
 
 ## License
 

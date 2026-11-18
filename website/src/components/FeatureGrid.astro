@@ -1,0 +1,66 @@
+---
+const features = [
+  { title: 'Per-app faders', body: 'Every app playing audio gets its own fader, from silent to full volume.' },
+  {
+    title: 'Boost up to 200%',
+    body: 'Lift a quiet call or video past 100%. A soft limiter keeps the peaks from clipping harshly.',
+  },
+  { title: 'One-click mute', body: 'Silence a noisy tab or app without touching its own volume control.' },
+  { title: 'Live level meters', body: 'See which app is making that sound while the mixer is open.' },
+  {
+    title: "Remembers each app's level",
+    body: 'Levels and mutes come back the next time the app runs, even after a restart.',
+  },
+  {
+    title: 'No audio driver, no admin password',
+    body: 'Hush uses Core Audio process taps built into macOS. There’s nothing to install system-wide.',
+  },
+];
+---
+<section class="features" aria-labelledby="features-heading">
+  <h2 id="features-heading">A mixer for every app</h2>
+  <ul class="grid">
+    {features.map((feature) => (
+      <li class="card">
+        <h3>{feature.title}</h3>
+        <p>{feature.body}</p>
+      </li>
+    ))}
+  </ul>
+</section>
+
+<style>
+  .features {
+    padding-block: 3rem;
+  }
+  h2 {
+    text-align: center;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    margin: 0 0 2rem;
+  }
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 1rem;
+  }
+  .card {
+    background: var(--hush-surface);
+    border: 1px solid var(--hush-border);
+    border-radius: var(--hush-radius);
+    padding: 1.25rem 1.4rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  h3 {
+    font-size: 1.05rem;
+    margin: 0 0 0.4rem;
+  }
+  p {
+    margin: 0;
+    color: var(--hush-text-muted);
+    line-height: 1.5;
+  }
+</style>

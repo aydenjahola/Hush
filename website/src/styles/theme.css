@@ -1,0 +1,51 @@
+/*
+ * Hush design tokens, shared by the landing page and Starlight.
+ * Dark-first. light-dark() picks a value from the active color-scheme:
+ * the OS preference by default, or Starlight's theme toggle via data-theme.
+ * This file is unlayered, so it wins over Starlight's layered defaults.
+ * Contrast (WCAG AA): accent text #a14a00 on #f6f6f7 is 5.6:1, #ffb340 on #17171a is 10:1,
+ * button text #1c1204 on #ff9f0a is 9:1, muted text is at least 5.7:1 in both themes.
+ */
+:root {
+  color-scheme: dark light;
+
+  --hush-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --hush-bg: light-dark(#f6f6f7, #0d0d0f);
+  --hush-surface: light-dark(rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.06));
+  --hush-border: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
+  --hush-text: light-dark(#18181b, #f2f2f4);
+  --hush-text-muted: light-dark(#52525b, #a1a1aa);
+  --hush-accent: #ff9f0a;
+  --hush-on-accent: #1c1204;
+  --hush-accent-text: light-dark(#a14a00, #ffb340);
+  --hush-glow-1: light-dark(rgb(255 159 10 / 0.22), rgb(255 159 10 / 0.18));
+  --hush-glow-2: light-dark(rgb(120 120 255 / 0.16), rgb(90 90 200 / 0.2));
+  --hush-radius: 14px;
+
+  /* Starlight */
+  --sl-font: var(--hush-font);
+  --sl-color-accent-low: light-dark(#ffe8c7, #3d2600);
+  --sl-color-accent: light-dark(#a14a00, #ff9f0a);
+  --sl-color-accent-high: light-dark(#5c2b00, #ffd8a1);
+  --sl-color-white: light-dark(#121214, #ffffff);
+  --sl-color-gray-1: light-dark(#232327, #ececee);
+  --sl-color-gray-2: light-dark(#3a3a3f, #c4c4c8);
+  --sl-color-gray-3: light-dark(#5b5b61, #8e8e94);
+  --sl-color-gray-4: light-dark(#8e8e94, #5b5b61);
+  --sl-color-gray-5: light-dark(#c4c4c8, #3a3a3f);
+  --sl-color-gray-6: light-dark(#ececee, #232327);
+  --sl-color-gray-7: light-dark(#f6f6f7, #17171a);
+  --sl-color-black: light-dark(#ffffff, #121214);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+.hush-tabular {
+  font-variant-numeric: tabular-nums;
+}

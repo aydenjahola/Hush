@@ -1,18 +1,69 @@
-# Hush manual test checklist
+---
+title: Testing
+description: Run Hush's unit tests, the Core Audio integration tests and the manual checklist to work through before every release.
+---
+
+Hush has three kinds of tests. Automated unit tests cover all the logic that doesn't need real audio hardware. Integration tests run Hush's real engines against real Core Audio. A manual checklist covers what only a person can check.
 
 ## Before every release
 
-`make integration-test` must pass. It runs Hush's real engines against real Core Audio: process taps, aggregate devices, the process monitor, and what actually reaches the output, including the mute regression test. A plain `make test` uses fake engines and can't catch those bugs.
+1. `make test` passes.
+2. `make integration-test` passes, with no tests skipped. See [Integration tests](#integration-tests).
+3. Every item in the [manual checklist](#manual-checklist) passes.
 
-1. **Install BlackHole 2ch** (a virtual loopback device the end-to-end tests play into and record from): `brew install --cask blackhole-2ch`. If it doesn't show up in Audio MIDI Setup, run `sudo killall coreaudiod` or log out and back in. You don't need to select it as your output: the tests never change the system default output.
-2. **Grant Audio Recording** to the app you run the tests from (Terminal, iTerm or VS Code): System Settings → Privacy & Security → Screen & System Audio Recording, in the System Audio Recording Only list. Quit and reopen that app afterwards. The tests only read this permission and never ask for it, so without it every test is reported as skipped with that instruction.
-3. **Run `make integration-test`.** Every test must pass, none skipped. Without BlackHole the engine-level tests still run, on your default output with a -60 dBFS tone, and the end-to-end tests skip.
+Any change to audio behaviour (engines, taps, aggregate devices, the process monitor, or how the mixer starts, swaps or stops engines) must also pass `make integration-test` before it merges.
 
-Leave the Mac alone while it runs (about a minute): other audio from the terminal app can disturb the level checks.
+## Unit tests
 
-## Manual checks
+```sh
+make test
+```
 
-Run these before every release too. `make run` builds `Hush.app` and launches it. Test the app bundle, not the bare binary from Xcode's Run button: without the bundle there's no bundle ID or usage description, so permission and Settings misbehave.
+The tests use Swift Testing (`@Test` and `#expect`) and need Xcode 26. See [Build from source](/Hush/contributing/build-from-source/) for the setup.
+
+| Target | What it covers |
+|---|---|
+| `HushCoreTests` | Volume curve, soft limiter (the output never reaches 1.0), sample processing and gain ramps, meter ballistics, setting clamping, settings document versioning and normalisation, strip ordering, semantic versions, the update policy and schedule, and the bundle identifier. |
+| `HushAudioTests` | `BufferRouting` (interleaved and non-interleaved layouts, mono fan-out, stereo on six-channel outputs, skipping the output device's own input streams, zero-filling and silence) and the running-state poller. |
+| `HushUITests` | `MixerStore` against fake process, output, permission and engine sources: the reconcile rule, control engines for playing adjusted apps, meter-only engines while the popover is open, output changes and failed rebuilds, engine error messages and retries, permission flows, "show apps that aren't playing", frozen strip order, saving and Reset All Levels. `UpdateChecker` against a fake fetcher and notifier. `SettingsStore`: missing, corrupt and unknown-version files. |
+
+Fakes for the `MixerStore` dependencies live in `Tests/HushUITests/`. New behaviour in `MixerStore` should come with a test that drives it through those fakes.
+
+## Integration tests
+
+The unit tests use fake engines, so they keep passing even when real muting breaks. The `HushIntegrationTests` target plays a real tone from a helper process (`HushToneGenerator`), lets Hush tap it, and checks what Core Audio does: that taps receive audio, that gain and boost scale the output, that `stop()` leaves no aggregate device behind, that the process monitor notices playback starting and stopping, and, through the BlackHole loopback, that mute really silences the app, that 50% is 12 dB down, and that swapping engines never lets a burst or a gap through.
+
+A plain `swift test` (and CI's build job) reports these tests as skipped. To run them:
+
+1. **Install BlackHole 2ch**, a virtual loopback device. The end-to-end tests play into it and record what comes back:
+
+   ```sh
+   brew install --cask blackhole-2ch
+   ```
+
+   If it doesn't show up in Audio MIDI Setup, run `sudo killall coreaudiod` or log out and back in. Don't select it as your output: the tests never change the system default output.
+2. **Grant Audio Recording** to the app you run the tests from (Terminal, iTerm or VS Code): System Settings → Privacy & Security → Screen & System Audio Recording, in the System Audio Recording Only list. Quit and reopen that app afterwards. The tests only read this permission and never ask for it. Without it, every test is skipped with that instruction.
+3. **Run the tests:**
+
+   ```sh
+   make integration-test
+   ```
+
+   This builds `HushToneGenerator`, then runs `HUSH_INTEGRATION=1 swift test --no-parallel --filter HushIntegrationTests`. Every test must pass, none skipped. Without BlackHole, the engine-level tests still run, on your default output with a -60 dBFS tone, and the end-to-end tests skip.
+
+Leave the Mac alone while the tests run (about a minute). Other audio from the terminal app can disturb the level checks.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
+
+- **build-and-test** runs `swift build` and `swift test` on a macOS 26 runner. The integration tests show as skipped.
+- **integration** is experimental and can't fail the build. It installs BlackHole, tries to grant Audio Recording with `scripts/ci-grant-audio-capture.sh` (only possible when SIP is off), runs `make integration-test`, and reports how many tests passed and were skipped. It becomes required once it proves reliable.
+- **website** runs on pull requests that change `website/`. It runs `npm ci`, `npm test` and `npm run build`, and the build fails on any broken internal docs link.
+
+## Manual checklist
+
+Run this before every release, on the build you're about to ship. `make run` builds `Hush.app` and launches it. Test the app bundle, not the bare binary from Xcode's Run button: without the bundle there's no bundle ID or usage description, so permission and Settings misbehave.
 
 - [ ] **Two apps at different levels.** Play audio in two apps (e.g. Music and a browser video). Set one to 30% and the other to 150%. Each changes independently.
 - [ ] **Boost to 200%.** Play a quiet source and raise it to 200%. It's louder, with no harsh clipping on peaks.
@@ -35,3 +86,17 @@ Run these before every release too. `make run` builds `Hush.app` and launches it
 - [ ] **No hitch with many apps.** Play audio in 4–5 apps at once and open the popover several times. It opens without a visible stutter and the meters move smoothly.
 - [ ] **Release DMG from /Applications, with quarantine.** Run `make dmg ARCHS="arm64 x86_64"` (or download the release's `Hush.dmg`). To simulate a browser download, mark it quarantined: `xattr -w com.apple.quarantine "0081;$(printf %x $(date +%s));Safari;" build/Hush.dmg`. Open the DMG: it shows Hush and an Applications shortcut, and Finder shows the fader icon. Drag Hush to Applications and open it from there: Gatekeeper blocks it. Allow it with System Settings → Privacy & Security → "Open Anyway"; Hush launches, asks for Audio Recording permission, and Finder's Get Info on /Applications/Hush.app shows the release version. Repeat with a fresh copy, using `xattr -dr com.apple.quarantine /Applications/Hush.app` instead.
 - [ ] **Update notifier.** Run a build whose version is older than the latest GitHub release (e.g. `echo 0.0.1 > version.txt && make run`, then `git checkout version.txt`). About 30 s after launch: macOS asks once for notification permission, a "Hush X.Y.Z is available" notification appears with Download / Later / Skip This Version, the menu bar icon shows a dot (check it in a light and a dark menu bar), and the popover shows the same banner. **Download** opens the release's DMG in the browser and nothing is installed. **Later** hides the banner and dot; they return after 24 h (or after setting `snoozedUntil` in the past in `~/Library/Application Support/Hush/settings.json` and relaunching). **Skip This Version** hides them for good, also after a relaunch, until a newer release exists. Repeat the three actions from the notification itself; clicking the notification body acts as Download, and Download or Skip removes the notification from Notification Center. Deny notifications: the banner and dot still appear. Settings → "Check Now" shows "Checking…" then "Hush X.Y.Z is available"; offline it shows "Couldn't check for updates"; on the current release it shows "Hush is up to date". With "Check for updates automatically" off, relaunching makes no request (watch with Little Snitch or `nettop -p Hush`).
+
+## Website checks
+
+For changes to `website/`:
+
+```sh
+cd website
+npm ci
+npm test        # unit tests for the release lookup
+npm run build   # must end with "All internal links are valid."
+npm run preview # then check the pages at http://localhost:4321/Hush/
+```
+
+In the preview, check the landing page and at least one docs page in light and dark mode, at widths of 1280 px and 400 px, and check that search returns docs results.

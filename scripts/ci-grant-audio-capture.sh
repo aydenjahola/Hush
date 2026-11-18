@@ -6,7 +6,7 @@
 # and the TCC.db schema matches what's written below. It never fails the job: if the grant doesn't
 # take, the integration tests skip themselves with the permission message instead of prompting.
 #
-# Never run this on your own Mac. Grant permission in System Settings instead (see docs/manual-test.md).
+# Never run this on your own Mac. Grant permission in System Settings instead (see https://aydenjahola.github.io/Hush/contributing/testing/#integration-tests).
 
 set -u
 

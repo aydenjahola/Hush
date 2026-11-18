@@ -1,0 +1,24 @@
+---
+import { getCollection, render } from 'astro:content';
+
+const [entry] = await getCollection('changelog');
+// Before the first release the file is just "# Changelog", with no release sections.
+const hasReleases = entry ? /^##\s/m.test(entry.body ?? '') : false;
+const rendered = entry && hasReleases ? await render(entry) : undefined;
+const Content = rendered?.Content;
+---
+{Content ? (
+  <div class="hush-changelog"><Content /></div>
+) : (
+  <p>
+    Hush hasn't had a release yet. Release notes will appear here automatically when the first version ships.
+    Until then, see the <a href="https://github.com/aydenjahola/Hush/commits/main">commit history on GitHub</a>.
+  </p>
+)}
+
+<style>
+  /* release-please starts the file with "# Changelog", which repeats the page title. */
+  .hush-changelog > :global(h1:first-child) {
+    display: none;
+  }
+</style>
