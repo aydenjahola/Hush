@@ -16,3 +16,48 @@ jobs:
         run: swift build
       - name: Test
         run: swift test
+
+  # EXPERIMENTAL: real Core Audio integration tests (make integration-test) with BlackHole 2ch.
+  # Hosted runners have no audio hardware and no way to click a TCC prompt, so this depends on
+  # scripts/ci-grant-audio-capture.sh writing TCC.db (only possible with SIP disabled). If the grant
+  # doesn't take, the tests skip themselves rather than fail. continue-on-error keeps this job from
+  # blocking merges; make it required (drop continue-on-error) once it has proven reliable.
+  integration:
+    runs-on: macos-26
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install BlackHole 2ch
+        run: |
+          brew install --cask blackhole-2ch
+          sudo killall coreaudiod || true
+      - name: Wait for BlackHole
+        run: |
+          for _ in $(seq 1 30); do
+            if system_profiler SPAudioDataType 2>/dev/null | grep -q "BlackHole 2ch"; then
+              echo "BlackHole 2ch is available."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "BlackHole 2ch didn't appear within 60 s; end-to-end tests will skip."
+      - name: Grant Audio Recording (experimental)
+        run: scripts/ci-grant-audio-capture.sh
+      - name: Integration tests
+        run: |
+          set -o pipefail
+          make integration-test 2>&1 | tee integration.log
+      - name: Summary
+        if: always()
+        run: |
+          # Per-test result lines; "Test run with ..." is the overall summary, not a test.
+          tests=$(grep -E '^[^ ]+ Test ' integration.log | grep -v ' Test run with ' || true)
+          passed=$(printf '%s\n' "$tests" | grep -c ' passed after' || true)
+          skipped=$(printf '%s\n' "$tests" | grep -c ' skipped' || true)
+          failed=$(printf '%s\n' "$tests" | grep -c ' failed after' || true)
+          echo "Integration tests: ${passed} passed, ${skipped} skipped, ${failed} failed"
+          {
+            echo "### Core Audio integration tests (experimental)"
+            echo "${passed} passed, ${skipped} skipped, ${failed} failed"
+          } >> "$GITHUB_STEP_SUMMARY"
