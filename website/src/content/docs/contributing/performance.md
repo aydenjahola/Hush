@@ -12,6 +12,7 @@ Hush lives in the menu bar all day, so it has to cost almost nothing while it si
 | Idle: popover closed, nothing adjusted, a quiet system | Average CPU under 0.1%, and under 1 wake-up per second |
 | Idle with ordinary app churn (sounds starting and stopping) | Average CPU under 0.2% |
 | An adjusted app is running, popover closed | Average CPU under 0.15%, and no more than 2 wake-ups per second |
+| One adjusted app playing (real engine) | Average CPU under 1% |
 | Popover open with 3 playing apps | Average CPU under 2% |
 | Memory (resident size) | Under 40 MB, with the popover opened and closed |
 | Growth over 30 minutes of churn | None: memory settles and `leaks` reports 0 leaks |
@@ -29,6 +30,9 @@ Measured with the headless harness described below, on an Apple M4 running macOS
 | An adjusted app, popover closed | 0.09% | 0.15% |
 | Idle with app churn | 0.11% | 0.2% |
 | Popover open, 3 strips with live meters | 1.47% | 2% |
+| One adjusted app playing (real engine) | 0.47% | 1% |
+
+The harness rows use fake engines, so they exclude real audio processing. The "one adjusted app playing (real engine)" row covers that: it was measured at 0.47% on the owner's Mac with Spotify muted and the popover closed.
 
 Memory sits well under 40 MB with the SwiftUI scene loaded, and a 10 minute churn run showed no leaks and under 1 MB of growth.
 
