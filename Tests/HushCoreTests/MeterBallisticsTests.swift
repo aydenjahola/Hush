@@ -16,6 +16,11 @@ import Testing
         #expect(isApproximatelyEqual(next, 0.1))
     }
 
+    @Test func negativeElapsedTimeDoesNotGrowTheLevel() {
+        #expect(MeterBallistics.next(displayed: 0.5, peak: 0, elapsed: -1) == 0.5)
+        #expect(MeterBallistics.next(displayed: 0.5, peak: 0.2, elapsed: -0.033) == 0.5)
+    }
+
     @Test func snapsTinyLevelsToZero() {
         #expect(MeterBallistics.next(displayed: 0.000_05, peak: 0, elapsed: 0.033) == 0)
     }

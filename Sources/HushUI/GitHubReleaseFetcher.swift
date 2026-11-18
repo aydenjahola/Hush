@@ -66,13 +66,18 @@ nonisolated package struct GitHubReleaseFetcher: ReleaseFetching {
         }
     }
 
+    /// A header value as seconds, or nil unless it's a finite number ("nan" and "inf" parse as Doubles).
+    private static func finiteSeconds(_ value: String) -> TimeInterval? {
+        TimeInterval(value).flatMap { $0.isFinite ? $0 : nil }
+    }
+
     /// Seconds from Retry-After, or until x-ratelimit-reset when the limit is used up; 0...24 h.
     private static func retryDelay(_ http: HTTPURLResponse, now: Date) -> TimeInterval? {
         let delay: TimeInterval
-        if let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init) {
+        if let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(finiteSeconds) {
             delay = retryAfter
         } else if http.value(forHTTPHeaderField: "x-ratelimit-remaining") == "0",
-                  let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(TimeInterval.init) {
+                  let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(finiteSeconds) {
             delay = reset - now.timeIntervalSince1970
         } else {
             return nil

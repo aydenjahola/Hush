@@ -82,6 +82,16 @@ import Testing
         }
     }
 
+    @Test(arguments: ["nan", "inf", "-inf", "NaN", "soon"])
+    func nonFiniteRetryAfterIsIgnored(value: String) {
+        #expect(throws: ReleaseFetchError.rateLimited(retryAfter: nil)) {
+            try result(429, headers: ["Retry-After": value])
+        }
+        #expect(throws: ReleaseFetchError.rateLimited(retryAfter: nil)) {
+            try result(429, headers: ["x-ratelimit-remaining": "0", "x-ratelimit-reset": value])
+        }
+    }
+
     @Test func rateLimitWithoutHintsHasNoDelay() {
         #expect(throws: ReleaseFetchError.rateLimited(retryAfter: nil)) { try result(429) }
     }

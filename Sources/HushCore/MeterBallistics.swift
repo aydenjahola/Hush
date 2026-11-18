@@ -7,6 +7,8 @@ package enum MeterBallistics {
 
     /// The next displayed linear level given the latest engine peak.
     package static func next(displayed: Float, peak: Float, elapsed: Double) -> Float {
+        // A clock step backwards must not make the meter grow.
+        let elapsed = max(elapsed, 0)
         let decayFactor = Float(pow(10, -decayDecibelsPerSecond * elapsed / 20))
         let value = max(peak, displayed * decayFactor)
         return value < 0.000_1 ? 0 : value
