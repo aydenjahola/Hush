@@ -53,7 +53,9 @@ A plain `swift test` (and CI's build job) reports these tests as skipped. To run
 
    This builds `HushToneGenerator`, then runs `HUSH_INTEGRATION=1 swift test --no-parallel --filter HushIntegrationTests`. Every test must pass, none skipped. Without BlackHole, the engine-level tests still run, on your default output with a -60 dBFS tone, and the end-to-end tests skip.
 
-   Afterwards it prints how many tests actually ran and whether the BlackHole group ran. Swift Testing counts skipped tests as passed, so if none ran, `make integration-test` fails with "No integration tests ran". Set `ALLOW_SKIP=1` to allow that (CI does).
+   Afterwards it prints how many tests actually ran and whether the BlackHole group ran. Swift Testing counts skipped tests as passed, so `make integration-test` fails if no test ran ("No integration tests ran") or if the BlackHole end-to-end group didn't run, and says why. Set `ALLOW_SKIP=1` to allow either (CI does).
+
+   The check that `stop()` leaves no process tap behind only runs when the HAL lists the test's own taps (`kAudioHardwarePropertyTapList`). If it doesn't, only the aggregate-device check runs.
 
 Leave the Mac alone while the tests run (about a minute). Other audio from the terminal app can disturb the level checks.
 
