@@ -25,17 +25,29 @@ DMG_ROOT := build/dmg-root
 # SwiftUI/Observation macros ship with Xcode. DEVELOPER_DIR, when set, wins over xcode-select.
 DEV_DIR := $(or $(DEVELOPER_DIR),$(shell xcode-select -p 2>/dev/null))
 
+XCODE_MESSAGE := Hush needs Xcode 26+ to build. Install Xcode, then run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer (or set DEVELOPER_DIR)
+
 INSTALL_DIR ?= /Applications
+BUNDLE_ID := io.github.aydenjahola.Hush
 
 .PHONY: require-xcode build test app dmg install icon run clean
 
+# Fails unless the developer directory is inside an Xcode app whose version is 26 or later.
 require-xcode:
 	@case "$(DEV_DIR)" in \
 		*.app/Contents/Developer|*.app/Contents/Developer/) ;; \
-		*) echo "Hush needs Xcode 26+ to build. Install Xcode, then run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer (or set DEVELOPER_DIR)" >&2; \
+		*) echo "$(XCODE_MESSAGE)" >&2; \
 		   echo "Current developer directory: $(or $(DEV_DIR),none)" >&2; \
 		   exit 1 ;; \
-	esac
+	esac; \
+	version="$$(DEVELOPER_DIR="$(DEV_DIR)" xcodebuild -version 2>/dev/null | awk 'NR == 1 { print $$2 }')"; \
+	major="$${version%%.*}"; \
+	case "$$major" in ''|*[!0-9]*) major=0 ;; esac; \
+	if [ "$$major" -lt 26 ]; then \
+		echo "$(XCODE_MESSAGE)" >&2; \
+		echo "Found Xcode $${version:-(unknown version)} at $(DEV_DIR)" >&2; \
+		exit 1; \
+	fi
 
 build: require-xcode
 	swift build
@@ -83,13 +95,24 @@ icon:
 run: app
 	open $(APP)
 
-# Builds first, so a failed build leaves the installed copy running. Then quits Hush, waits up to
-# 5 s for it to exit, replaces the installed app and relaunches it. Honors ARCHS like `app`.
+# Builds first, so a failed build leaves the installed copy running. Then asks Hush to quit
+# (falling back to pkill after 5 s), replaces the installed app and relaunches it. Honors ARCHS
+# like `app`. The quit event is only sent while Hush runs: AppleScript would otherwise launch it.
 install: app
-	pkill -x Hush || true
-	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do \
-		pgrep -x Hush >/dev/null || break; sleep 0.2; \
-	done
+	if pgrep -x Hush >/dev/null; then \
+		osascript -e 'quit app id "$(BUNDLE_ID)"' >/dev/null 2>&1 || true; \
+		for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do \
+			pgrep -x Hush >/dev/null || break; sleep 0.2; \
+		done; \
+	fi
+	if pgrep -x Hush >/dev/null; then \
+		pkill -x Hush || true; \
+		for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x Hush >/dev/null || break; sleep 0.2; done; \
+	fi
+	@if pgrep -x Hush >/dev/null; then \
+		echo "Hush is still running. Quit it (right-click the gear, then Quit Hush) and run make install again." >&2; \
+		exit 1; \
+	fi
 	rm -rf "$(INSTALL_DIR)/Hush.app"
 	ditto $(APP) "$(INSTALL_DIR)/Hush.app"
 	open "$(INSTALL_DIR)/Hush.app"
