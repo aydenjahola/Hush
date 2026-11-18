@@ -58,7 +58,55 @@ import Testing
         #expect(h.store.playingCount == 1)
         #expect(h.factory.live("a")?.mode == .meterOnly)
         #expect(h.factory.live("b") == nil, "no meter engine for a hidden app")
-        #expect(h.factory.events.allSatisfy { !$0.contains(" b ") })
+        #expect(h.factory.made.map(\.appID) == ["a"])
+    }
+
+    @Test func hiddenAppNeverGetsASettingWritten() {
+        let h = Harness(document: SettingsDocument(hiddenApps: hidden("b")))
+        h.processes.emit([makeApp("b")])
+
+        h.store.setPercent(40, for: "b")
+        h.store.toggleMute(for: "b")
+        h.store.resetVolume(for: "b")
+
+        #expect(h.factory.made.isEmpty)
+        h.store.flushPendingSave()
+        #expect(h.persister.saved.allSatisfy { $0.apps["b"] == nil })
+    }
+
+    @Test func hidingAMutedAppWithTheMixerOpenAndMetersOnLeavesNoEngineOrMeter() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a", objects: [1]), makeApp("b", objects: [2])])
+        h.store.toggleMute(for: "b")
+        h.store.popoverDidAppear()
+        let engine = try #require(h.factory.live("b"))
+        #expect(engine.mode == .control)
+        engine.peak = 0.5
+        h.store.tickMeters(elapsed: 0.033)
+
+        h.store.hideApp("b", displayName: "B")
+
+        #expect(engine.isStopped)
+        #expect(h.factory.live("b") == nil, "no meter-only engine replaces it")
+        #expect(h.store.meterLevels["b"] == nil)
+        #expect(h.store.strips.map(\.id) == ["a"])
+        h.store.tickMeters(elapsed: 0.033)
+        #expect(h.store.meterLevels["b"] == nil)
+        h.store.flushPendingSave()
+        #expect(h.persister.saved.last?.apps["b"] == nil)
+    }
+
+    @Test func changingMaxBoostKeepsAppsHidden() {
+        let h = Harness(document: SettingsDocument(hiddenApps: hidden("b")))
+        h.processes.emit([makeApp("a"), makeApp("b")])
+
+        h.store.setMaxBoost(.percent150)
+        h.store.flushPendingSave()
+
+        #expect(h.store.hiddenApps == hidden("b"))
+        #expect(h.store.strips.map(\.id) == ["a"])
+        #expect(h.persister.saved.last?.hiddenApps == hidden("b"))
+        #expect(h.persister.saved.last?.preferences.maxBoostPercent == .percent150)
     }
 
     @Test func savedLevelOfAHiddenAppIsNeverApplied() {
