@@ -31,7 +31,7 @@ extension CoreAudioIntegration {
         }
 
         @Test(
-            "A running engine's IO cycle count advances, and stops once the engine stops",
+            "A running engine's IO cycle count advances and its aggregate lists the output; both stop with the engine",
             .enabled(if: IntegrationEnvironment.isEnabled, IntegrationEnvironment.disabledMessage))
         func ioCycleCountTracksTheIOProc() async throws {
             IntegrationEnvironment.recordRun(group: "A")
@@ -45,16 +45,19 @@ extension CoreAudioIntegration {
             defer { engine.stop() }
             try engine.start()
             let start = engine.ioCycleCount
-            // The wake health check waits 300 ms; a running engine must advance well within that.
-            let advanced = await waitUntil(timeout: .milliseconds(300), interval: .milliseconds(10)) {
+            let advanced = await waitUntil(timeout: .seconds(1), interval: .milliseconds(10)) {
                 engine.ioCycleCount != start
             }
-            #expect(advanced, "the count stayed at \(start) for 300 ms on a running engine")
+            #expect(advanced, "the count stayed at \(start) for 1 s on a running engine")
+            #expect(
+                engine.isAttached(toOutputDeviceID: output.device.id) == true,
+                "the aggregate's active sub-device list should contain the output (\(output.device.id))")
 
             engine.stop()
             let stopped = engine.ioCycleCount
             try await Task.sleep(for: .milliseconds(100))
             #expect(engine.ioCycleCount == stopped, "a stopped engine reads as stalled")
+            #expect(engine.isAttached(toOutputDeviceID: output.device.id) == false)
         }
 
         @Test(

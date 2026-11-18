@@ -73,6 +73,15 @@ package final class AppAudioEngine: AudioEngineHandle {
 
     package var ioCycleCount: UInt32 { state.ioCycles.load(ordering: .relaxed) }
 
+    package func isAttached(toOutputDeviceID outputDeviceID: AudioObjectID) -> Bool? {
+        guard aggregateID != kAudioObjectUnknown else { return false }
+        guard
+            let active = try? CoreAudioProperty.array(
+                aggregateID, kAudioAggregateDevicePropertyActiveSubDeviceList, filler: AudioObjectID(0))
+        else { return nil }
+        return active.contains(outputDeviceID)
+    }
+
     package func start() throws {
         guard tapID == kAudioObjectUnknown else { return }
         do {

@@ -71,11 +71,15 @@ extension MixerStore {
     func rebuildEngines(onOutputDevice device: OutputDevice) {
         cancelHealthCheck()  // every engine is about to restart; a pending check is moot
         engineErrors = [:]
+        stallRetryIDs = []
         rebuildEngines(Array(engines.keys), onOutputDevice: device)
     }
 
     /// Rebuilds the engines for `ids` on `device`, dropping (and recording) any that fail.
-    private func rebuildEngines(_ ids: [String], onOutputDevice device: OutputDevice) {
+    /// Returns the IDs that failed.
+    @discardableResult
+    private func rebuildEngines(_ ids: [String], onOutputDevice device: OutputDevice) -> [String] {
+        var failed: [String] = []
         // Two phases so control engines overlap their start-up: every engine restarts first (a
         // control one meter-only), then each is switched back once its IOProc has run. In the
         // typical case the waits overlap (later engines are already running when their turn
@@ -90,6 +94,7 @@ extension MixerStore {
             } catch {
                 tearDownEngine(id)
                 recordFailure(error, for: id, mode: mode)
+                failed.append(id)
             }
         }
         for (id, engine, mode) in started {
@@ -98,8 +103,10 @@ extension MixerStore {
             } catch {
                 tearDownEngine(id)
                 recordFailure(error, for: id, mode: mode)
+                failed.append(id)
             }
         }
+        return failed
     }
 
     // MARK: Health check
@@ -110,47 +117,109 @@ extension MixerStore {
         scheduleHealthCheck()
     }
 
-    /// Notes every engine's IO cycle count, then after `healthCheckDelay` rebuilds only the
-    /// engines whose count hasn't moved. A stalled control engine would leave its app muted at
-    /// the source with nothing replaying it; a running one is left alone, so it never blips.
+    /// Checks every engine in two stages and rebuilds only the ones confirmed unhealthy: no IO
+    /// cycle since the previous reading, or an aggregate whose active sub-devices don't include
+    /// the current output. The first check, after `healthCheckDelay`, only picks out suspects;
+    /// the confirmation, `stallConfirmDelay` later, rebuilds the suspects that are still
+    /// unhealthy. Devices often take more than a few hundred milliseconds to resume IO after a
+    /// wake, and rebuilding an engine that would have recovered brings back the blip this check
+    /// exists to avoid. An engine that is healthy at either check is never touched.
     func scheduleHealthCheck() {
         cancelHealthCheck()
         guard !engines.isEmpty else { return }
-        healthCheckBaseline = engines.mapValues { (engine: $0, cycles: $0.ioCycleCount) }
-        let delay = healthCheckDelay
+        healthReadings = readings(of: Array(engines.keys))
+        let first = healthCheckDelay
+        let confirm = stallConfirmDelay
         healthCheckTask = Task { [weak self] in
-            try? await Task.sleep(for: delay)
+            try? await Task.sleep(for: first)
+            guard !Task.isCancelled, self?.checkHealth(confirming: false) == true else { return }
+            try? await Task.sleep(for: confirm)
             guard !Task.isCancelled else { return }
-            self?.rebuildStalledEngines()
+            self?.checkHealth(confirming: true)
         }
     }
 
     func cancelHealthCheck() {
         healthCheckTask?.cancel()
         healthCheckTask = nil
-        healthCheckBaseline = [:]
+        healthReadings = [:]
     }
 
-    /// Rebuilds, on the current output, each engine that is still the one noted at the start of
-    /// the check and hasn't run an IO cycle since.
-    private func rebuildStalledEngines() {
-        let baseline = healthCheckBaseline
-        healthCheckTask = nil
-        healthCheckBaseline = [:]
-        guard controlsEnabled, let device = outputDevice else { return }
-        let stalled = engines.compactMap { id, engine -> String? in
-            guard let noted = baseline[id], noted.engine === engine, noted.cycles == engine.ioCycleCount else {
-                return nil
-            }
-            return id
+    /// One stage of the health check (see `scheduleHealthCheck`). The first stage keeps only the
+    /// suspects, with fresh readings, and returns whether there are any. The confirming stage
+    /// rebuilds the suspects that are still unhealthy and ends the check.
+    @discardableResult
+    func checkHealth(confirming: Bool) -> Bool {
+        guard controlsEnabled, let device = outputDevice else {
+            cancelHealthCheck()
+            return false
         }
-        guard !stalled.isEmpty else { return }
+        let suspects = engines.compactMap { id, engine -> String? in
+            guard let noted = healthReadings[id], noted.engine === engine else { return nil }
+            let stalled = noted.cycles == engine.ioCycleCount
+            // nil means the list couldn't be read, which is no evidence either way.
+            let detached = engine.isAttached(toOutputDeviceID: device.id) == false
+            return stalled || detached ? id : nil
+        }
+        guard confirming else {
+            healthReadings = readings(of: suspects)
+            if suspects.isEmpty { healthCheckTask = nil }
+            return !suspects.isEmpty
+        }
+        healthCheckTask = nil
+        healthReadings = [:]
+        guard !suspects.isEmpty else { return false }
         logger.notice(
-            "Rebuilding \(stalled.count) stalled engine(s): \(stalled.sorted().joined(separator: ", "), privacy: .public)"
+            "Rebuilding \(suspects.count) stalled engine(s): \(suspects.sorted().joined(separator: ", "), privacy: .public)"
         )
-        rebuildEngines(stalled, onOutputDevice: device)
+        let failed = rebuildEngines(suspects, onOutputDevice: device)
+        if !failed.isEmpty { scheduleStallRetry(for: failed) }
         reconcile()
         rebuildStrips()
+        return false
+    }
+
+    private func readings(of ids: [String]) -> [String: EngineReading] {
+        var readings: [String: EngineReading] = [:]
+        for id in ids {
+            guard let engine = engines[id] else { continue }
+            readings[id] = EngineReading(engine: engine, cycles: engine.ioCycleCount)
+        }
+        return readings
+    }
+
+    /// A stall rebuild can fail because the device isn't ready yet after a wake. Unlike other
+    /// failures, these don't wait for the user: they're cleared (so `reconcile` tries again) on
+    /// the next output or device-list change, or once after `stallRetryDelay`, whichever is first.
+    private func scheduleStallRetry(for ids: [String]) {
+        stallRetryIDs.formUnion(ids)
+        stallRetryTask?.cancel()
+        let delay = stallRetryDelay
+        stallRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            self?.retryStalledEngines()
+        }
+    }
+
+    /// Clears the errors left by failed stall rebuilds and reconciles, which builds those
+    /// engines again. A failure this time is an ordinary one.
+    func retryStalledEngines() {
+        guard clearStallRetries() else { return }
+        reconcile()
+        rebuildStrips()
+    }
+
+    /// Clears the errors left by failed stall rebuilds, without reconciling. Returns whether
+    /// there were any.
+    @discardableResult
+    func clearStallRetries() -> Bool {
+        stallRetryTask?.cancel()
+        stallRetryTask = nil
+        guard !stallRetryIDs.isEmpty else { return false }
+        for id in stallRetryIDs { engineErrors[id] = nil }
+        stallRetryIDs = []
+        return true
     }
 
     /// Updates the process list first, then the mode. Returns false (after logging) if the engine
@@ -206,7 +275,15 @@ extension MixerStore {
             case .meterOnly: String(localized: L10n.meterFailed)
             }
         engineErrors[id] = String(localized: L10n.failureDetail(summary, "\(error)"))
+        stallRetryIDs.remove(id)  // the stall path marks its own failures retryable afterwards
         if mode == .meterOnly { meterOnlyErrorIDs.insert(id) } else { meterOnlyErrorIDs.remove(id) }
         logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
     }
+}
+
+/// One engine and its IO cycle count at a health-check reading. The reference is weak, so a
+/// pending check never keeps a stopped engine alive, and a replaced engine never matches.
+struct EngineReading {
+    weak var engine: (any AudioEngineHandle)?
+    let cycles: UInt32
 }

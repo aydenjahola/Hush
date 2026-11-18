@@ -99,14 +99,13 @@ final class FakeEngine: AudioEngineHandle {
     func setGain(_ gain: Float) { currentGain = gain }
     func currentPeak() -> Float { peak }
 
-    /// False models a stalled IOProc: the cycle count stops moving. While true, every read
-    /// returns a higher count, as if IO ran in between.
-    var isFlowing = true
-    private var cycles: UInt32 = 0
-    var ioCycleCount: UInt32 {
-        if isFlowing { cycles &+= 1 }
-        return cycles
-    }
+    /// The IO cycle count only moves when a test calls `runIO()`, so an engine looks stalled
+    /// unless the test says IO ran.
+    private(set) var ioCycleCount: UInt32 = 0
+    func runIO() { ioCycleCount &+= 1 }
+    /// What `isAttached(toOutputDeviceID:)` reports.
+    var attached: Bool? = true
+    func isAttached(toOutputDeviceID outputDeviceID: AudioObjectID) -> Bool? { attached }
 
     var finishRebuildError: (any Error)?
 
@@ -120,7 +119,7 @@ final class FakeEngine: AudioEngineHandle {
         log?("beginRebuild \(appID)")
         if let rebuildError { throw rebuildError }
         rebuiltDeviceIDs.append(outputDeviceID)
-        isFlowing = true  // a rebuilt engine runs on a fresh aggregate
+        attached = true  // a rebuilt engine has a fresh aggregate on the new device
         if mode == .control {
             mode = .meterOnly
             pendingControl = true
@@ -224,6 +223,7 @@ final class Harness {
         permission status: AudioCapturePermissionStatus = .authorized,
         answer: AudioCapturePermissionStatus? = nil,
         outputErrorDuration: Duration = .seconds(3600),
+        healthCheckDelay: Duration = .seconds(3600),
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = { _ in nil }
     ) {
         let processes = FakeProcessSource()
@@ -247,16 +247,17 @@ final class Harness {
             saveDelay: .seconds(3600),
             outputErrorDuration: outputErrorDuration,
             wakeNotifications: wakeNotifications,
-            healthCheckDelay: .zero,
+            healthCheckDelay: healthCheckDelay,
+            stallConfirmDelay: healthCheckDelay,
+            stallRetryDelay: .seconds(3600),
             now: { Harness.fixedNow },
             installedApp: installedApp)
         store.start()
     }
 
-    /// Posts a wake notification, then waits for the health check it schedules to finish.
-    func simulateWake() async {
+    /// Posts a wake notification, as `NSWorkspace` does when the Mac wakes.
+    func simulateWake() {
         wakeNotifications.post(name: NSWorkspace.didWakeNotification, object: nil)
-        await store.healthCheckTask?.value
     }
 }
 

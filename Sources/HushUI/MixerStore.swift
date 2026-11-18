@@ -63,12 +63,19 @@ package final class MixerStore {
     /// Where `NSWorkspace.didWakeNotification` arrives (injectable for tests).
     @ObservationIgnored private let wakeNotifications: NotificationCenter
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
-    /// How long the health check waits before comparing each engine's IO cycle count.
+    /// How long the health check waits before its first reading (see `scheduleHealthCheck`).
     @ObservationIgnored let healthCheckDelay: Duration
+    /// How much longer it waits before confirming a suspected stall and rebuilding.
+    @ObservationIgnored let stallConfirmDelay: Duration
+    /// How long after a failed stall rebuild Hush tries that app again.
+    @ObservationIgnored let stallRetryDelay: Duration
     /// The pending health check, if any (exposed for tests).
     @ObservationIgnored var healthCheckTask: Task<Void, Never>?
-    /// Each engine and its IO cycle count when the pending health check began.
-    @ObservationIgnored var healthCheckBaseline: [String: (engine: any AudioEngineHandle, cycles: UInt32)] = [:]
+    /// The engines the pending health check is watching, as of its last reading.
+    @ObservationIgnored var healthReadings: [String: EngineReading] = [:]
+    /// Apps whose current error came from a failed stall rebuild, so it's retried automatically.
+    @ObservationIgnored var stallRetryIDs: Set<String> = []
+    @ObservationIgnored var stallRetryTask: Task<Void, Never>?
     @ObservationIgnored private let permissionSource: any AudioCapturePermissionSource
     @ObservationIgnored private let persister: any SettingsPersisting
     @ObservationIgnored private let now: () -> Date
@@ -95,6 +102,8 @@ package final class MixerStore {
         outputErrorDuration: Duration = .seconds(4),
         wakeNotifications: NotificationCenter = NSWorkspace.shared.notificationCenter,
         healthCheckDelay: Duration = .milliseconds(300),
+        stallConfirmDelay: Duration = .milliseconds(1700),
+        stallRetryDelay: Duration = .seconds(3),
         now: @escaping () -> Date = Date.init,
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = InstalledAppInfo.lookUp(bundleID:)
     ) {
@@ -107,6 +116,8 @@ package final class MixerStore {
         self.outputErrorDuration = outputErrorDuration
         self.wakeNotifications = wakeNotifications
         self.healthCheckDelay = healthCheckDelay
+        self.stallConfirmDelay = stallConfirmDelay
+        self.stallRetryDelay = stallRetryDelay
         self.now = now
         self.installedApp = installedApp
         let document = persister.load()
@@ -295,7 +306,11 @@ package final class MixerStore {
     package func shutdown() {
         flushPendingSave()
         stopMeterPolling()
+        if let wakeObserver { wakeNotifications.removeObserver(wakeObserver) }
+        wakeObserver = nil
         cancelHealthCheck()
+        stallRetryTask?.cancel()
+        stallRetryTask = nil
         tearDownAllEngines()
     }
 
@@ -320,12 +335,13 @@ package final class MixerStore {
             if OutputDevice.isSameDevice(previous, device) {
                 // The same device under a new object ID (it was re-enumerated, as can happen
                 // across sleep). The aggregates name it by UID, so keep every engine and only
-                // rebuild the ones whose IO stopped.
+                // rebuild the ones whose IO stopped or that didn't reattach to the new ID.
                 scheduleHealthCheck()
             } else {
                 rebuildEngines(onOutputDevice: device)
             }
         }
+        clearStallRetries()  // a device that wasn't ready may be now
         reconcile()
         rebuildStrips()
     }
