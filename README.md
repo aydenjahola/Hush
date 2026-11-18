@@ -16,11 +16,13 @@ Turn Spotify down, boost a quiet call, mute a noisy tab: Hush gives every app th
 
 The documentation covers [installing](https://aydenjahola.github.io/Hush/getting-started/install/) (including uninstalling), [using the mixer](https://aydenjahola.github.io/Hush/using/mixer/), [settings](https://aydenjahola.github.io/Hush/using/settings/), [troubleshooting](https://aydenjahola.github.io/Hush/help/troubleshooting/), [building from source](https://aydenjahola.github.io/Hush/contributing/build-from-source/), [releasing](https://aydenjahola.github.io/Hush/contributing/releasing/) and [how Hush works](https://aydenjahola.github.io/Hush/contributing/architecture/). The essentials are below.
 
-<!-- Screenshots: replace each comment with a real capture once it exists.
-<p align="center"><img src="website/public/screenshot-strips.png" width="340" alt="Hush mixer, channel strips layout"></p>
-<p align="center"><img src="website/public/screenshot-rows.png" width="340" alt="Hush mixer, classic rows layout"></p>
-<p align="center"><img src="website/public/screenshot-tiles.png" width="340" alt="Hush mixer, tiles layout"></p>
--->
+<p align="center"><img src="docs/screenshots/strips.png" width="436" alt="The Hush mixer open from the menu bar in the channel strips layout: Discord boosted to 150%, Safari muted, Spotify at 62% and Zen at 100%, each with a live level meter."></p>
+
+Hush has three layouts, chosen in Settings:
+
+| Channel strips | Classic rows | Tiles |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/strips.png" alt="Hush channel strips layout"> | <img src="docs/screenshots/rows.png" alt="Hush classic rows layout"> | <img src="docs/screenshots/tiles.png" alt="Hush tiles layout"> |
 
 ## Features
 
@@ -105,7 +107,7 @@ For each app you adjust, Hush creates a private process tap that mutes the app a
 
 - For muted, lowered or boosted apps, up to about a second (usually much less) of each new sound can play at normal volume before Hush notices it and starts processing it. This includes a muted app's notification sounds, and the first sound after an app launches or starts a new audio helper process (common in browsers).
 - Audio from command-line tools is attributed to the terminal app that launched them.
-- When you switch output devices, muted, lowered or boosted apps briefly play at their normal level while Hush rebuilds their engines.
+- When you switch output devices, and briefly after your Mac wakes from sleep, muted, lowered or boosted apps play at their normal level while Hush rebuilds their engines.
 - When Hush starts adjusting an app that's already playing, there can be a tiny (~10 ms) dropout at that moment. Core Audio drops one buffer of the app's audio when Hush takes it over.
 
 ## Releasing

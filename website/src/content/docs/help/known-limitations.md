@@ -15,7 +15,7 @@ When Hush starts adjusting an app that's already playing, there can be a tiny (~
 
 ## Switching output devices causes a short blip
 
-When you change the output device, for example by connecting headphones, Hush rebuilds each adjusted app's tap on the new device. For that moment, apps play at their normal level.
+When you change the output device, for example by connecting headphones, Hush rebuilds each adjusted app's tap on the new device. For that moment, apps play at their normal level. The same brief blip happens after your Mac wakes from sleep, while Hush rebuilds the taps.
 
 ## Command-line audio is listed under the terminal
 
