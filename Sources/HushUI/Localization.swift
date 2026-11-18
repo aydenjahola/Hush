@@ -94,6 +94,15 @@ package enum L10n {
     package static let checkNow = resource("Check Now")
     package static let about = resource("About")
     package static let version = resource("Version")
+    package static func localVersion(_ version: String, commit: String?) -> LocalizedStringResource {
+        if let commit { resource("\(version) (local build, \(commit))") } else { resource("\(version) (local build)") }
+    }
+    package static let devBadge = resource("DEV")
+    package static let localBuild = resource("Local build")
+    package static func localBuildHelp(_ commit: String) -> LocalizedStringResource {
+        resource("Local build from commit \(commit), not a downloaded release")
+    }
+    package static let localBuildHelpNoCommit = resource("Local build, not a downloaded release")
     package static let sourceCode = resource("Source code on GitHub")
     package static let licence = resource(
         "Hush is free software, released under the GNU General Public License v3.0. It comes with ABSOLUTELY NO WARRANTY."
@@ -156,7 +165,10 @@ package enum L10n {
             clickToMute, clickToUnmute, permissionNeeded, openSystemSettings, updateAvailable("x"), download, later,
             skipThisVersion, downloadHelp, laterHelp, general, launchAtLogin, maximumBoost, showInactiveApps, levels,
             resetAllLevelsButton, resetAllLevelsTitle, resetAllLevels, resetAllLevelsMessage, updates,
-            checkAutomatically, checkNow, about, version, sourceCode, licence, lastChecked("x"), checking, upToDate,
+            checkAutomatically, checkNow, about, version, localVersion("x", commit: "y"),
+            localVersion("x", commit: nil),
+            devBadge, localBuild, localBuildHelp("x"), localBuildHelpNoCommit, sourceCode, licence, lastChecked("x"),
+            checking, upToDate,
             checkFailed, appearance, layout, channelStrips, classicRows, tiles, size, comfortable, compact,
             showLevelMeters, recordingIndicatorNote, showPercentages, sortApps, sortActivity, sortAlphabetical,
             accentColour, amber, systemAccent, menuBarIcon, speaker, faderGlyph, previewChannelStrips,

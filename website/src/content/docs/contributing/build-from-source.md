@@ -52,6 +52,10 @@ When Hush launches, a speaker icon appears in the menu bar and macOS asks for pe
 
 `make app` builds the release configuration for your own architecture. Add `ARCHS="arm64 x86_64"` to `make app`, `make dmg` or `make install` for a universal binary. For a debug app bundle, run `make app CONFIG=debug`.
 
+### Telling a local build from a release
+
+Apps you build yourself show an orange **DEV** badge next to "Hush" in the popover. Hover over it to see the commit the build came from. **Settings → About** shows the version as, for example, `0.2.0 (local build, 545d335)`. A `-dirty` suffix on the commit means the build had uncommitted changes. Only the release workflow builds with `CHANNEL=release`, so downloaded DMGs show no badge.
+
 ### Always run the app bundle
 
 Run `Hush.app` with `make run`, not the bare executable from `swift run` or Xcode's Run button. The app bundle carries Hush's bundle ID (`io.github.aydenjahola.Hush`), the `LSUIElement` flag that keeps it out of the Dock, and the audio recording usage description. Without them the permission prompt and the Settings window misbehave.
