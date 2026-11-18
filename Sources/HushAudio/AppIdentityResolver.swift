@@ -10,26 +10,48 @@ struct AppIdentity: Equatable {
 }
 
 /// Attributes an audio process (often a helper) to the app the user knows.
+///
+/// Every result is cached per PID, standalone ones included: resolving a daemon asks LaunchServices
+/// about every running app. A cached entry is reused while its bundle ID matches, which catches PID
+/// reuse. App launches and terminations invalidate what they can change (`onInvalidate` then asks
+/// the monitor to regroup):
+/// - a launch drops standalone entries, since a helper's app may only now be visible (a helper's
+///   process object can appear before its app is listed as running);
+/// - a termination drops entries attributed to the app that quit.
 @MainActor
 final class AppIdentityResolver {
-    private typealias ResponsibleFunction = @convention(c) (pid_t) -> pid_t
+    private struct Entry {
+        let bundleID: String?
+        let identity: AppIdentity
+        /// The app this process was attributed to; nil for standalone results.
+        let ownerPID: pid_t?
+    }
 
-    private let responsiblePID: ResponsibleFunction?
-    private var cache: [pid_t: (bundleID: String?, identity: AppIdentity)] = [:]
+    /// Called after an app launch or termination dropped cached entries.
+    var onInvalidate: (@MainActor () -> Void)?
 
-    init() {
-        let rtldDefault = UnsafeMutableRawPointer(bitPattern: -2)  // RTLD_DEFAULT
-        responsiblePID = dlsym(rtldDefault, "responsibility_get_pid_responsible_for_pid")
-            .map { unsafeBitCast($0, to: ResponsibleFunction.self) }
+    private let provider: any RunningAppsProviding
+    private var cache: [pid_t: Entry] = [:]
+    /// Running regular apps, taken once per launch or termination instead of once per object.
+    private var regularApps: [(pid: pid_t, bundleID: String)]?
+
+    init(provider: any RunningAppsProviding = WorkspaceRunningApps()) {
+        self.provider = provider
+    }
+
+    func startObserving() {
+        provider.observe { [weak self] event in self?.handle(event) }
+    }
+
+    func stopObserving() {
+        provider.stopObserving()
     }
 
     func identity(pid: pid_t, bundleID: String?) -> AppIdentity {
         if let cached = cache[pid], cached.bundleID == bundleID { return cached.identity }
-        cache[pid] = nil
-        let (resolved, isAttributed) = resolve(pid: pid, bundleID: bundleID)
-        // Standalone fallbacks are not cached: the owning app may become visible later.
-        if isAttributed { cache[pid] = (bundleID, resolved) }
-        return resolved
+        let entry = resolve(pid: pid, bundleID: bundleID)
+        cache[pid] = entry
+        return entry.identity
     }
 
     /// Drops cached entries for processes that no longer exist.
@@ -37,55 +59,56 @@ final class AppIdentityResolver {
         cache = cache.filter { pids.contains($0.key) }
     }
 
-    private func resolve(pid: pid_t, bundleID: String?) -> (identity: AppIdentity, isAttributed: Bool) {
-        if let responsiblePID {
-            let owner = responsiblePID(pid)
-            if owner > 0,
-               let app = NSRunningApplication(processIdentifier: owner),
-               let identity = Self.identity(of: app) {
-                return (identity, true)
-            }
+    private func handle(_ event: RunningAppsEvent) {
+        regularApps = nil
+        let before = cache.count
+        switch event {
+        case .launched:
+            cache = cache.filter { $0.value.ownerPID != nil }
+        case .terminated(let pid):
+            cache = cache.filter { $0.key != pid && $0.value.ownerPID != pid }
+        }
+        if cache.count != before { onInvalidate?() }
+    }
+
+    private func resolve(pid: pid_t, bundleID: String?) -> Entry {
+        if let owner = provider.responsiblePID(for: pid),
+           let app = provider.app(pid: owner),
+           let identity = Self.identity(of: app) {
+            return Entry(bundleID: bundleID, identity: identity, ownerPID: owner)
         }
         if let bundleID,
-           let app = Self.runningApp(owning: bundleID),
+           let owner = regularApp(owning: bundleID),
+           let app = provider.app(pid: owner),
            let identity = Self.identity(of: app) {
-            return (identity, true)
+            return Entry(bundleID: bundleID, identity: identity, ownerPID: owner)
         }
-        let name = Self.executableName(pid: pid)
-        let running = NSRunningApplication(processIdentifier: pid)
+        let running = provider.app(pid: pid)
+        let name = running?.executableName ?? provider.processName(pid: pid) ?? "Process \(pid)"
         let standalone = AppIdentity(
             id: bundleID ?? name,
             displayName: name,
             icon: running?.icon,
-            isRegularApp: running?.activationPolicy == .regular)
-        return (standalone, false)
+            isRegularApp: running?.isRegular ?? false)
+        return Entry(bundleID: bundleID, identity: standalone, ownerPID: nil)
     }
 
-    private static func identity(of app: NSRunningApplication) -> AppIdentity? {
-        guard let bundleID = app.bundleIdentifier else { return nil }
+    private static func identity(of app: RunningAppInfo) -> AppIdentity? {
+        guard let bundleID = app.bundleID else { return nil }
         return AppIdentity(
             id: bundleID,
-            displayName: app.localizedName ?? bundleID,
+            displayName: app.name ?? bundleID,
             icon: app.icon,
-            isRegularApp: app.activationPolicy == .regular)
+            isRegularApp: app.isRegular)
     }
 
-    private static func runningApp(owning bundleID: String) -> NSRunningApplication? {
-        NSWorkspace.shared.runningApplications
-            .filter { app in
-                guard app.activationPolicy == .regular, let candidate = app.bundleIdentifier else { return false }
-                return bundleID == candidate || bundleID.hasPrefix(candidate + ".")
-            }
-            .max { ($0.bundleIdentifier?.count ?? 0) < ($1.bundleIdentifier?.count ?? 0) }
-    }
-
-    private static func executableName(pid: pid_t) -> String {
-        if let name = NSRunningApplication(processIdentifier: pid)?.executableURL?.lastPathComponent {
-            return name
-        }
-        var buffer = [CChar](repeating: 0, count: 256)
-        let length = proc_name(pid, &buffer, UInt32(buffer.count))
-        guard length > 0 else { return "Process \(pid)" }
-        return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    /// The running regular app whose bundle ID is `bundleID` or its longest prefix ("com.x.helper" → "com.x").
+    private func regularApp(owning bundleID: String) -> pid_t? {
+        let apps = regularApps ?? provider.regularApps()
+        regularApps = apps
+        return apps
+            .filter { bundleID == $0.bundleID || bundleID.hasPrefix($0.bundleID + ".") }
+            .max { $0.bundleID.count < $1.bundleID.count }?
+            .pid
     }
 }

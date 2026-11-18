@@ -29,6 +29,8 @@ public final class AudioProcessMonitor: AudioProcessSource {
     public func start(onChange: @escaping @MainActor ([AudioApp]) -> Void) {
         self.onChange = onChange
         listListener = addListener(to: CoreAudioProperty.systemObject, selector: kAudioHardwarePropertyProcessObjectList)
+        resolver.onInvalidate = { [weak self] in self?.refresh() }
+        resolver.startObserving()
         refresh()
         onChange(apps)
         poller.start()
@@ -40,6 +42,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
 
     public func stop() {
         poller.stop()
+        resolver.stopObserving()
         if let listListener {
             removeListener(listListener, from: CoreAudioProperty.systemObject, selector: kAudioHardwarePropertyProcessObjectList)
         }
