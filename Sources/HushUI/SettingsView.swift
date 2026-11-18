@@ -41,6 +41,7 @@ package struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 Toggle(L10n.showInactiveApps, isOn: $store.showInactiveApps)
+                KeyboardShortcutRow()
             }
 
             AppearanceSettingsSection(store: store)

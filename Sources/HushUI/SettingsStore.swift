@@ -7,6 +7,12 @@ import os
 package protocol SettingsPersisting: AnyObject {
     func load() -> SettingsDocument
     func update(_ change: (inout SettingsDocument) -> Void)
+    /// The document as last loaded or written, reading the file only if nothing is in memory yet.
+    func latest() -> SettingsDocument
+}
+
+extension SettingsPersisting {
+    package func latest() -> SettingsDocument { load() }
 }
 
 /// Settings access for `UpdateChecker`: only the "updates" section.
@@ -37,6 +43,10 @@ package final class SettingsStore: SettingsPersisting, UpdateSettingsPersisting 
         let document = readFile()
         current = document
         return document
+    }
+
+    package func latest() -> SettingsDocument {
+        current ?? load()
     }
 
     package func update(_ change: (inout SettingsDocument) -> Void) {

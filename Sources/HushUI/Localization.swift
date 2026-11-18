@@ -95,6 +95,24 @@ package enum L10n {
         "Launch at login needs Hush to run as an installed app.")
     package static let openLoginItems = resource("Open Login Items")
     package static let maximumBoost = resource("Maximum boost")
+    package static let keyboardShortcut = resource("Keyboard shortcut")
+    package static let recordShortcut = resource("Record Shortcut")
+    package static let typeShortcut = resource("Type Shortcut")
+    package static let noShortcut = resource("None")
+    package static let clearShortcut = resource("Clear keyboard shortcut")
+    package static let shortcutRecordHint = resource(
+        "Records a key combination that opens the mixer from any app. Press Escape while recording to cancel.")
+    package static func shortcutSaved(_ shortcut: String) -> LocalizedStringResource {
+        resource("Keyboard shortcut set to \(shortcut)")
+    }
+    package static let shortcutRecordingHint = resource("Press the key combination, or Escape to cancel.")
+    package static let shortcutInUse = resource("That shortcut is in use. Try another.")
+    package static let shortcutNeedsModifier = resource("Include ⌥ or ⌃, or use a function key.")
+    package static let shortcutIsStandard = resource("That's a standard app shortcut. Add ⌥ or ⌃.")
+    package static let shortcutReservedByMacOS = resource("macOS uses that shortcut. Try another.")
+    package static let shortcutCleared = resource("Keyboard shortcut cleared")
+    package static let spaceKey = resource("Space")
+    package static func unknownKey(_ keyCode: Int) -> LocalizedStringResource { resource("Key \(keyCode)") }
     package static let showInactiveApps = resource("Show apps that aren't playing")
     package static let levels = resource("Levels")
     package static let resetAllLevelsButton = resource("Reset All Levels…")
@@ -176,7 +194,12 @@ package enum L10n {
             muted, percent(50), mute("x"), unmute("x"), volumeLabel("x"), volumeValue(50), warning("x"),
             clickToMute, clickToUnmute, permissionNeeded, openSystemSettings, updateAvailable("x"), download, later,
             skipThisVersion, downloadHelp, laterHelp, general, launchAtLogin, launchAtLoginApprovalHint,
-            launchAtLoginUnavailableHelp, openLoginItems, maximumBoost, showInactiveApps, levels,
+            launchAtLoginUnavailableHelp, openLoginItems, maximumBoost, keyboardShortcut,
+            recordShortcut, typeShortcut, noShortcut, clearShortcut, shortcutRecordHint, shortcutSaved("x"),
+            shortcutRecordingHint,
+            shortcutInUse, shortcutNeedsModifier, shortcutIsStandard, shortcutReservedByMacOS, shortcutCleared,
+            spaceKey, unknownKey(50), showInactiveApps,
+            levels,
             resetAllLevelsButton, resetAllLevelsTitle, resetAllLevels, resetAllLevelsMessage, updates,
             checkAutomatically, checkNow, about, version, localVersion("x", commit: "y"),
             localVersion("x", commit: nil),

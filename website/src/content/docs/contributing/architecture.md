@@ -21,9 +21,9 @@ The Swift package has four targets, each depending only on the ones above it in 
 
 | Target | Responsibility | Key types |
 |---|---|---|
-| `HushCore` | Pure logic with no system frameworks beyond Foundation. Fully unit tested. | `VolumeCurve`, `SoftLimiter`, `SampleProcessor`, `MeterBallistics`, `AppVolumeSetting`, `Preferences`, `SettingsDocument`, `StripOrdering`, `SemanticVersion`, `UpdatePolicy`, `UpdateSettings`, `HushIdentity` |
+| `HushCore` | Pure logic with no system frameworks beyond Foundation. Fully unit tested. | `VolumeCurve`, `SoftLimiter`, `SampleProcessor`, `MeterBallistics`, `AppVolumeSetting`, `Preferences`, `SettingsDocument`, `StripOrdering`, `SemanticVersion`, `UpdatePolicy`, `UpdateSettings`, `GlobalShortcut`, `HushIdentity` |
 | `HushAudio` | Everything that talks to Core Audio and the system. | `AudioProcessMonitor`, `RunningStatePoller`, `AppIdentityResolver`, `DefaultOutputMonitor`, `AppAudioEngine`, `BufferRouting`, `AudioCapturePermission`, `CoreAudioProperty` |
-| `HushUI` | State and SwiftUI views. | `MixerStore`, `SettingsStore`, `UpdateChecker`, `GitHubReleaseFetcher`, `MixerPopover`, `ChannelStrip`, `VerticalFader`, `LevelMeter`, `MuteButton`, `PermissionBanner`, `UpdateBanner`, `SettingsView` |
+| `HushUI` | State and SwiftUI views. | `MixerStore`, `SettingsStore`, `UpdateChecker`, `GitHubReleaseFetcher`, `MixerPopover`, `ChannelStrip`, `VerticalFader`, `LevelMeter`, `MuteButton`, `PermissionBanner`, `UpdateBanner`, `SettingsView`, `GlobalShortcutController`, `GlobalHotKey` |
 | `HushApp` | The `@main` entry point with the `Settings` scene, and the AppKit menu bar item: an `NSStatusItem` whose left-click toggles an `NSPopover` hosting `MixerPopover` and whose right-click opens the quick menu (`QuickMenu` in `HushUI`). | `HushApp`, `StatusItemController` |
 
 `HushIdentity.bundleID` (`io.github.aydenjahola.Hush`) is the single source for the `os.Logger` subsystem and the prefix of every aggregate device UID.
@@ -125,6 +125,17 @@ Settings live at `~/Library/Application Support/Hush/settings.json`, a versioned
 - `normalized()` clamps every level to the current maximum boost and drops entries at the default (100%, unmuted) before encoding.
 - A file that can't be decoded, or that has an unknown version, is moved aside to `settings.corrupt-<unix-time>.json`, and Hush starts with defaults.
 - Every field added after the first release is optional on disk, so older files still decode.
+
+## Global shortcut: `GlobalShortcutController`
+
+The optional shortcut that toggles the popover uses Carbon's `RegisterEventHotKey` (wrapped in `GlobalHotKey`), which needs no Accessibility or Input Monitoring permission. Hush never uses an event tap or a global `NSEvent` monitor.
+
+- `GlobalShortcut` (in `HushCore`) holds a virtual key code and modifiers, validates them (⌥ or ⌃ is required, since ⌘ and ⌘⇧ alone are left to apps; a function key may be used alone) and supplies the glyphs. `ShortcutFormatter` takes letters from the current keyboard layout with `UCKeyTranslate`.
+- It's stored as the top-level `globalShortcut` field of `settings.json`, outside `preferences`, so the mixer's debounced saves never overwrite it.
+- "In use" detection is best effort. Registration is refused when an enabled system shortcut (`CopySymbolicHotKeys`) already uses the combination, or when `RegisterEventHotKey` fails, which happens only against another app's exclusive registration. Non-exclusive registrations by other apps aren't detected and can overlap. Hush registers non-exclusively itself (no `kEventHotKeyExclusive`). The previous shortcut is kept.
+- A saved shortcut that the current rules don't allow stays saved but isn't registered, and Settings shows why.
+- While recording, the Settings recorder uses a local `NSEvent` key-down monitor. It only takes events for the Settings window, so the popover and menus keep their keys, and recording stops when that window resigns key. The shortcut is unregistered meanwhile, so pressing it records it.
+- `StatusItemController.togglePopover()` is what the shortcut calls. It does nothing unless the status item is visible and its window is visible and on a screen, which fails only when the icon is turned off in System Settings → Menu Bar. Occlusion isn't checked, so the shortcut still works while the menu bar is hidden (in full-screen apps, or with auto-hide), and the popover appears anchored at the top of the screen.
 
 ## Update notifier: `UpdateChecker`
 

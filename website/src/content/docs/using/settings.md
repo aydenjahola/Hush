@@ -1,6 +1,6 @@
 ---
 title: Settings
-description: Launch at login, maximum boost, showing idle apps, the mixer's layout and appearance, resetting levels, update checks, and where Hush keeps its settings.
+description: Launch at login, maximum boost, showing idle apps, the keyboard shortcut, the mixer's layout and appearance, resetting levels, update checks, and where Hush keeps its settings.
 ---
 
 To open Settings, click the gear button in the bottom-right corner of the mixer. The Settings window comes to the front even if another app is active.
@@ -36,6 +36,19 @@ Off by default. When it's on, the mixer also shows:
 Background processes and system services aren't listed unless they're playing, or you've saved a level for them.
 
 Strips for apps that aren't playing are dimmed. An app that isn't running is shown with its name and icon, but its controls are disabled until it runs.
+
+### Keyboard shortcut
+
+A key combination that opens the mixer from any app, as if you'd clicked the Hush icon. Press it again to close the mixer. There's none by default. It works in full-screen apps too, and does nothing only when the Hush icon is turned off in **System Settings → Menu Bar**.
+
+- To set one, click **Record Shortcut**, then press the combination, such as **⌥⌘H**. It's saved straight away and shown with the standard key symbols.
+- The combination must include **⌥** or **⌃** (with or without **⌘** and **⇧**). **⌘** or **⌘⇧** on their own aren't enough, because apps use those for their own commands, such as **⌘C** or **⌘⇧4**. For these, Hush shows **"That's a standard app shortcut. Add ⌥ or ⌃."** **⌥⌘Esc** (Force Quit) is left to macOS: Hush shows **"macOS uses that shortcut. Try another."** A function key (**F1** to **F20**) can be used on its own or with any modifiers.
+- Press **Esc** while recording to cancel and keep the current shortcut.
+- To remove the shortcut, click the **ⓧ** button next to it.
+
+If Hush can tell the combination is already taken, it shows **"That shortcut is in use. Try another."** and keeps your previous shortcut. It can tell for macOS's own shortcuts (those turned on in **System Settings → Keyboard → Keyboard Shortcuts**) and for combinations another app has claimed exclusively. Most apps don't claim their shortcuts that way, so Hush can't always see them. If your shortcut also does something in another app, choose a different one. The same message appears if a saved shortcut has been taken since Hush last started.
+
+The shortcut needs no extra permission. See [Keyboard and accessibility](/Hush/using/keyboard-accessibility/#opening-the-mixer-with-a-shortcut).
 
 ## Appearance
 
@@ -165,6 +178,7 @@ It looks like this:
 - Each app is listed by its bundle ID, or by its executable name if it doesn't have one.
 - `percent` is clamped to between 0 and your maximum boost when the file is read.
 - The `appearance` section holds the [Appearance](#appearance) options. Every key is optional: a missing or unrecognised value uses its default, so files from older versions of Hush load unchanged. The reverse holds too: if a newer Hush wrote a value this version doesn't know, it falls back to the default after a downgrade, and the newer value is lost the next time settings are saved.
+- `globalShortcut` appears only once you've set a [keyboard shortcut](#keyboard-shortcut), for example `{ "keyCode" : 4, "modifiers" : ["option", "command"] }`. `keyCode` is the macOS virtual key code (a physical key, so the shortcut survives a keyboard layout change). If it's missing or can't be read, there's no shortcut.
 - The `updates` section remembers the update checker's state: whether automatic checks are on, the version you skipped, when "Later" ends and when Hush last checked. It may be missing or partly filled in.
 - Hush rewrites the file after every change, so quit Hush before editing it by hand.
 - If the file can't be read, for example because it isn't valid JSON or comes from a newer version of Hush, Hush moves it aside as `settings.corrupt-<number>.json` in the same folder and starts with default settings. Your old file isn't deleted.

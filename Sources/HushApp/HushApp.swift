@@ -9,6 +9,7 @@ struct HushApp: App {
     // App.init runs once, so the store (and its audio sources) is created exactly once.
     @State private var store: MixerStore
     @State private var updates: UpdateChecker
+    @State private var shortcut: GlobalShortcutController
     @State private var statusItem: StatusItemLauncher
 
     init() {
@@ -23,12 +24,17 @@ struct HushApp: App {
         store.start()
         let updates = Self.makeUpdateChecker(settings: settings)
         updates.start()
+        // Off by default: nothing is registered until the user records a shortcut in Settings.
+        let shortcut = GlobalShortcutController(persister: settings, hotKey: GlobalHotKey())
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil,
             queue: .main
         ) { _ in
-            MainActor.assumeIsolated { store.shutdown() }
+            MainActor.assumeIsolated {
+                shortcut.stop()
+                store.shutdown()
+            }
         }
         // Permission can be granted or revoked in System Settings at any time; re-check when the
         // user comes back to Hush, as well as whenever the popover opens.
@@ -41,7 +47,8 @@ struct HushApp: App {
         }
         _store = State(initialValue: store)
         _updates = State(initialValue: updates)
-        _statusItem = State(initialValue: StatusItemLauncher(store: store, updates: updates))
+        _shortcut = State(initialValue: shortcut)
+        _statusItem = State(initialValue: StatusItemLauncher(store: store, updates: updates, shortcut: shortcut))
     }
 
     private static func makeUpdateChecker(settings: SettingsStore) -> UpdateChecker {
@@ -64,22 +71,26 @@ struct HushApp: App {
         // The menu bar item (popover and quick menu) is AppKit; see StatusItemController.
         Settings {
             SettingsView(store: store, updates: updates)
+                .environment(shortcut)
         }
     }
 }
 
 /// Creates the menu bar item once the app has finished launching (App.init runs before that) and
-/// keeps it alive for the life of the app.
+/// keeps it alive for the life of the app. The global shortcut is registered then too, since it
+/// toggles the item's popover.
 @MainActor
 private final class StatusItemLauncher {
     private let store: MixerStore
     private let updates: UpdateChecker
+    private let shortcut: GlobalShortcutController
     private var controller: StatusItemController?
     private var observer: (any NSObjectProtocol)?
 
-    init(store: MixerStore, updates: UpdateChecker) {
+    init(store: MixerStore, updates: UpdateChecker, shortcut: GlobalShortcutController) {
         self.store = store
         self.updates = updates
+        self.shortcut = shortcut
         // Normally App.init runs before launch finishes; if the app is already running, don't wait.
         if NSApplication.shared.isRunning {
             install()
@@ -98,7 +109,10 @@ private final class StatusItemLauncher {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = nil
         guard controller == nil else { return }
-        controller = StatusItemController(store: store, updates: updates)
+        let controller = StatusItemController(store: store, updates: updates)
+        self.controller = controller
+        shortcut.onPress = { [weak controller] in controller?.togglePopover() }
+        shortcut.start()
     }
 }
 
