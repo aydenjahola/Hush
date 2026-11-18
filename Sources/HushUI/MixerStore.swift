@@ -23,13 +23,13 @@ package final class MixerStore {
 
     // MARK: Published state
 
-    package private(set) var strips: [Strip] = []
+    package internal(set) var strips: [Strip] = []
     /// Ballistics state for the meters. Not observed: views read their `StripMeter` instead.
-    @ObservationIgnored package private(set) var meterLevels: [String: Float] = [:]
-    package private(set) var preferences: Preferences
+    @ObservationIgnored package internal(set) var meterLevels: [String: Float] = [:]
+    package internal(set) var preferences: Preferences
     package private(set) var permission: AudioCapturePermissionStatus = .undetermined
-    package private(set) var outputDevice: OutputDevice?
-    package private(set) var isPopoverVisible = false
+    package internal(set) var outputDevice: OutputDevice?
+    package internal(set) var isPopoverVisible = false
 
     package var controlsEnabled: Bool { permission == .authorized }
     package var playingCount: Int { apps.filter(\.isPlaying).count }
@@ -43,32 +43,30 @@ package final class MixerStore {
 
     // MARK: Private state
 
-    private var apps: [AudioApp] = []
-    private var settings: [String: AppVolumeSetting]
-    private var engineErrors: [String: String] = [:]
+    var apps: [AudioApp] = []
+    var settings: [String: AppVolumeSetting]
+    var engineErrors: [String: String] = [:]
     /// Apps whose current error came from a meter-only engine, so turning meters off can clear it.
-    @ObservationIgnored private var meterOnlyErrorIDs: Set<String> = []
+    @ObservationIgnored var meterOnlyErrorIDs: Set<String> = []
 
-    @ObservationIgnored private let processSource: any AudioProcessSource
+    @ObservationIgnored let processSource: any AudioProcessSource
     @ObservationIgnored private let outputSource: any OutputDeviceSource
-    @ObservationIgnored private let engineFactory: any AudioEngineFactory
+    @ObservationIgnored let engineFactory: any AudioEngineFactory
     @ObservationIgnored private let permissionSource: any AudioCapturePermissionSource
     @ObservationIgnored private let persister: any SettingsPersisting
-    @ObservationIgnored private let saveDelay: Duration
     @ObservationIgnored private let now: () -> Date
-    @ObservationIgnored private let installedApp: @MainActor (String) -> InstalledAppInfo?
-    @ObservationIgnored private var installedAppCache: [String: InstalledAppInfo?] = [:]
-    @ObservationIgnored private var engines: [String: any AudioEngineHandle] = [:]
-    @ObservationIgnored private var order: [String] = []
-    @ObservationIgnored private var saveTask: Task<Void, Never>?
-    @ObservationIgnored private var hasPendingSave = false
-    @ObservationIgnored private var meterTask: Task<Void, Never>?
+    @ObservationIgnored let installedApp: @MainActor (String) -> InstalledAppInfo?
+    @ObservationIgnored var installedAppCache: [String: InstalledAppInfo?] = [:]
+    @ObservationIgnored var engines: [String: any AudioEngineHandle] = [:]
+    @ObservationIgnored var order: [String] = []
+    @ObservationIgnored private let saver: DebouncedSaver
+    @ObservationIgnored var meterTask: Task<Void, Never>?
     @ObservationIgnored let meterBank = MeterBank()
     /// Last value pushed to `processSource.setPolling`.
-    @ObservationIgnored private var currentPolling: ProcessPolling = .off
+    @ObservationIgnored var currentPolling: ProcessPolling = .off
     /// The first-launch permission request, if one was made (exposed for tests).
     @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
-    @ObservationIgnored private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
+    @ObservationIgnored let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
 
     package init(
         processSource: any AudioProcessSource,
@@ -85,12 +83,13 @@ package final class MixerStore {
         self.engineFactory = engineFactory
         self.permissionSource = permissionSource
         self.persister = persister
-        self.saveDelay = saveDelay
+        self.saver = DebouncedSaver(delay: saveDelay)
         self.now = now
         self.installedApp = installedApp
         let document = persister.load()
         self.preferences = document.preferences
         self.settings = document.apps
+        saver.perform = { [weak self] in self?.persistNow() }
     }
 
     package func start() {
@@ -167,8 +166,7 @@ package final class MixerStore {
                 startMeterPolling()
             } else {
                 stopMeterPolling()
-                meterLevels = [:]
-                meterBank.publish(meterLevels)
+                clearMeterLevels()
             }
         }
         settingsDidChange()
@@ -197,8 +195,7 @@ package final class MixerStore {
         guard isPopoverVisible else { return }
         isPopoverVisible = false
         stopMeterPolling()
-        meterLevels = [:]
-        meterBank.publish(meterLevels)
+        clearMeterLevels()
         reconcile()
         rebuildStrips()
     }
@@ -210,10 +207,10 @@ package final class MixerStore {
     // MARK: Persistence
 
     package func flushPendingSave() {
-        saveTask?.cancel()
-        saveTask = nil
-        guard hasPendingSave else { return }
-        hasPendingSave = false
+        saver.flush()
+    }
+
+    private func persistNow() {
         let preferences = preferences
         let apps = settings
         persister.update { document in
@@ -234,51 +231,6 @@ package final class MixerStore {
 
     func engineMode(for id: String) -> EngineMode? { engines[id]?.mode }
 
-    // MARK: Meters
-
-    /// The live meter for a strip. Only `LevelMeter` should read its value.
-    func meter(for id: String) -> StripMeter { meterBank.meter(for: id) }
-
-    /// Advances the ballistics and publishes to the per-strip meters, which notify their views
-    /// only when the displayed height changes by a step.
-    func tickMeters(elapsed: Double) {
-        guard !engines.isEmpty || !meterLevels.isEmpty || !meterBank.isSilent else { return }
-        for id in meterLevels.keys where engines[id] == nil { meterLevels[id] = nil }
-        for (id, engine) in engines {
-            meterLevels[id] = MeterBallistics.next(
-                displayed: meterLevels[id] ?? 0,
-                peak: engine.currentPeak(),
-                elapsed: elapsed)
-        }
-        meterBank.publish(meterLevels)
-    }
-
-    /// About 30 Hz. Engines report the peak since the last read, so no peak is missed between ticks.
-    static let meterInterval: Duration = .milliseconds(33)
-    /// About 10%: lets the system coalesce meter wakeups; the ballistics use the real elapsed time.
-    static let meterTolerance: Duration = meterInterval / 10
-
-    private func startMeterPolling() {
-        meterTask?.cancel()
-        meterTask = Task { [weak self] in
-            let clock = ContinuousClock()
-            var last = clock.now
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.meterInterval, tolerance: Self.meterTolerance)
-                guard !Task.isCancelled, let self else { break }
-                let current = clock.now
-                let elapsed = (current - last) / .seconds(1)
-                last = current
-                self.tickMeters(elapsed: elapsed)
-            }
-        }
-    }
-
-    private func stopMeterPolling() {
-        meterTask?.cancel()
-        meterTask = nil
-    }
-
     // MARK: Source callbacks
 
     private func appsDidChange(_ newApps: [AudioApp]) {
@@ -291,15 +243,7 @@ package final class MixerStore {
         let previous = outputDevice
         outputDevice = device
         if let device, let previous, previous.id != device.id {
-            engineErrors = [:]
-            for (id, engine) in engines {
-                do {
-                    try engine.rebuild(outputDeviceID: device.id)
-                } catch {
-                    tearDownEngine(id)
-                    recordFailure(error, for: id, mode: engine.mode)
-                }
-            }
+            rebuildEngines(onOutputDevice: device)
         }
         reconcile()
         rebuildStrips()
@@ -321,210 +265,8 @@ package final class MixerStore {
     }
 
     private func settingsDidChange() {
-        scheduleSave()
+        saver.schedule()
         reconcile()
         rebuildStrips()
-    }
-
-    /// Makes the set of running engines match the reconcile rule in spec section 4.3:
-    /// muted, lowered or boosted playing apps get a `.control` engine (gain 0 when muted), other
-    /// playing apps a `.meterOnly` engine while the popover is open, the rest none.
-    private func reconcile() {
-        defer { updatePolling() }
-        guard controlsEnabled, let device = outputDevice else {
-            tearDownAllEngines()
-            return
-        }
-
-        var present: [String: AudioApp] = [:]
-        for app in apps { present[app.id] = app }
-
-        // An app that's gone takes its engine and its error with it; the setting stays for its return.
-        for id in engines.keys where present[id] == nil { tearDownEngine(id) }
-        for id in engineErrors.keys where present[id] == nil { engineErrors[id] = nil }
-
-        for (id, app) in present {
-            let setting = settings[id] ?? AppVolumeSetting()
-            // Muting is a control engine at gain 0: a `.muted` tap that nothing reads doesn't
-            // silence the app (confirmed live), so idle apps get no engine at all.
-            let desired: EngineMode? = if setting.needsEngine && app.isPlaying {
-                .control
-            } else if app.isPlaying && isPopoverVisible && preferences.appearance.showLevelMeters {
-                .meterOnly
-            } else {
-                nil
-            }
-
-            let existing = engines[id]
-            if let existing, existing.mode == desired, existing.processObjectIDs == app.processObjectIDs {
-                if desired == .control { existing.setGain(setting.effectiveGain) }
-                continue
-            }
-
-            guard let mode = desired, engineErrors[id] == nil else {
-                tearDownEngine(id)
-                continue
-            }
-            // Change the running engine in place when possible: destroying a muted tap lets the
-            // app through at full level until a replacement's IO runs, and a new aggregate starts
-            // with a gap. A helper spawning (process list) or the user adjusting a metered app
-            // (mode) therefore keeps the same tap, aggregate and IOProc.
-            if let existing, applyInPlace(to: existing, id: id, processObjectIDs: app.processObjectIDs, mode: mode, setting: setting) {
-                continue
-            }
-            // Fallback, make before break: the old engine keeps the app muted or processed until
-            // the new one exists.
-            do {
-                let replacement = try engineFactory.makeEngine(
-                    appID: id,
-                    processObjectIDs: app.processObjectIDs,
-                    mode: mode,
-                    initialGain: mode == .control ? setting.effectiveGain : 1,
-                    outputDeviceID: device.id)
-                engines[id] = replacement
-                existing?.stop()
-                if existing != nil { meterLevels[id] = nil }
-            } catch {
-                tearDownEngine(id)  // never keep an engine in the wrong mode
-                recordFailure(error, for: id, mode: mode)
-            }
-        }
-    }
-
-    /// Updates the process list first, then the mode. Returns false (after logging) if the engine
-    /// refused either change, so the caller replaces it.
-    private func applyInPlace(
-        to engine: any AudioEngineHandle,
-        id: String,
-        processObjectIDs: [AudioObjectID],
-        mode: EngineMode,
-        setting: AppVolumeSetting
-    ) -> Bool {
-        do {
-            if engine.processObjectIDs != processObjectIDs {
-                try engine.updateProcesses(processObjectIDs)
-            }
-            if engine.mode != mode {
-                try engine.switchMode(to: mode, gain: setting.effectiveGain)
-            } else if mode == .control {
-                engine.setGain(setting.effectiveGain)
-            }
-            return true
-        } catch {
-            logger.error("In-place change for \(id, privacy: .public) failed, rebuilding: \(String(describing: error), privacy: .public)")
-            return false
-        }
-    }
-
-    /// Polls only what decisions depend on:
-    /// - every process while the popover is open (live strips);
-    /// - otherwise the objects of every present muted, lowered or boosted app, playing or not. Its
-    ///   control engine starts only once Hush sees it play and stops once Hush sees it stop. The HAL
-    ///   often skips both notifications (a browser pausing and resuming), so the poll catches a
-    ///   missed start (audio unprocessed) and a missed stop (an IOProc running on silence keeps the
-    ///   output device and Bluetooth awake).
-    /// - nothing otherwise; the HAL listeners still give best-effort updates.
-    private func updatePolling() {
-        let polling: ProcessPolling
-        if isPopoverVisible {
-            polling = .all
-        } else {
-            var objects: Set<AudioObjectID> = []
-            if controlsEnabled {
-                for app in apps where settings[app.id]?.needsEngine ?? false {
-                    objects.formUnion(app.processObjectIDs)
-                }
-            }
-            polling = objects.isEmpty ? .off : .objects(objects)
-        }
-        guard polling != currentPolling else { return }
-        currentPolling = polling
-        processSource.setPolling(polling)
-    }
-
-    private func tearDownEngine(_ id: String) {
-        engines.removeValue(forKey: id)?.stop()
-        meterLevels[id] = nil
-    }
-
-    private func tearDownAllEngines() {
-        for id in engines.keys { tearDownEngine(id) }
-    }
-
-    private func recordFailure(_ error: any Error, for id: String, mode: EngineMode) {
-        let summary = switch mode {
-        case .control: "Hush couldn't control this app's audio, so it's playing normally."
-        case .meterOnly: "Hush couldn't read this app's level."
-        }
-        engineErrors[id] = "\(summary) (\(error))"
-        if mode == .meterOnly { meterOnlyErrorIDs.insert(id) } else { meterOnlyErrorIDs.remove(id) }
-        logger.error("Engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
-    }
-
-    private func scheduleSave() {
-        hasPendingSave = true
-        saveTask?.cancel()
-        let delay = saveDelay
-        saveTask = Task { [weak self] in
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            self?.flushPendingSave()
-        }
-    }
-
-    // MARK: Strips
-
-    private func rebuildStrips() {
-        var byID: [String: Strip] = [:]
-        // Idle apps are listed only when they're real (Dock) apps or the user has a level saved for them;
-        // otherwise every daemon with a Core Audio process object would get a strip.
-        for app in apps where app.isPlaying
-            || (preferences.showInactiveApps && (app.isRegularApp || settings[app.id] != nil)) {
-            byID[app.id] = Strip(
-                id: app.id,
-                displayName: app.displayName,
-                icon: app.icon,
-                isPlaying: app.isPlaying,
-                isRunning: true,
-                setting: settings[app.id] ?? AppVolumeSetting(),
-                engineError: engineErrors[app.id])
-        }
-        if preferences.showInactiveApps {
-            for (id, setting) in settings where byID[id] == nil {
-                let info = cachedInstalledApp(id)
-                byID[id] = Strip(
-                    id: id, displayName: info?.displayName ?? id, icon: info?.icon, isPlaying: false,
-                    isRunning: false, setting: setting, engineError: nil)
-            }
-        }
-
-        // Alphabetical order doesn't jump around, so only activity order is frozen while open.
-        if isPopoverVisible && preferences.appearance.sortMode == .activity {
-            let survivors = order.filter { byID[$0] != nil }
-            let known = Set(survivors)
-            let newcomers = sortedIDs(byID.values.filter { !known.contains($0.id) })
-            order = survivors + newcomers
-        } else {
-            order = sortedIDs(Array(byID.values))
-        }
-        strips = order.compactMap { byID[$0] }
-        meterBank.retain(only: Set(order))
-    }
-
-    private func cachedInstalledApp(_ id: String) -> InstalledAppInfo? {
-        if let cached = installedAppCache[id] { return cached }
-        let info = installedApp(id)
-        installedAppCache[id] = info
-        return info
-    }
-
-    private func sortedIDs(_ candidates: [Strip]) -> [String] {
-        StripOrdering.sorted(candidates.map { strip in
-            StripSortKey(
-                id: strip.id,
-                displayName: strip.displayName,
-                isPlaying: strip.isPlaying,
-                lastAdjusted: settings[strip.id]?.lastAdjusted)
-        }, mode: preferences.appearance.sortMode).map(\.id)
     }
 }
