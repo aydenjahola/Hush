@@ -1,6 +1,6 @@
 ---
 title: Settings
-description: Launch at login, maximum boost, showing idle apps, resetting levels, update checks, and where Hush keeps its settings.
+description: Launch at login, maximum boost, showing idle apps, the mixer's layout and appearance, resetting levels, update checks, and where Hush keeps its settings.
 ---
 
 To open Settings, click the gear button in the bottom-right corner of the mixer. The Settings window comes to the front even if another app is active.
@@ -30,6 +30,51 @@ Off by default. When it's on, the mixer also shows:
 Background processes and system services aren't listed unless they're playing, or you've saved a level for them.
 
 Strips for apps that aren't playing are dimmed. An app that isn't running is shown with its name and icon, but its controls are disabled until it runs.
+
+## Appearance
+
+A small preview at the top of this section shows the chosen layout with sample apps, and changes as you change the options below. Changes apply to the mixer straight away.
+
+### Layout
+
+How the mixer lays out the apps. All three show the same information and work the same way: see [The mixer](/Hush/using/mixer/#layouts).
+
+- **Channel strips** (the default): a vertical fader per app, side by side.
+- **Classic rows:** one dense row per app with a horizontal slider, like Control Center.
+- **Tiles:** one row per app that is itself the slider.
+
+### Size
+
+**Comfortable** (the default) or **Compact**, which uses tighter spacing and smaller icons so more apps fit.
+
+### Show level meters
+
+On by default. Turn it off to hide the level meters. With meters off, Hush doesn't tap apps you haven't adjusted when you open the mixer, because the meters were the only reason to. Apps you've muted, lowered or boosted are still processed while they play.
+
+Under the switch, Hush explains the purple dot in the menu bar: it's macOS's audio-recording indicator, which appears while Hush is adjusting an app's volume and, with meters on, while the mixer is open. See [Troubleshooting](/Hush/help/troubleshooting/#why-is-there-a-purple-dot-in-my-menu-bar).
+
+### Show percentages
+
+On by default. Turn it off to hide each app's percentage. A muted app still reads **Muted**, and VoiceOver still reads the level.
+
+### Sort apps
+
+- **Playing & recently adjusted first** (the default): playing apps, then the apps you adjusted most recently, then the rest by name. The order stays put while the mixer is open.
+- **Alphabetical:** by name, whether or not the app is playing.
+
+### Accent colour
+
+The colour used above 100%: the boost part of each fader, the boost zone on classic-row sliders and boosted percentages.
+
+- **Amber** (the default).
+- **System accent:** your accent colour from **System Settings → Appearance**. In light mode Hush darkens it, and darkens it further with **Increase contrast**, so pale accents such as yellow stay readable.
+
+### Menu bar icon
+
+- **Speaker** (the default): a speaker that shows fewer sound waves while any app is muted or lowered.
+- **Fader glyph:** three small faders, like the app icon. Their knobs drop lower while any app is muted or lowered.
+
+Both follow the menu bar's light, dark or tinted appearance and show the update dot when a new version is available.
 
 ## Levels
 
@@ -89,6 +134,15 @@ It looks like this:
     }
   },
   "preferences" : {
+    "appearance" : {
+      "accent" : "amber",
+      "density" : "comfortable",
+      "layout" : "strips",
+      "menuBarIcon" : "speaker",
+      "showLevelMeters" : true,
+      "showPercentages" : true,
+      "sortMode" : "activity"
+    },
     "maxBoostPercent" : 200,
     "showInactiveApps" : false
   },
@@ -102,6 +156,7 @@ It looks like this:
 
 - Each app is listed by its bundle ID, or by its executable name if it doesn't have one.
 - `percent` is clamped to between 0 and your maximum boost when the file is read.
+- The `appearance` section holds the [Appearance](#appearance) options. Every key is optional: a missing or unrecognised value uses its default, so files from older versions of Hush load unchanged.
 - The `updates` section remembers the update checker's state: whether automatic checks are on, the version you skipped, when "Later" ends and when Hush last checked. It may be missing or partly filled in.
 - Hush rewrites the file after every change, so quit Hush before editing it by hand.
 - If the file can't be read, for example because it isn't valid JSON or comes from a newer version of Hush, Hush moves it aside as `settings.corrupt-<number>.json` in the same folder and starts with default settings. Your old file isn't deleted.

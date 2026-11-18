@@ -1,12 +1,12 @@
 ---
 title: The mixer
-description: Change each app's volume, boost quiet apps, mute noisy ones and read the level meters.
+description: The three mixer layouts, and how to change each app's volume, boost quiet apps, mute noisy ones and read the level meters.
 ---
 
 Click the Hush icon in the menu bar to open the mixer. It has three parts:
 
 - **Header:** the name Hush and a pill showing your current output device, such as "MacBook Pro Speakers". If there's no output device, the pill reads "No Output".
-- **Strips:** one column per app.
+- **Apps:** one strip, row or tile per app, depending on the [layout](#layouts).
 - **Footer:** how many apps are playing, such as "2 apps playing", and the gear button for [Settings](/Hush/using/settings/).
 
 When nothing is playing, the mixer shows **Nothing is playing**. If an update is available, a banner appears at the top. See [Settings](/Hush/using/settings/#updates).
@@ -19,9 +19,21 @@ To also see apps that aren't playing right now, such as a chat app you want to m
 
 If an app is missing, see [Troubleshooting](/Hush/help/troubleshooting/#an-app-isnt-in-the-mixer).
 
+## Layouts
+
+Choose a layout under **Appearance** in [Settings](/Hush/using/settings/#appearance). All three show the same apps with the same controls: percentage, level meter, volume slider, icon (with the warning badge when something's wrong), name and mute button. The keyboard, scroll-wheel and VoiceOver controls are the same too.
+
+- **Channel strips** (the default): a column per app with a vertical fader, side by side like a mixing desk. With many apps, scroll the row sideways.
+- **Classic rows:** a dense row per app, like Control Center: icon, name, a horizontal slider with a thin level meter under it, percentage and mute button.
+- **Tiles:** each app's row is the slider. Drag anywhere on it; the shaded fill shows the volume and a soft green glow shows how loud the app is right now. Click the app's icon to mute or unmute it, or use the mute button at the end of the row.
+
+Rows and tiles stack vertically and scroll once there are more than about six apps.
+
+**Size** in Settings switches between **Comfortable** and **Compact**, which fits more apps with tighter spacing and smaller icons. You can also hide the percentages and the level meters there.
+
 ## Parts of a strip
 
-From top to bottom, each strip has:
+In the channel-strip layout, each strip has, from top to bottom:
 
 | Part | What it shows |
 |---|---|
@@ -32,16 +44,16 @@ From top to bottom, each strip has:
 | Name | The app's name. Hover to see it in full if it's cut off. |
 | Mute button | Mutes or unmutes the app. |
 
-Strips for apps that aren't playing are dimmed.
+Classic rows and tiles show the same parts in one line. Apps that aren't playing are dimmed in every layout.
 
 ## Change an app's volume
 
-- **Drag** the fader knob, or click anywhere on the fader to jump there.
-- **Scroll** over the fader with a mouse wheel or trackpad. Each step is 5%.
-- **Double-click** the knob to put the app back at 100%.
-- **Arrow keys:** with the fader focused, press **↑** or **↓** to move 5%. See [Keyboard and accessibility](/Hush/using/keyboard-accessibility/).
+- **Drag** the fader knob, or click anywhere on the fader to jump there. In the tiles layout, drag or click anywhere on the tile.
+- **Scroll** over the fader or tile with a mouse wheel or trackpad. Each step is 5%.
+- **Double-click** the knob (or anywhere on a tile), or **Option-click** the fader, to put the app back at 100%.
+- **Arrow keys:** with the fader focused, press **↑** or **↓** (or **→** / **←**) to move 5%. See [Keyboard and accessibility](/Hush/using/keyboard-accessibility/).
 
-When the maximum boost is above 100%, a small tick marks 100% on the fader, and the knob snaps to 100% when you drag within 3% of it. The fader fills white up to 100% and amber above it.
+When the maximum boost is above 100%, a small tick marks 100% on the fader, and the knob snaps to 100% when you drag within 3% of it. The fader fills white (black in light mode) up to 100% and amber above it, or your system accent colour if you chose it under **Accent colour** in [Settings](/Hush/using/settings/#accent-colour). Classic-row sliders also tint the stretch above 100% faintly, so you can see where boosting starts.
 
 ### How the percentages work
 
@@ -55,7 +67,7 @@ The highest level available depends on **Maximum boost** in [Settings](/Hush/usi
 
 ## Mute an app
 
-Click the speaker button at the bottom of the strip. It turns red with a slashed speaker, the percent reads **Muted** and the icon greys out. The fader keeps its position, so unmuting brings the app back to the level it had.
+Click the speaker button at the bottom of the strip (at the end of the row in classic rows and tiles), or in the tiles layout click the app's icon. The button turns red with a slashed speaker, the percent reads **Muted** and the icon greys out. The fader keeps its position, so unmuting brings the app back to the level it had.
 
 You can mute an app that isn't playing right now, as long as it's running. Hush starts silencing it as soon as it notices the app playing. The very first instant of a new sound can still be heard, for up to about a second and usually much less. See [Known limitations](/Hush/help/known-limitations/).
 
@@ -63,15 +75,19 @@ You can mute an app that isn't playing right now, as long as it's running. Hush 
 
 The meters show each playing app's level on a scale from −60 dB at the bottom to 0 dB (full scale) at the top. They're green, turning yellow in the top 30% of the scale. They jump up instantly and fall back at 20 dB per second.
 
-Meters only run while the mixer is open. They're hidden for muted apps and for apps that aren't playing.
+In classic rows the meter is a thin bar under the slider, and in tiles it's the green glow behind the app's name.
+
+Meters only run while the mixer is open. They're hidden for muted apps and for apps that aren't playing. To measure an app it hasn't adjusted, Hush has to tap it while the mixer is open, which also shows macOS's purple recording dot. If you'd rather not, turn off **Show level meters** in [Settings](/Hush/using/settings/#show-level-meters).
 
 ## Strip order
 
-Playing apps come first, then the apps you adjusted most recently, then the rest in alphabetical order.
+By default, playing apps come first, then the apps you adjusted most recently, then the rest in alphabetical order.
 
 While the mixer is open, the order stays put so nothing moves under your cursor. Apps that start playing join at the end. The next time you open the mixer, the order is refreshed.
 
-With many apps, scroll the row of strips sideways. The edges fade to show there's more.
+To list apps by name instead, choose **Alphabetical** under **Sort apps** in [Settings](/Hush/using/settings/#sort-apps).
+
+With many apps, scroll the row of strips sideways (the edges fade to show there's more), or scroll classic rows and tiles up and down.
 
 ## Your output device
 

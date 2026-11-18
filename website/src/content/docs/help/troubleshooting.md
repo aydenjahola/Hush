@@ -38,6 +38,17 @@ Each build of Hush has a new ad-hoc signature, and macOS may treat a new signatu
 - A **dimmed** strip belongs to an app that isn't playing. Its controls still work if the app is running.
 - If the controls **don't respond at all**, the app isn't running (it's shown because you saved a level for it), or Hush is missing permission (look for the banner).
 
+## Why is there a purple dot in my menu bar?
+
+The purple dot is macOS's audio-recording indicator. It appears whenever an app is capturing audio, and Hush changes an app's volume by capturing that app's audio with a process tap, so macOS shows the dot. Hush never records to disk or sends audio anywhere.
+
+You'll see it:
+
+- **while an app you've muted, lowered or boosted is playing**, because Hush is processing that app's audio. It goes away when the app stops playing or you put it back to 100% and unmuted;
+- **while the mixer is open and apps are playing**, because the level meters measure apps you haven't adjusted too.
+
+To keep the dot to a minimum, turn off **Show level meters** in [Settings](/Hush/using/settings/#show-level-meters). Hush then taps only the apps you've adjusted, and only while they play, so opening the mixer no longer shows the dot by itself.
+
 ## A warning triangle appears on an app's icon
 
 Hold the pointer over the triangle to see the message:
