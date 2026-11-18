@@ -58,6 +58,7 @@ struct VolumeTile: View {
         .help(Text(verbatim: strip.displayName))
         .disabled(!isEnabled)
         .opacity(strip.isPlaying ? 1 : 0.45)
+        .stripContextMenu(strip, actions: actions)
     }
 }
 

@@ -49,5 +49,6 @@ struct ClassicRow: View {
         .padding(.vertical, compact ? 2 : 4)
         .disabled(!isEnabled)
         .opacity(strip.isPlaying ? 1 : 0.45)
+        .stripContextMenu(strip, actions: actions)
     }
 }

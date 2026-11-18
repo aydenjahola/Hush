@@ -36,6 +36,7 @@ struct VolumeControlBehavior: ViewModifier {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.isMixerPreview) private var isPreview
     @Environment(\.mixerAppearance) private var appearance
+    @Environment(\.stripHideAction) private var hideAction
 
     func body(content: Content) -> some View {
         content
@@ -66,6 +67,12 @@ struct VolumeControlBehavior: ViewModifier {
                 case .increment: nudge(FaderScale.step)
                 case .decrement: nudge(-FaderScale.step)
                 @unknown default: break
+                }
+            }
+            .accessibilityActions {
+                // The strip's "Hide <App>" context menu, which VoiceOver can't reach otherwise.
+                if let hideAction, !isPreview {
+                    Button(L10n.hideApp(hideAction.appName)) { hideAction.perform() }
                 }
             }
     }

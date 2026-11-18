@@ -53,6 +53,7 @@ struct StripActions: Equatable {
     @MainActor func setPercent(_ percent: Int) { target.setPercent(percent, for: id) }
     @MainActor func reset() { target.resetVolume(for: id) }
     @MainActor func toggleMute() { target.toggleMute(for: id) }
+    @MainActor func hide(displayName: String) { target.hideApp(id, displayName: displayName) }
 
     static func == (lhs: StripActions, rhs: StripActions) -> Bool {
         lhs.id == rhs.id && lhs.target === rhs.target
@@ -64,6 +65,7 @@ protocol StripActionTarget: AnyObject {
     func setPercent(_ percent: Int, for id: String)
     func resetVolume(for id: String)
     func toggleMute(for id: String)
+    func hideApp(_ id: String, displayName: String)
 }
 
 extension MixerStore: StripActionTarget {}
@@ -74,6 +76,7 @@ final class InertStripActions: StripActionTarget {
     func setPercent(_ percent: Int, for id: String) {}
     func resetVolume(for id: String) {}
     func toggleMute(for id: String) {}
+    func hideApp(_ id: String, displayName: String) {}
 }
 
 extension Palette {

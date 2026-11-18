@@ -11,6 +11,8 @@ struct HushApp: App {
     @State private var updates: UpdateChecker
     @State private var shortcut: GlobalShortcutController
     @State private var statusItem: StatusItemLauncher
+    /// Lets the quick menu open Settings on a particular section.
+    @State private var settingsNavigator: SettingsNavigator
 
     init() {
         // One SettingsStore for both, so level and update-state writes merge in settings.json.
@@ -48,7 +50,11 @@ struct HushApp: App {
         _store = State(initialValue: store)
         _updates = State(initialValue: updates)
         _shortcut = State(initialValue: shortcut)
-        _statusItem = State(initialValue: StatusItemLauncher(store: store, updates: updates, shortcut: shortcut))
+        let settingsNavigator = SettingsNavigator()
+        _settingsNavigator = State(initialValue: settingsNavigator)
+        _statusItem = State(
+            initialValue: StatusItemLauncher(
+                store: store, updates: updates, shortcut: shortcut, settingsNavigator: settingsNavigator))
     }
 
     private static func makeUpdateChecker(settings: SettingsStore) -> UpdateChecker {
@@ -70,7 +76,7 @@ struct HushApp: App {
     var body: some Scene {
         // The menu bar item (popover and quick menu) is AppKit; see StatusItemController.
         Settings {
-            SettingsView(store: store, updates: updates)
+            SettingsView(store: store, updates: updates, navigator: settingsNavigator)
                 .environment(shortcut)
         }
     }
@@ -84,13 +90,18 @@ private final class StatusItemLauncher {
     private let store: MixerStore
     private let updates: UpdateChecker
     private let shortcut: GlobalShortcutController
+    private let settingsNavigator: SettingsNavigator
     private var controller: StatusItemController?
     private var observer: (any NSObjectProtocol)?
 
-    init(store: MixerStore, updates: UpdateChecker, shortcut: GlobalShortcutController) {
+    init(
+        store: MixerStore, updates: UpdateChecker, shortcut: GlobalShortcutController,
+        settingsNavigator: SettingsNavigator
+    ) {
         self.store = store
         self.updates = updates
         self.shortcut = shortcut
+        self.settingsNavigator = settingsNavigator
         // Normally App.init runs before launch finishes; if the app is already running, don't wait.
         if NSApplication.shared.isRunning {
             install()
@@ -109,7 +120,7 @@ private final class StatusItemLauncher {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = nil
         guard controller == nil else { return }
-        let controller = StatusItemController(store: store, updates: updates)
+        let controller = StatusItemController(store: store, updates: updates, settingsNavigator: settingsNavigator)
         self.controller = controller
         shortcut.onPress = { [weak controller] in controller?.togglePopover() }
         shortcut.start()

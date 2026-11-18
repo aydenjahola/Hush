@@ -54,5 +54,6 @@ struct ChannelStrip: View {
         .frame(width: compact ? 60 : 72)
         .disabled(!isEnabled)
         .opacity(strip.isPlaying ? 1 : 0.45)
+        .stripContextMenu(strip, actions: actions)
     }
 }

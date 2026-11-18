@@ -10,6 +10,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     private let store: MixerStore
     private let updates: UpdateChecker
     private let settingsOpener = SettingsOpener()
+    private let settingsNavigator: SettingsNavigator
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private let menu = NSMenu()
@@ -20,9 +21,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     /// Watches clicks in other apps while the popover is open; see `startWatchingOutsideClicks`.
     private var outsideClickMonitor: Any?
 
-    init(store: MixerStore, updates: UpdateChecker) {
+    init(store: MixerStore, updates: UpdateChecker, settingsNavigator: SettingsNavigator) {
         self.store = store
         self.updates = updates
+        self.settingsNavigator = settingsNavigator
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -140,7 +142,18 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
             unmuteAll: { [store] in store.unmuteAll() },
             openSettings: { [settingsOpener] in settingsOpener.open() },
             checkForUpdates: { [updates] in Task { await updates.checkNow() } },
-            quit: { NSApp.terminate(nil) })
+            quit: { NSApp.terminate(nil) },
+            applyPreset: { [store] in store.applyPreset($0) },
+            // Naming happens in Settings' save sheet, so the quick menu and Settings share one
+            // flow for checking names and confirming a replace.
+            savePreset: { [settingsNavigator, settingsOpener] in
+                settingsNavigator.request(.savePreset)
+                settingsOpener.open()
+            },
+            managePresets: { [settingsNavigator, settingsOpener] in
+                settingsNavigator.request(.presets)
+                settingsOpener.open()
+            })
     }
 
     // MARK: NSPopoverDelegate

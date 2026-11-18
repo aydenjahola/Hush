@@ -35,6 +35,10 @@ package final class MixerStore {
     /// A short-lived message after choosing an output failed; cleared after a few seconds or on the next success.
     package internal(set) var outputSelectionError: String?
     package internal(set) var isPopoverVisible = false
+    /// Apps hidden from the mixer, sorted by name. Shown again from Settings.
+    package private(set) var hiddenApps: [HiddenApp]
+    /// Saved presets; see MixerStore+Presets. Saved in the same write as the levels.
+    package internal(set) var presetLibrary: PresetLibrary
 
     package var controlsEnabled: Bool { permission == .authorized }
     package var playingCount: Int { apps.filter(\.isPlaying).count }
@@ -48,7 +52,10 @@ package final class MixerStore {
 
     // MARK: Private state
 
+    /// The apps the mixer works with: `allApps` minus the hidden ones (see `HiddenAppsPlan`).
     var apps: [AudioApp] = []
+    /// Every app the process source last reported, hidden ones included.
+    var allApps: [AudioApp] = []
     var settings: [String: AppVolumeSetting]
     var engineErrors: [String: String] = [:]
     /// Apps whose current error came from a meter-only engine, so turning meters off can clear it.
@@ -78,12 +85,12 @@ package final class MixerStore {
     @ObservationIgnored var stallRetryTask: Task<Void, Never>?
     @ObservationIgnored private let permissionSource: any AudioCapturePermissionSource
     @ObservationIgnored private let persister: any SettingsPersisting
-    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored let now: () -> Date
     @ObservationIgnored let installedApp: @MainActor (String) -> InstalledAppInfo?
     @ObservationIgnored var installedAppCache: [String: InstalledAppInfo?] = [:]
     @ObservationIgnored var engines: [String: any AudioEngineHandle] = [:]
     @ObservationIgnored var order: [String] = []
-    @ObservationIgnored private let saver: DebouncedSaver
+    @ObservationIgnored let saver: DebouncedSaver
     @ObservationIgnored var meterTask: Task<Void, Never>?
     @ObservationIgnored let meterBank = MeterBank()
     /// Last value pushed to `processSource.setPolling`.
@@ -122,7 +129,10 @@ package final class MixerStore {
         self.installedApp = installedApp
         let document = persister.load()
         self.preferences = document.preferences
-        self.settings = document.apps
+        let hiddenApps = document.hiddenApps?.normalized() ?? []
+        self.hiddenApps = hiddenApps
+        self.settings = HiddenAppsPlan.visibleSettings(document.apps, hidden: hiddenApps.ids)
+        self.presetLibrary = PresetLibrary(presets: document.presets ?? [])
         saver.perform = { [weak self] in self?.persistNow() }
     }
 
@@ -148,7 +158,7 @@ package final class MixerStore {
     // MARK: User actions
 
     package func setPercent(_ percent: Int, for id: String) {
-        guard controlsEnabled else { return }
+        guard controlsEnabled, !isHidden(id) else { return }
         var setting = settings[id] ?? AppVolumeSetting()
         setting.setPercent(percent, maxPercent: maxPercent)
         setting.lastAdjusted = now()
@@ -256,6 +266,40 @@ package final class MixerStore {
         settingsDidChange()
     }
 
+    /// Hides an app from the mixer. Its saved level is dropped, so it plays at its normal volume,
+    /// and its engine (if any) is torn down. Allowed without permission: it never adjusts audio.
+    package func hideApp(_ id: String, displayName: String) {
+        let result = HiddenAppsPlan.hide(
+            HiddenApp(bundleID: id, displayName: displayName), hidden: hiddenApps, settings: settings)
+        hiddenApps = result.hidden
+        settings = result.settings
+        engineErrors[id] = nil
+        meterOnlyErrorIDs.remove(id)
+        stallRetryIDs.remove(id)
+        hiddenAppsDidChange()
+    }
+
+    func isHidden(_ id: String) -> Bool {
+        hiddenApps.contains { $0.bundleID == id }
+    }
+
+    /// Shows a hidden app in the mixer again, at 100% and unmuted.
+    package func showApp(_ id: String) {
+        guard hiddenApps.contains(where: { $0.bundleID == id }) else { return }
+        hiddenApps = hiddenApps.showing(id)
+        hiddenAppsDidChange()
+    }
+
+    /// The icon for a hidden app's row in Settings: the running app's, else the installed app's.
+    package func icon(forHiddenApp id: String) -> NSImage? {
+        allApps.first { $0.id == id }?.icon ?? cachedInstalledApp(id)?.icon
+    }
+
+    private func hiddenAppsDidChange() {
+        apps = HiddenAppsPlan.visibleApps(allApps, hidden: hiddenApps.ids)
+        settingsDidChange()
+    }
+
     package func resetAllLevels() {
         settings = [:]
         engineErrors = [:]
@@ -297,9 +341,13 @@ package final class MixerStore {
     private func persistNow() {
         let preferences = preferences
         let apps = settings
+        let hiddenApps = hiddenApps
+        let presets = presetLibrary.presets
         persister.update { document in
             document.preferences = preferences
             document.apps = apps
+            document.hiddenApps = hiddenApps.isEmpty ? nil : hiddenApps
+            document.presets = presets.isEmpty ? nil : presets
         }
     }
 
@@ -323,7 +371,8 @@ package final class MixerStore {
     // MARK: Source callbacks
 
     private func appsDidChange(_ newApps: [AudioApp]) {
-        apps = newApps
+        allApps = newApps
+        apps = HiddenAppsPlan.visibleApps(newApps, hidden: hiddenApps.ids)
         reconcile()
         rebuildStrips()
     }
@@ -355,13 +404,15 @@ package final class MixerStore {
 
     // MARK: Core logic
 
+    /// Hidden apps always play at 100%, so nothing may write a level for one.
     private func commit(_ setting: AppVolumeSetting, for id: String) {
+        guard !isHidden(id) else { return }
         settings[id] = setting.isDefault ? nil : setting
         engineErrors[id] = nil
         settingsDidChange()
     }
 
-    private func settingsDidChange() {
+    func settingsDidChange() {
         saver.schedule()
         reconcile()
         rebuildStrips()

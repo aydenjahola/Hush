@@ -72,6 +72,10 @@ package enum L10n {
     package static func warning(_ detail: String) -> LocalizedStringResource { resource("Warning: \(detail)") }
     package static let clickToMute = resource("Click to mute")
     package static let clickToUnmute = resource("Click to unmute")
+    package static func hideApp(_ app: String) -> LocalizedStringResource { resource("Hide \(app)") }
+    package static func hideAppHelp(_ app: String) -> LocalizedStringResource {
+        resource("Hides \(app) and plays it at its normal volume.")
+    }
 
     // MARK: Banners
 
@@ -119,6 +123,10 @@ package enum L10n {
     package static let resetAllLevelsTitle = resource("Reset all app levels?")
     package static let resetAllLevels = resource("Reset All Levels")
     package static let resetAllLevelsMessage = resource("Every app goes back to 100% and unmuted.")
+    package static let hiddenApps = resource("Hidden apps")
+    package static let noHiddenApps = resource("No hidden apps.")
+    package static let show = resource("Show")
+    package static func showApp(_ app: String) -> LocalizedStringResource { resource("Show \(app)") }
     package static let updates = resource("Updates")
     package static let checkAutomatically = resource("Check for updates automatically")
     package static let checkNow = resource("Check Now")
@@ -172,6 +180,50 @@ package enum L10n {
     package static let previewClassicRows = resource("Preview of the classic rows layout")
     package static let previewTiles = resource("Preview of the tiles layout")
 
+    // MARK: Presets (quick menu and Settings)
+
+    package static let presets = resource("Presets")
+    package static let noPresets = resource("No Presets")
+    package static let saveCurrentLevelsAsPreset = resource("Save Current Levels as Preset…")
+    package static let managePresets = resource("Manage Presets…")
+    package static let presetsExplanation = resource(
+        "Applying a preset sets every app it holds to its saved level and puts every other app back at 100% and unmuted."
+    )
+    package static let noPresetsYet = resource("No presets yet.")
+    package static func presetAppCount(_ count: Int) -> LocalizedStringResource {
+        count == 0 ? resource("Every app at 100%") : resource("\(count) apps in preset")
+    }
+    package static let activePreset = resource("Active")
+    package static let applyPreset = resource("Apply")
+    package static let renamePresetEllipsis = resource("Rename…")
+    package static let deletePresetEllipsis = resource("Delete…")
+    package static let presetActions = resource("Preset actions")
+    package static func deletePresetTitle(_ name: String) -> LocalizedStringResource {
+        resource("Delete the preset “\(name)”?")
+    }
+    package static let deletePresetMessage = resource("Your current levels don't change.")
+    package static let deletePreset = resource("Delete")
+    package static let savePresetTitle = resource("Save Current Levels as Preset")
+    package static let renamePresetTitle = resource("Rename Preset")
+    package static let presetName = resource("Name")
+    package static let savePreset = resource("Save")
+    package static let renamePreset = resource("Rename")
+    package static let cancel = resource("Cancel")
+    package static func presetNameTaken(_ name: String) -> LocalizedStringResource {
+        resource("A preset named “\(name)” already exists.")
+    }
+    package static func presetWillReplace(_ name: String) -> LocalizedStringResource {
+        resource("Saving replaces the preset “\(name)”.")
+    }
+    package static func presetLimitReached(_ limit: Int) -> LocalizedStringResource {
+        resource("You can keep up to \(limit) presets. Delete one to save another.")
+    }
+    package static func replacePresetTitle(_ name: String) -> LocalizedStringResource {
+        resource("Replace the preset “\(name)”?")
+    }
+    package static let replacePresetMessage = resource("It will hold the current levels instead of its saved ones.")
+    package static let replacePreset = resource("Replace")
+
     // MARK: Engine failures (strip warning tooltips)
 
     package static let controlFailed = resource("Hush couldn't control this app's audio, so it's playing normally.")
@@ -209,6 +261,13 @@ package enum L10n {
             showLevelMeters, recordingIndicatorNote, showPercentages, sortApps, sortActivity, sortAlphabetical,
             accentColour, amber, systemAccent, menuBarIcon, speaker, faderGlyph, previewChannelStrips,
             previewClassicRows, previewTiles, controlFailed, meterFailed, failureDetail("x", "y"), notificationBody,
+            hideApp("x"), hideAppHelp("x"), hiddenApps, noHiddenApps, show, showApp("x"),
+            presets, noPresets, saveCurrentLevelsAsPreset, managePresets, presetsExplanation, noPresetsYet,
+            presetAppCount(0), presetAppCount(2), activePreset, applyPreset, renamePresetEllipsis,
+            deletePresetEllipsis, presetActions, deletePresetTitle("x"), deletePresetMessage, deletePreset,
+            savePresetTitle, renamePresetTitle, presetName, savePreset, renamePreset, cancel, presetNameTaken("x"),
+            presetWillReplace("x"), presetLimitReached(20), replacePresetTitle("x"), replacePresetMessage,
+            replacePreset,
         ]
     }
 }
