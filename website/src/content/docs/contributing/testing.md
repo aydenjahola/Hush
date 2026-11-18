@@ -31,7 +31,7 @@ Fakes for the `MixerStore` dependencies live in `Tests/HushUITests/`. New behavi
 
 ## Integration tests
 
-The unit tests use fake engines, so they keep passing even when real muting breaks. The `HushIntegrationTests` target plays a real tone from a helper process (`HushToneGenerator`), lets Hush tap it, and checks what Core Audio does: that taps receive audio, that gain and boost scale the output, that `stop()` leaves no aggregate device behind, that the process monitor notices playback starting and stopping, and, through the BlackHole loopback, that mute really silences the app, that 50% is 12 dB down, and that swapping engines never lets a burst or a gap through.
+The unit tests use fake engines, so they keep passing even when real muting breaks. The `HushIntegrationTests` target plays a real tone from a helper process (`HushToneGenerator`), lets Hush tap it, and checks what Core Audio does: that taps receive audio, that gain and boost scale the output, that `stop()` leaves no aggregate device behind, that the process monitor notices playback starting and stopping, and, through the BlackHole loopback, that mute really silences the app, that 50% is 12 dB down, and that changing a running engine in place (a helper process joining or leaving, or a metered app being adjusted) never lets a burst or a gap through.
 
 A plain `swift test` (and CI's build job) reports these tests as skipped. To run them:
 
