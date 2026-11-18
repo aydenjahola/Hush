@@ -119,7 +119,7 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 3. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release.
 4. The same workflow (`.github/workflows/release.yml`) then runs the tests, builds a universal DMG and uploads `Hush-X.Y.Z.dmg`, `Hush.dmg` and a `.sha256` checksum for each to the release.
 
-The first release is pinned with `"release-as": "0.1.0"` in `release-please-config.json` so it matches `version.txt`. **Remove that line after 0.1.0 ships**, or every later release PR will propose 0.1.0 again.
+Version bumps follow Conventional Commits. Before 1.0, `feat:` bumps the minor version and `fix:` bumps the patch version.
 
 The repository needs Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" turned on so release-please can open its PR. Releases are ad-hoc signed. If the `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and `NOTARY_PASSWORD` secrets are ever added, the workflow signs with the Developer ID and notarizes too. Before merging a release PR, run through the [manual checklist](https://aydenjahola.github.io/Hush/contributing/testing/#manual-checklist). The full release guide is [on the website](https://aydenjahola.github.io/Hush/contributing/releasing/).
 
