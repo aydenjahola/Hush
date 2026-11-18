@@ -161,30 +161,74 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
                 unmuteAll: { self.calls.append("unmute all") },
                 openSettings: { self.calls.append("settings") },
                 checkForUpdates: { self.calls.append("check") },
-                quit: { self.calls.append("quit") })
+                quit: { self.calls.append("quit") },
+                applyPreset: { self.calls.append("apply \($0)") },
+                savePreset: { self.calls.append("save preset") },
+                managePresets: { self.calls.append("manage presets") })
         }
     }
 
     private func model(
         outputs: [QuickMenuModel.Output] = [],
         bulkMute: BulkMuteAction = BulkMuteAction(kind: .muteAllPlaying, isEnabled: true),
-        canCheckForUpdates: Bool = true
+        canCheckForUpdates: Bool = true,
+        presets: [QuickMenuModel.PresetItem] = [],
+        presetsEnabled: Bool = true
     ) -> QuickMenuModel {
-        QuickMenuModel(outputs: outputs, bulkMute: bulkMute, canCheckForUpdates: canCheckForUpdates)
+        QuickMenuModel(
+            outputs: outputs, bulkMute: bulkMute, canCheckForUpdates: canCheckForUpdates, presets: presets,
+            presetsEnabled: presetsEnabled)
     }
 
     @Test func itemsComeInOrderWithStandardTitlesAndShortcuts() {
         let items = QuickMenu.items(for: model(), actions: Recorder().actions)
         #expect(
             items.map(\.title) == [
-                "Output", "Mute All Playing Apps", "", "Settings…", "Check for Updates…", "", "Quit Hush",
+                "Output", "Presets", "Mute All Playing Apps", "", "Settings…", "Check for Updates…", "", "Quit Hush",
             ])
-        #expect(items[2].isSeparatorItem)
-        #expect(items[5].isSeparatorItem)
-        #expect(items[3].keyEquivalent == ",")
-        #expect(items[3].keyEquivalentModifierMask == .command)
-        #expect(items[6].keyEquivalent == "q")
-        #expect(items[6].keyEquivalentModifierMask == .command)
+        #expect(items[3].isSeparatorItem)
+        #expect(items[6].isSeparatorItem)
+        #expect(items[4].keyEquivalent == ",")
+        #expect(items[4].keyEquivalentModifierMask == .command)
+        #expect(items[7].keyEquivalent == "q")
+        #expect(items[7].keyEquivalentModifierMask == .command)
+    }
+
+    // MARK: Presets submenu
+
+    private let call = QuickMenuModel.PresetItem(id: UUID(), name: "Call", isActive: false)
+    private let focus = QuickMenuModel.PresetItem(id: UUID(), name: "Focus", isActive: true)
+
+    @Test func presetsSubmenuListsPresetsWithTheActiveOneChecked() throws {
+        let recorder = Recorder()
+        let items = QuickMenu.items(for: model(presets: [call, focus]), actions: recorder.actions)
+        let submenu = try #require(items[1].submenu)
+
+        #expect(
+            submenu.items.map(\.title) == ["Call", "Focus", "", "Save Current Levels as Preset…", "Manage Presets…"])
+        #expect(submenu.items.map(\.state) == [.off, .on, .off, .off, .off])
+        #expect(!submenu.autoenablesItems)
+        #expect(submenu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.isEnabled })
+
+        for index in [0, 1, 3, 4] { ActionMenuItem.perform(submenu.items[index]) }
+        #expect(recorder.calls == ["apply \(call.id)", "apply \(focus.id)", "save preset", "manage presets"])
+    }
+
+    @Test func presetsSubmenuWithNoPresetsShowsADisabledPlaceholder() throws {
+        let items = QuickMenu.items(for: model(), actions: Recorder().actions)
+        let submenu = try #require(items[1].submenu)
+        #expect(submenu.items.map(\.title) == ["No Presets", "", "Save Current Levels as Preset…", "Manage Presets…"])
+        #expect(!submenu.items[0].isEnabled)
+        #expect(submenu.items[2].isEnabled)
+        #expect(submenu.items[3].isEnabled)
+    }
+
+    @Test func presetItemsAreDisabledWithoutPermission() throws {
+        let items = QuickMenu.items(for: model(presets: [call], presetsEnabled: false), actions: Recorder().actions)
+        let submenu = try #require(items[1].submenu)
+        #expect(
+            submenu.items.filter { !$0.isSeparatorItem }.map(\.isEnabled) == [false, false, true],
+            "Manage Presets… still opens Settings")
     }
 
     private func item(_ title: String, in items: [NSMenuItem]) throws -> NSMenuItem {
@@ -227,9 +271,9 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
         let recorder = Recorder()
         let items = QuickMenu.items(
             for: model(bulkMute: BulkMuteAction(kind: .unmuteAll, isEnabled: true)), actions: recorder.actions)
-        #expect(items[1].title == "Unmute All")
-        #expect(items[1].isEnabled)
-        ActionMenuItem.perform(items[1])
+        #expect(items[2].title == "Unmute All")
+        #expect(items[2].isEnabled)
+        ActionMenuItem.perform(items[2])
         #expect(recorder.calls == ["unmute all"])
     }
 

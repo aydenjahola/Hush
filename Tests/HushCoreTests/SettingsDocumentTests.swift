@@ -113,4 +113,90 @@ import Testing
         #expect(try SettingsDocument.decode(from: data) == document)
         #expect(try SettingsDocument.decode(from: data).version == 1)
     }
+
+    // MARK: Presets (additive, optional field in version 1)
+
+    private static let presetID = UUID(uuidString: "6F9619FF-8B86-D011-B42D-00C04FC964FF")!
+
+    @Test func fileWithoutPresetsLoadsWithNone() throws {
+        let json = #"{"version": 1, "preferences": {}, "apps": {}}"#
+        #expect(try SettingsDocument.decode(from: Data(json.utf8)).presets == nil)
+    }
+
+    @Test func noPresetsLeavesTheFileWithoutThem() throws {
+        let text = String(decoding: try SettingsDocument().encoded(), as: UTF8.self)
+        #expect(!text.contains("presets"))
+        let emptied = SettingsDocument(presets: [])
+        #expect(!String(decoding: try emptied.encoded(), as: UTF8.self).contains("presets"))
+    }
+
+    @Test func presetsRoundTrip() throws {
+        let document = SettingsDocument(
+            apps: ["x": AppVolumeSetting(percent: 50, lastAdjusted: date)],
+            presets: [
+                Preset(
+                    id: Self.presetID, name: "Call",
+                    apps: [
+                        "com.example.chat": Preset.Level(displayName: "Chat", percent: 150),
+                        "com.example.player": Preset.Level(displayName: "Player", percent: 30, isMuted: true),
+                    ])
+            ])
+        let decoded = try SettingsDocument.decode(from: document.encoded())
+        #expect(decoded == document)
+    }
+
+    @Test func decodesPresetsFromJSON() throws {
+        let json = """
+            {
+              "version": 1, "preferences": {}, "apps": {},
+              "presets": [
+                { "id": "\(Self.presetID.uuidString)", "name": "Call",
+                  "apps": { "com.example.chat": { "displayName": "Chat", "percent": 150, "isMuted": false } } }
+              ]
+            }
+            """
+        let presets = try #require(try SettingsDocument.decode(from: Data(json.utf8)).presets)
+        #expect(presets.map(\.name) == ["Call"])
+        #expect(presets.first?.id == Self.presetID)
+        #expect(presets.first?.apps["com.example.chat"] == Preset.Level(displayName: "Chat", percent: 150))
+    }
+
+    @Test func malformedPresetsValueIsDroppedButTheFileLoads() throws {
+        let json = """
+            {"version": 1, "preferences": {}, "apps": {
+              "x": { "percent": 50, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" }
+            }, "presets": "nonsense"}
+            """
+        let document = try SettingsDocument.decode(from: Data(json.utf8))
+        #expect(document.presets == nil)
+        #expect(document.apps["x"]?.percent == 50)
+    }
+
+    @Test func malformedPresetIsDroppedAndTheOthersKept() throws {
+        let json = """
+            {"version": 1, "preferences": {}, "apps": {}, "presets": [
+              { "name": "No ID", "apps": {} },
+              42,
+              { "id": "\(Self.presetID.uuidString)", "name": "Focus", "apps": {} },
+              { "id": "\(UUID().uuidString)", "name": "Bad level", "apps": { "a": { "percent": "loud" } } }
+            ]}
+            """
+        let presets = try #require(try SettingsDocument.decode(from: Data(json.utf8)).presets)
+        #expect(presets.map(\.name) == ["Focus"])
+    }
+
+    @Test func normalizingAppliesThePresetRules() {
+        let document = SettingsDocument(presets: [
+            Preset(name: "Call", apps: [:]), Preset(name: "call", apps: [:]), Preset(name: " ", apps: [:]),
+        ])
+        #expect(document.normalized().presets?.map(\.name) == ["Call"])
+        #expect(SettingsDocument(presets: [Preset(name: " ", apps: [:])]).normalized().presets == nil)
+    }
+
+    @Test func normalizingKeepsPresetLevelsAboveTheCurrentMaximumBoost() {
+        let document = SettingsDocument(
+            preferences: Preferences(maxBoostPercent: .percent150),
+            presets: [Preset(name: "Loud", apps: ["a": Preset.Level(displayName: "A", percent: 200)])])
+        #expect(document.normalized().presets?.first?.apps["a"]?.percent == 200)
+    }
 }

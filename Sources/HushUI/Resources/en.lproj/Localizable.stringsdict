@@ -20,5 +20,22 @@
 			<string>%lld apps playing</string>
 		</dict>
 	</dict>
+	<!-- Settings > Presets, under a preset's name: how many apps the preset holds (one or more). -->
+	<key>%lld apps</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@apps@</string>
+		<key>apps</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld app</string>
+			<key>other</key>
+			<string>%lld apps</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

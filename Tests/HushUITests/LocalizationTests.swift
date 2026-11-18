@@ -57,4 +57,16 @@ import Testing
     func playingSummaryPluralises(count: Int, expected: String) {
         #expect(String(localized: L10n.playingSummary(count: count)) == expected)
     }
+
+    @Test(arguments: [(0, "Every app at 100%"), (1, "1 app"), (2, "2 apps"), (20, "20 apps")])
+    func presetAppCountPluralises(count: Int, expected: String) {
+        #expect(String(localized: L10n.presetAppCount(count)) == expected)
+    }
+
+    @Test func presetStringsResolveThroughTheBundle() {
+        #expect(String(localized: L10n.deletePresetTitle("Call")) == "Delete the preset “Call”?")
+        #expect(
+            String(localized: L10n.presetLimitReached(20))
+                == "You can keep up to 20 presets. Delete one to save another.")
+    }
 }
