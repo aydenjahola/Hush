@@ -109,13 +109,26 @@ Apply and Save are greyed out until Hush has Audio Recording permission.
 
 ## Levels
 
+### Remember levels for each output device
+
+Off by default. When it's on, each output device keeps its own app levels and mute states. For example, you can keep your music quiet on the MacBook speakers and louder on your headphones.
+
+- When the output changes to another device, Hush saves the current levels for the old device. If you've used the new device before, its levels come back. If you haven't, the current levels carry over as its starting point, so nothing sounds different until you change something.
+- Changes you make, including applying a [preset](/Hush/using/presets/), **Mute All Playing Apps** and **Unmute All**, apply to the current device's levels.
+- Switching back to a device brings back its levels.
+- Hush tells devices apart by their unique ID, not their name, so a device that briefly disconnects or reappears after sleep keeps its levels.
+- Turning it on saves the current levels for the current device.
+- Turning it off keeps the current device's levels as the one set of levels for every device, as before. The other devices' saved levels stay in the settings file, so turning it on again brings them back.
+
+While it's on, a list underneath shows every device with saved levels, by name. Click **Forget** to drop a device's saved levels. Forgetting the current device doesn't change what you hear: it only drops the saved copy, and Hush saves the current levels for it again the next time you change something or switch away. With no saved levels, the list reads **No devices have saved levels yet.**
+
 ### Hidden apps
 
 Lists the apps you've [hidden from the mixer](/Hush/using/mixer/#hide-an-app), each with its icon (or a generic app icon if Hush can't find the app) and name. Click **Show** to put an app back in the mixer, at 100% and unmuted. With nothing hidden, the list reads **No hidden apps.**
 
 ### Reset All Levels…
 
-Puts every app back to 100% and unmuted, and forgets all saved levels. Hush asks you to confirm first: **"Reset all app levels?"** Hidden apps stay hidden.
+Puts every app back to 100% and unmuted, and forgets all saved levels, including every output device's saved levels when [Remember levels for each output device](#remember-levels-for-each-output-device) has saved any. Hush asks you to confirm first: **"Reset all app levels?"** Hidden apps stay hidden.
 
 ## Updates
 
@@ -179,6 +192,7 @@ It looks like this:
       "sortMode" : "activity"
     },
     "maxBoostPercent" : 200,
+    "rememberLevelsPerDevice" : false,
     "showInactiveApps" : false
   },
   "updates" : {
@@ -195,6 +209,8 @@ It looks like this:
 - `globalShortcut` appears only once you've set a [keyboard shortcut](#keyboard-shortcut), for example `{ "keyCode" : 4, "modifiers" : ["option", "command"] }`. `keyCode` is the macOS virtual key code (a physical key, so the shortcut survives a keyboard layout change). If it's missing or can't be read, there's no shortcut.
 - The `presets` list holds your [presets](/Hush/using/presets/), in order: each has an `id`, a `name`, and an `apps` map with each app's `displayName`, `percent` and `isMuted`. It's missing when you have no presets. A preset that can't be read is skipped, and the rest of the file still loads.
 - The `updates` section remembers the update checker's state: whether automatic checks are on, the version you skipped, when "Later" ends and when Hush last checked. It may be missing or partly filled in.
+- `rememberLevelsPerDevice` in `preferences` is the [Remember levels for each output device](#remember-levels-for-each-output-device) setting. If it's missing, it's off.
+- `deviceLevels` holds each output device's saved levels, keyed by the device's unique ID: each has the device's `name` and an `apps` map like the top-level one, such as `{ "BuiltInSpeakerDevice" : { "name" : "MacBook Pro Speakers", "apps" : { … } } }`. A device with an empty `apps` map plays every app at 100%. It's missing when no device has saved levels, and it stays when you turn the setting off. A device that can't be read is skipped, and the rest of the file still loads.
 - `hiddenApps`, present only once you've [hidden an app](#hidden-apps), lists each hidden app's `bundleID` (or executable name) and `displayName`, such as `{ "bundleID" : "com.apple.Safari", "displayName" : "Safari" }`. If it can't be read, Hush ignores it and keeps the rest of the file.
 - Hush rewrites the file after every change, so quit Hush before editing it by hand.
 - If the file can't be read, for example because it isn't valid JSON or comes from a newer version of Hush, Hush moves it aside as `settings.corrupt-<number>.json` in the same folder and starts with default settings. Your old file isn't deleted.

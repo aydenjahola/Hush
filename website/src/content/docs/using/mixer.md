@@ -124,6 +124,8 @@ You can also open the menu from the keyboard. See [Keyboard and accessibility](/
 
 Hush plays adjusted apps through the system's default output device, whether you pick it in Hush, in Control Center or in **System Settings → Sound**. When it changes, for example because you connected headphones, Hush follows automatically and the header pill shows the new device.
 
+If [Remember levels for each output device](/Hush/using/settings/#remember-levels-for-each-output-device) is on in Settings, the new device's own levels come back at the same moment.
+
 While Hush switches over, apps briefly play at their normal level. See [Known limitations](/Hush/help/known-limitations/).
 
 If there's no output device at all, the pill reads **No Output** and Hush steps aside. Apps play normally until an output device is available again.
@@ -133,5 +135,7 @@ If there's no output device at all, the pill reads **No Output** and Hush steps 
 Hush saves each app's level and mute state about half a second after your last change, and again when it quits. The next time the app runs, even after a restart, Hush applies the saved level as soon as it notices the app playing.
 
 Apps at 100% and unmuted aren't saved, and Hush doesn't touch their audio at all, except to measure their level while the mixer is open.
+
+By default, each app has one level for every output device. To give each device its own levels, turn on [Remember levels for each output device](/Hush/using/settings/#remember-levels-for-each-output-device) in Settings.
 
 To put every app back to 100%, use **Reset All Levels…** in [Settings](/Hush/using/settings/).
