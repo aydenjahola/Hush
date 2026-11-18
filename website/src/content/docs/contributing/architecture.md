@@ -24,7 +24,7 @@ The Swift package has four targets, each depending only on the ones above it in 
 | `HushCore` | Pure logic with no system frameworks beyond Foundation. Fully unit tested. | `VolumeCurve`, `SoftLimiter`, `SampleProcessor`, `MeterBallistics`, `AppVolumeSetting`, `Preferences`, `SettingsDocument`, `StripOrdering`, `SemanticVersion`, `UpdatePolicy`, `UpdateSettings`, `HushIdentity` |
 | `HushAudio` | Everything that talks to Core Audio and the system. | `AudioProcessMonitor`, `RunningStatePoller`, `AppIdentityResolver`, `DefaultOutputMonitor`, `AppAudioEngine`, `BufferRouting`, `AudioCapturePermission`, `CoreAudioProperty` |
 | `HushUI` | State and SwiftUI views. | `MixerStore`, `SettingsStore`, `UpdateChecker`, `GitHubReleaseFetcher`, `MixerPopover`, `ChannelStrip`, `VerticalFader`, `LevelMeter`, `MuteButton`, `PermissionBanner`, `UpdateBanner`, `SettingsView` |
-| `HushApp` | The `@main` entry point: a `MenuBarExtra` with the `.window` style plus a `Settings` scene. | `HushApp` |
+| `HushApp` | The `@main` entry point with the `Settings` scene, and the AppKit menu bar item: an `NSStatusItem` whose left-click toggles an `NSPopover` hosting `MixerPopover` and whose right-click opens the quick menu (`QuickMenu` in `HushUI`). | `HushApp`, `StatusItemController` |
 
 `HushIdentity.bundleID` (`io.github.aydenjahola.Hush`) is the single source for the `os.Logger` subsystem and the prefix of every aggregate device UID.
 
@@ -128,7 +128,7 @@ Hush is notify-only: it never downloads or installs anything. `UpdateChecker` as
 ## UI notes
 
 - Strip order comes from `StripOrdering`: playing apps first, then the most recently adjusted, then by name. While the popover is open the order is frozen and new apps join at the end, so nothing jumps under your cursor.
-- The gear uses `SettingsLink`, the reliable way to open Settings from a `MenuBarExtra` in an `LSUIElement` app. It also activates Hush so the window comes to the front.
+- The gear uses `SettingsLink`, the reliable way to open Settings from SwiftUI in an `LSUIElement` app. It also activates Hush so the window comes to the front. The quick menu is AppKit, so it uses `SettingsOpener`: a zero-size `SettingsOpenerBridge` view in the status item button captures `openSettings` for it.
 - Views respect Reduce Motion (no reorder animation) and Increase Contrast (stronger tracks, ticks and meter backgrounds).
 
 See [Testing](/Hush/contributing/testing/) for how each layer is tested.

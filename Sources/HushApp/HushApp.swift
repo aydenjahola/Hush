@@ -9,6 +9,7 @@ struct HushApp: App {
     // App.init runs once, so the store (and its audio sources) is created exactly once.
     @State private var store: MixerStore
     @State private var updates: UpdateChecker
+    @State private var statusItem: StatusItemLauncher
 
     init() {
         // One SettingsStore for both, so level and update-state writes merge in settings.json.
@@ -40,6 +41,7 @@ struct HushApp: App {
         }
         _store = State(initialValue: store)
         _updates = State(initialValue: updates)
+        _statusItem = State(initialValue: StatusItemLauncher(store: store, updates: updates))
     }
 
     private static func makeUpdateChecker(settings: SettingsStore) -> UpdateChecker {
@@ -59,22 +61,44 @@ struct HushApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra {
-            MixerPopover(store: store, updates: updates)
-        } label: {
-            Image(
-                nsImage: MenuBarIcon.image(
-                    style: store.preferences.appearance.menuBarIcon,
-                    attenuated: store.isAnyAppAttenuated,
-                    badged: updates.hasPendingUpdate)
-            )
-            .accessibilityLabel(Text(L10n.menuBarLabel(updateAvailable: updates.hasPendingUpdate)))
-        }
-        .menuBarExtraStyle(.window)
-
+        // The menu bar item (popover and quick menu) is AppKit; see StatusItemController.
         Settings {
             SettingsView(store: store, updates: updates)
         }
+    }
+}
+
+/// Creates the menu bar item once the app has finished launching (App.init runs before that) and
+/// keeps it alive for the life of the app.
+@MainActor
+private final class StatusItemLauncher {
+    private let store: MixerStore
+    private let updates: UpdateChecker
+    private var controller: StatusItemController?
+    private var observer: (any NSObjectProtocol)?
+
+    init(store: MixerStore, updates: UpdateChecker) {
+        self.store = store
+        self.updates = updates
+        // Normally App.init runs before launch finishes; if the app is already running, don't wait.
+        if NSApplication.shared.isRunning {
+            install()
+            return
+        }
+        observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.didFinishLaunchingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.install() }
+        }
+    }
+
+    private func install() {
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+        observer = nil
+        guard controller == nil else { return }
+        controller = StatusItemController(store: store, updates: updates)
     }
 }
 

@@ -34,6 +34,7 @@ Hush has three layouts, chosen in Settings:
 - **Remembers** each app's level across restarts
 - Apps you haven't touched aren't processed at all (except to measure them for the level meters while the mixer is open, if meters are on)
 - **Switch your Mac's output device from the menu bar**
+- **Quick menu:** right-click (or two-finger or Control-click) the menu bar icon to switch output, mute or unmute every playing app, open Settings or quit
 - **Follows your output device** when you switch headphones or speakers
 - **Tells you when a new version is available**
 - **No driver, no admin password**

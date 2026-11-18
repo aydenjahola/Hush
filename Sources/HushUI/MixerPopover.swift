@@ -145,7 +145,7 @@ package struct MixerPopover: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            // SettingsLink is the reliable way to open Settings from a MenuBarExtra in an
+            // SettingsLink is the reliable way to open Settings from the menu bar popover in an
             // LSUIElement app; the tap also activates Hush so the window comes to the front.
             SettingsLink {
                 Image(systemName: "gearshape.fill")
