@@ -33,6 +33,7 @@ Hush has three layouts, chosen in Settings:
 - **Appearance options:** comfortable or compact size, percentages on or off, playing-first or alphabetical order, amber or your system accent colour for the fills (boost is always amber), and a speaker or fader-glyph menu bar icon
 - **Hide apps** you never want to adjust: right-click one in the mixer, and show it again from Settings
 - **Remembers** each app's level across restarts
+- **Per-device levels (optional):** each output device can keep its own app levels, so switching between speakers and headphones brings back the levels you set for each
 - **Presets:** save every app's level under a name, such as "Call" or "Focus", and switch back to it from the quick menu or Settings
 - Apps you haven't touched aren't processed at all (except to measure them for the level meters while the mixer is open, if meters are on)
 - **Switch your Mac's output device from the menu bar**

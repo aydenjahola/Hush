@@ -90,6 +90,8 @@ The main thread and the IOProc share three atomics: the target gain, the gain ap
 
 `DefaultOutputMonitor` listens for changes to the default output device. When the device's UID changes, `MixerStore` rebuilds every engine on the new device (`beginRebuild` on all of them, then `finishRebuild`), which tears down each tap and aggregate and builds them again. While that happens, the tap is briefly gone and apps play at their normal level. If a rebuild fails, that engine is torn down and its strip shows a warning.
 
+With **Remember levels for each output device** on, the levels switch in the same pass, before any engine is rebuilt. `DeviceLevelBook` (HushCore) holds a set of app levels per device UID and does the pure switch: it stores the current levels as the old device's set and returns the new device's set, or the current levels when the new device has none. `MixerStore` keeps the current device's set in step with every change, so the book is always current when it switches or saves. Before the rebuild, each control engine takes its new gain with `setGain`, so `beginRebuild`/`finishRebuild` hand over at the new device's gain rather than correcting afterwards. Control engines that the new levels no longer need are torn down instead of rebuilt. Apps that go from 100% to adjusted get engines through the usual reconcile path. Same-UID reports never switch sets, and nothing in the IOProc changes. The sets are saved as `deviceLevels` in the same write as `apps`.
+
 A change that keeps the device's object ID, such as a rename or a new data source, only reconciles. The same device coming back under a new object ID with the same UID, which can happen across sleep, doesn't rebuild either: the aggregates name their sub-device by UID. Instead, `MixerStore` runs a health check, and it does the same when the Mac wakes (`NSWorkspace.didWakeNotification`).
 
 The check works in two stages:
@@ -122,7 +124,7 @@ While the popover is open, the store polls every engine's peak about 30 times a 
 Settings live at `~/Library/Application Support/Hush/settings.json`, a versioned JSON document (`version: 1`). Each app is keyed by bundle ID, or by executable name when there isn't one. The same file holds the preferences and the update checker's state.
 
 - Saves are debounced: the store writes 500 ms after the last change, and flushes any pending save when Hush quits.
-- `normalized()` clamps every level to the current maximum boost and drops entries at the default (100%, unmuted) before encoding.
+- `normalized()` clamps every level to the current maximum boost and drops entries at the default (100%, unmuted) before encoding. For each device's set in `deviceLevels` it drops default entries but doesn't clamp, so boosts survive lowering the maximum; a set is clamped when it's loaded. Hidden apps are dropped from both.
 - A file that can't be decoded, or that has an unknown version, is moved aside to `settings.corrupt-<unix-time>.json`, and Hush starts with defaults.
 - Every field added after the first release is optional on disk, so older files still decode.
 

@@ -352,3 +352,29 @@
 
 /* Button that saves over an existing preset in the replace confirmation. */
 "Replace" = "Replace";
+
+/* Remembering app levels per output device (Settings → Levels). */
+
+/* Settings → Levels: toggle that gives each output device its own app levels. */
+"Remember levels for each output device" = "Remember levels for each output device";
+
+/* Settings → Levels: explanation under the "Remember levels for each output device" toggle. */
+"Each output device keeps its own app levels. Switching outputs brings back that device's levels." = "Each output device keeps its own app levels. Switching outputs brings back that device's levels.";
+
+/* Settings → Levels: heading of the list of output devices that have saved app levels. */
+"Devices with saved levels" = "Devices with saved levels";
+
+/* Settings → Levels: shown in the list of devices with saved levels when there are none. */
+"No devices have saved levels yet." = "No devices have saved levels yet.";
+
+/* Settings → Levels: button on a device's row that drops the device's saved app levels. */
+"Forget" = "Forget";
+
+/* VoiceOver label of the Forget button on a device's row. %@ is the output device's name. */
+"Forget levels for %@" = "Forget levels for %@";
+
+/* Tooltip of the Forget button on a device's row. */
+"Drops this device's saved levels. The current levels don't change." = "Drops this device's saved levels. The current levels don't change.";
+
+/* Message of the Reset All Levels confirmation when output devices have saved levels. */
+"Every app goes back to 100% and unmuted, and every output device's saved levels are cleared." = "Every app goes back to 100% and unmuted, and every output device's saved levels are cleared.";

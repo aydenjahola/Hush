@@ -199,4 +199,76 @@ import Testing
             presets: [Preset(name: "Loud", apps: ["a": Preset.Level(displayName: "A", percent: 200)])])
         #expect(document.normalized().presets?.first?.apps["a"]?.percent == 200)
     }
+
+    // MARK: Levels per output device (additive, optional fields in version 1)
+
+    @Test func fileWithoutDeviceLevelsLoadsWithTheFeatureOff() throws {
+        let json = #"{"version": 1, "preferences": {}, "apps": {}}"#
+        let document = try SettingsDocument.decode(from: Data(json.utf8))
+        #expect(document.deviceLevels == nil)
+        #expect(!document.preferences.rememberLevelsPerDevice)
+        let text = String(decoding: try SettingsDocument().encoded(), as: UTF8.self)
+        #expect(!text.contains("deviceLevels"))
+    }
+
+    @Test func deviceLevelsRoundTrip() throws {
+        let document = SettingsDocument(
+            preferences: Preferences(rememberLevelsPerDevice: true),
+            apps: ["x": AppVolumeSetting(percent: 50, lastAdjusted: date)],
+            deviceLevels: [
+                "built-in": DeviceLevels(
+                    name: "MacBook Pro Speakers", apps: ["x": AppVolumeSetting(percent: 50, lastAdjusted: date)]),
+                "airpods": DeviceLevels(name: "AirPods Pro"),
+            ])
+        let decoded = try SettingsDocument.decode(from: document.encoded())
+        #expect(decoded == document)
+        #expect(decoded.preferences.rememberLevelsPerDevice)
+        #expect(decoded.deviceLevels?["airpods"]?.apps.isEmpty == true, "an empty set is kept: every app at 100%")
+    }
+
+    @Test func aMalformedDeviceIsDroppedWithoutLosingTheRest() throws {
+        let json = """
+            {"version": 1, "preferences": {"rememberLevelsPerDevice": "yes"}, "apps": {
+              "x": { "percent": 62, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" }
+            }, "deviceLevels": {
+              "good": {"name": "Good", "apps": {
+                "x": { "percent": 30, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" }
+              }},
+              "bad": {"name": "Bad", "apps": "nonsense"},
+              "nameless": {"apps": {}}
+            }}
+            """
+        let document = try SettingsDocument.decode(from: Data(json.utf8))
+        #expect(document.apps["x"]?.percent == 62)
+        #expect(!document.preferences.rememberLevelsPerDevice, "a malformed toggle falls back to off")
+        #expect(document.deviceLevels?.keys.sorted() == ["good", "nameless"])
+        #expect(document.deviceLevels?["good"]?.apps["x"]?.percent == 30)
+        #expect(document.deviceLevels?["nameless"]?.name == "")
+
+        let notAnObject = #"{"version": 1, "preferences": {}, "apps": {}, "deviceLevels": [1, 2]}"#
+        #expect(try SettingsDocument.decode(from: Data(notAnObject.utf8)).deviceLevels == nil)
+    }
+
+    @Test func normalizingDeviceLevelsStripsHiddenAppsAndDefaults() {
+        let document = SettingsDocument(
+            preferences: Preferences(maxBoostPercent: .percent150),
+            hiddenApps: [HiddenApp(bundleID: "hidden", displayName: "Hidden")],
+            deviceLevels: [
+                "built-in": DeviceLevels(
+                    name: "Speakers",
+                    apps: [
+                        "hidden": AppVolumeSetting(percent: 20, lastAdjusted: date),
+                        "plain": AppVolumeSetting(percent: 100, lastAdjusted: date),
+                        "loud": AppVolumeSetting(percent: 200, lastAdjusted: date),
+                    ]),
+                "": DeviceLevels(name: "No UID"),
+            ])
+        let normalized = document.normalized()
+        #expect(normalized.deviceLevels?.keys.sorted() == ["built-in"])
+        #expect(normalized.deviceLevels?["built-in"]?.apps.keys.sorted() == ["loud"])
+        #expect(
+            normalized.deviceLevels?["built-in"]?.apps["loud"]?.percent == 200,
+            "kept above the maximum boost; clamped only when loaded")
+        #expect(SettingsDocument(deviceLevels: [:]).normalized().deviceLevels == nil)
+    }
 }

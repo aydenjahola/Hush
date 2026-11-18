@@ -24,6 +24,11 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
     /// presets don't change. Added after version 1 shipped and optional on disk. The mixer owns
     /// it and writes it in the same save as `apps`.
     package var presets: [Preset]?
+    /// Each output device's saved levels, keyed by device UID, for "Remember levels for each
+    /// output device". nil (the default) when there are none. Added after version 1 shipped and
+    /// optional on disk. The mixer owns it and writes it in the same save as `apps`; the sets stay
+    /// when the feature is turned off, so turning it on again brings them back.
+    package var deviceLevels: [String: DeviceLevels]?
 
     package init(
         preferences: Preferences = Preferences(),
@@ -31,7 +36,8 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         updates: UpdateSettings = UpdateSettings(),
         globalShortcut: GlobalShortcut? = nil,
         hiddenApps: [HiddenApp]? = nil,
-        presets: [Preset]? = nil
+        presets: [Preset]? = nil,
+        deviceLevels: [String: DeviceLevels]? = nil
     ) {
         self.version = Self.currentVersion
         self.preferences = preferences
@@ -40,10 +46,11 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         self.globalShortcut = globalShortcut
         self.hiddenApps = hiddenApps
         self.presets = presets
+        self.deviceLevels = deviceLevels
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, preferences, apps, updates, globalShortcut, hiddenApps, presets
+        case version, preferences, apps, updates, globalShortcut, hiddenApps, presets, deviceLevels
     }
 
     package init(from decoder: any Decoder) throws {
@@ -59,6 +66,31 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         // A malformed preset is dropped rather than discarding the other presets or the whole
         // file, and a presets value that isn't a list is dropped too.
         presets = (try? container.decodeIfPresent(LossyList<Preset>.self, forKey: .presets))?.elements
+        // A malformed device's set is dropped rather than discarding the other devices or the
+        // whole file, and a value that isn't an object is dropped too.
+        deviceLevels =
+            (try? container.decodeIfPresent(LossyDictionary<DeviceLevels>.self, forKey: .deviceLevels))?.elements
+    }
+
+    /// Decodes a JSON object with string keys, skipping values that don't decode.
+    private struct LossyDictionary<Value: Decodable>: Decodable {
+        var elements: [String: Value] = [:]
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: AnyKey.self)
+            for key in container.allKeys {
+                if let value = try? container.decode(Value.self, forKey: key) {
+                    elements[key.stringValue] = value
+                }
+            }
+        }
+
+        private struct AnyKey: CodingKey {
+            var stringValue: String
+            var intValue: Int? { nil }
+            init(stringValue: String) { self.stringValue = stringValue }
+            init?(intValue: Int) { nil }
+        }
     }
 
     /// Decodes a JSON array, skipping elements that don't decode.
@@ -107,21 +139,23 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
     /// listed once each, sorted, and never keep a level (they always play at 100%); an empty
     /// hidden list is stored as absent. Presets follow `PresetLibrary`'s rules (and become nil
     /// when none are left); their levels keep their saved percent and are clamped only when applied.
+    /// Device sets lose default entries and hidden apps like `apps`, but keep their saved percent
+    /// (clamped only when loaded, like presets); a device whose set is empty stays (it means every
+    /// app at 100% there), and no sets at all become nil.
     package func normalized() -> SettingsDocument {
         let maxPercent = preferences.maxBoostPercent.rawValue
         let hidden = hiddenApps?.normalized() ?? []
         let hiddenIDs = hidden.ids
         var copy = self
-        copy.apps = apps.compactMapValues { setting in
-            var clamped = setting
-            clamped.setPercent(setting.percent, maxPercent: maxPercent)
-            return clamped.isDefault ? nil : clamped
-        }
-        .filter { !hiddenIDs.contains($0.key) }
+        copy.apps = DeviceLevelBook.cleaned(apps, maxPercent: maxPercent, excluding: hiddenIDs)
         copy.hiddenApps = hidden.isEmpty ? nil : hidden
         copy.presets = presets.flatMap { presets in
             let kept = PresetLibrary(presets: presets).presets
             return kept.isEmpty ? nil : kept
+        }
+        copy.deviceLevels = deviceLevels.flatMap { sets in
+            let book = DeviceLevelBook(sets: sets).normalized(excluding: hiddenIDs)
+            return book.isEmpty ? nil : book.sets
         }
         return copy
     }
