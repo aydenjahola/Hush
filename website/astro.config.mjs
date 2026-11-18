@@ -33,6 +33,7 @@ export default defineConfig({
           label: 'Using Hush',
           items: [
             { label: 'The mixer', slug: 'using/mixer' },
+            { label: 'Presets', slug: 'using/presets' },
             { label: 'Settings', slug: 'using/settings' },
             { label: 'Keyboard and accessibility', slug: 'using/keyboard-accessibility' },
           ],
