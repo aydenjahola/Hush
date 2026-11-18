@@ -163,15 +163,12 @@ extension CoreAudioIntegration {
             let gain = VolumeCurve.gain(percent: 50)
             let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
             defer { engine.stop() }
-            // Full volume is expected until the mute lands (switchMode starts the replay first, so
-            // the source and the fading-in replay may briefly overlap before that); after that it
-            // must not come back.
+            // Full volume is expected until the mute lands; after that it must not come back.
             let onset = try #require(check.firstWindowBelowThreshold, "the level never dropped below baseline × 0.75 during the swap")
             #expect(check.loudestWindow(from: onset) <= check.threshold,
                     "a burst of \(check.loudestWindow(from: onset)) RMS after attenuation began (limit \(check.threshold))")
-            let overlapLimit = rig.baseline * (1 + gain) * 1.1
-            #expect(check.loudestWindow(in: 0..<onset) <= overlapLimit,
-                    "before the level dropped it reached \(check.loudestWindow(in: 0..<onset)) RMS, more than source + replay (limit \(overlapLimit))")
+            #expect(check.loudestWindow(in: 0..<onset) <= meterToControlLimit(rig),
+                    "before the level dropped it reached \(check.loudestWindow(in: 0..<onset)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay")
             #expect(await rig.waitForLevel(rig.baseline * 0.25), "the level didn't settle at -12 dB after the swap")
         }
 
@@ -186,9 +183,8 @@ extension CoreAudioIntegration {
             let gain = VolumeCurve.gain(percent: 99)
             let (engine, check) = try await switchMeteredEngineToControl(rig, gain: gain)
             defer { engine.stop() }
-            let overlapLimit = rig.baseline * (1 + gain) * 1.1
-            #expect(check.loudestWindow(from: 0) <= overlapLimit,
-                    "the swap reached \(check.loudestWindow(from: 0)) RMS, more than source + replay (limit \(overlapLimit))")
+            #expect(check.loudestWindow(from: 0) <= meterToControlLimit(rig),
+                    "the swap reached \(check.loudestWindow(from: 0)) RMS (limit \(meterToControlLimit(rig))): the mute landed after the replay")
             // Positive control: an unmuted source plus the replay would settle near +6 dB.
             #expect(await rig.waitForLevel(rig.baseline * gain), "the level didn't settle at 99% (now \(rig.capture.recentLevel()))")
         }
@@ -218,6 +214,14 @@ extension CoreAudioIntegration {
             _ = engine.currentPeak()
             #expect(await waitUntil(timeout: .seconds(1)) { engine.currentPeak() > 0 }, "the converted engine stopped metering")
         }
+
+        /// switchMode mutes once the IOProc has rendered one replay buffer, so the mute and the first
+        /// replayed buffer (ramping up from g/1000) reach the output together: measured on hardware,
+        /// an immediate mute landed exactly one cycle before the replay, and the level stayed at
+        /// 1.00× baseline. 1.15× leaves headroom for a partial crossfade. A mute one cycle late
+        /// would overlap the source with the whole ramp (about 1 + 0.77g in the last 5 ms window if
+        /// in phase) and is meant to fail here.
+        private func meterToControlLimit(_ rig: LoopbackRig) -> Float { rig.baseline * 1.15 }
 
         /// Starts a meter-only engine, switches it to control at `gain`, and returns it (the caller
         /// stops it) with the analysed 600 ms after the switch (zero runs already checked).
