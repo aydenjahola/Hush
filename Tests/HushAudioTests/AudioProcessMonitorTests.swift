@@ -16,6 +16,9 @@ final class FakeProcessHAL: ProcessHAL {
     var pids: [AudioObjectID: pid_t] = [:]
     var bundleIDs: [AudioObjectID: String] = [:]
     var running: [AudioObjectID: Bool] = [:]
+    /// Remaining failures per object for the bundle-ID read and for adding a running listener.
+    var bundleIDFailures: [AudioObjectID: Int] = [:]
+    var listenerRefusals: [AudioObjectID: Int] = [:]
     private(set) var listReads = 0
     private(set) var pidReads: [AudioObjectID] = []
     private(set) var bundleIDReads: [AudioObjectID] = []
@@ -33,8 +36,12 @@ final class FakeProcessHAL: ProcessHAL {
         return pids[object]
     }
 
-    func bundleID(of object: AudioObjectID) -> String? {
+    func bundleID(of object: AudioObjectID) throws -> String? {
         bundleIDReads.append(object)
+        if let remaining = bundleIDFailures[object], remaining > 0 {
+            bundleIDFailures[object] = remaining - 1
+            throw FakeHALError()
+        }
         return bundleIDs[object]
     }
 
@@ -44,6 +51,10 @@ final class FakeProcessHAL: ProcessHAL {
     }
 
     func addListener(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ handler: @escaping @MainActor () -> Void) -> HALListener? {
+        if let remaining = listenerRefusals[object], remaining > 0 {
+            listenerRefusals[object] = remaining - 1
+            return nil
+        }
         listeners[Key(object: object, selector: selector)] = handler
         return HALListener(object: object, selector: selector, block: nil)
     }
@@ -92,15 +103,18 @@ final class MonitorHarness {
     let hal = FakeProcessHAL()
     let apps = FakeRunningApps()
     let scheduler = ManualScheduler()
+    let retries = ManualScheduler()
     let sleeper = FakeSleeper()
     private(set) var published: [[AudioApp]] = []
     lazy var monitor: AudioProcessMonitor = {
         let scheduler = self.scheduler
+        let retries = self.retries
         let sleeper = self.sleeper
         return AudioProcessMonitor(
             hal: hal,
             resolver: AppIdentityResolver(provider: apps),
             schedule: { scheduler.schedule($0) },
+            retrySchedule: { retries.schedule($0) },
             pollerSleep: { try await sleeper.sleep($0) },
             ownPID: 1,
             ownBundleID: "io.github.aydenjahola.Hush")
@@ -241,18 +255,73 @@ final class MonitorHarness {
         #expect(h.latest.map(\.id) == ["app.100", "app.111"])
     }
 
-    @Test func objectWithUnreadablePIDIsRetriedOnTheNextListChange() {
+    @Test func unreadablePIDIsRetriedWithoutWaitingForAListChange() {
         let h = MonitorHarness()
         h.hal.add(10, pid: 100)
         h.hal.pids[10] = nil
         h.start()
         #expect(h.latest.isEmpty)
+        #expect(h.retries.pending.count == 1, "a retry is scheduled")
+
+        h.hal.pids[10] = 100
+        h.retries.runAll()
+        #expect(h.latest.map(\.id) == ["app.100"])
+        #expect(h.hal.listReads == 1, "the retry didn't need the list again")
+        #expect(h.retries.pending.isEmpty)
+    }
+
+    @Test func failedBundleIDReadIsRetriedInsteadOfCachingNoBundle() {
+        let h = MonitorHarness()
+        h.hal.add(10, pid: 100)
+        h.hal.bundleIDFailures[10] = 1
+        h.start()
+        #expect(h.latest.isEmpty, "not grouped under a guessed identity")
+
+        h.retries.runAll()
+        #expect(h.latest.map(\.id) == ["app.100"])
+    }
+
+    @Test func retriesAreBounded() {
+        let h = MonitorHarness()
+        h.hal.add(10, pid: 100)
+        h.hal.pids[10] = nil
+        h.start()
+        for _ in 0..<20 { h.retries.runAll() }
+        #expect(h.hal.pidReads.count == AudioProcessMonitor.maxRetries, "gives up after a few attempts")
+        #expect(h.retries.pending.isEmpty)
 
         h.hal.pids[10] = 100
         h.hal.add(11, pid: 101)
         h.hal.fireList()
         h.scheduler.runAll()
-        #expect(h.latest.map(\.id) == ["app.100", "app.101"])
+        #expect(h.latest.map(\.id) == ["app.100", "app.101"], "a list change starts a fresh round")
+    }
+
+    @Test func aRefusedRunningListenerIsRetried() {
+        let h = MonitorHarness()
+        h.hal.add(10, pid: 100)
+        h.hal.listenerRefusals[10] = 2
+        h.start()
+        #expect(h.latest.map(\.id) == ["app.100"], "the object is still listed")
+        #expect(!h.hal.listeners.keys.contains { $0.object == 10 })
+
+        h.retries.runAll()
+        h.retries.runAll()
+        #expect(h.hal.listeners.keys.contains { $0.object == 10 })
+        #expect(h.retries.pending.isEmpty)
+    }
+
+    @Test func startAfterStopReAddsListenersAndRepublishes() {
+        let h = MonitorHarness()
+        h.hal.add(10, pid: 100, playing: true)
+        h.start()
+        h.monitor.stop()
+        #expect(h.hal.listeners.isEmpty)
+
+        h.start()
+        #expect(h.hal.listeners.keys.contains { $0.object == 10 }, "per-object caches were cleared, so listeners come back")
+        #expect(h.published.count == 2)
+        #expect(h.app(100)?.isPlaying == true)
     }
 
     @Test func helpersGroupUnderTheirApp() {
@@ -322,6 +391,21 @@ final class MonitorHarness {
 
         h.monitor.setPolling(.off)
         #expect(h.monitor.pollTargets.isEmpty)
+    }
+
+    @Test func aMissedStopIsFoundByThePoll() async throws {
+        let h = MonitorHarness()
+        h.hal.add(10, pid: 100, playing: true)
+        h.start()
+        h.monitor.setPolling(.objects([10]))
+
+        h.hal.running[10] = false  // a browser pause the HAL didn't notify
+        try await waitUntil { h.sleeper.waiting.count == 1 }
+        h.sleeper.wakeAll()
+        try await waitUntil { h.scheduler.pending.count == 1 }
+        h.scheduler.runAll()
+        #expect(h.app(100)?.isPlaying == false)
+        h.monitor.stop()
     }
 
     @Test func aPolledChangeIsPublished() async throws {

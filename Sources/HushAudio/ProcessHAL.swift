@@ -14,7 +14,8 @@ struct HALListener {
 protocol ProcessHAL: AnyObject {
     func processObjects() throws -> [AudioObjectID]
     func pid(of object: AudioObjectID) -> pid_t?
-    func bundleID(of object: AudioObjectID) -> String?
+    /// Nil when the process has no bundle ID; throws when the read itself failed.
+    func bundleID(of object: AudioObjectID) throws -> String?
     func isRunningOutput(_ object: AudioObjectID) -> Bool
     /// Calls `handler` on the main queue whenever `selector` changes on `object`. Nil if the HAL refused.
     func addListener(
@@ -38,9 +39,9 @@ final class CoreAudioProcessHAL: ProcessHAL {
         try? CoreAudioProperty.scalar(object, kAudioProcessPropertyPID, initial: pid_t(0))
     }
 
-    func bundleID(of object: AudioObjectID) -> String? {
-        guard let raw = try? CoreAudioProperty.string(object, kAudioProcessPropertyBundleID), !raw.isEmpty else { return nil }
-        return raw
+    func bundleID(of object: AudioObjectID) throws -> String? {
+        let raw = try CoreAudioProperty.string(object, kAudioProcessPropertyBundleID)
+        return raw.isEmpty ? nil : raw
     }
 
     func isRunningOutput(_ object: AudioObjectID) -> Bool {

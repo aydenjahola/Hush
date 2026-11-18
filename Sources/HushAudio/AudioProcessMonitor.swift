@@ -16,6 +16,10 @@ public final class AudioProcessMonitor: AudioProcessSource {
 
     public private(set) var apps: [AudioApp] = []
 
+    /// Attempts per object at reading its PID/bundle ID, or at adding its running listener, before
+    /// giving up until the next list change.
+    static let maxRetries = 5
+
     private struct ObjectInfo {
         let pid: pid_t
         let bundleID: String?
@@ -24,6 +28,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
     private let hal: any ProcessHAL
     private let resolver: AppIdentityResolver
     private let schedule: Scheduler
+    private let retrySchedule: Scheduler
     private let ownPID: pid_t
     private let ownBundleID: String?
     private let logger = Logger(subsystem: HushIdentity.bundleID, category: "processes")
@@ -40,6 +45,10 @@ public final class AudioProcessMonitor: AudioProcessSource {
     private var needsListRead = false
     private var dirtyRunning: Set<AudioObjectID> = []
     private var isFlushScheduled = false
+    private var isRetryScheduled = false
+    /// Failed attempts so far, for objects whose info couldn't be read / whose listener was refused.
+    private var infoAttempts: [AudioObjectID: Int] = [:]
+    private var listenerAttempts: [AudioObjectID: Int] = [:]
 
     private lazy var poller: RunningStatePoller = {
         let hal = self.hal
@@ -55,13 +64,15 @@ public final class AudioProcessMonitor: AudioProcessSource {
         self.init(
             hal: CoreAudioProcessHAL(),
             resolver: AppIdentityResolver(),
-            schedule: Self.coalescing(within: .milliseconds(10)))
+            schedule: Self.coalescing(within: .milliseconds(10)),
+            retrySchedule: Self.coalescing(within: .milliseconds(250)))
     }
 
     init(
         hal: any ProcessHAL,
         resolver: AppIdentityResolver,
         schedule: @escaping Scheduler,
+        retrySchedule: @escaping Scheduler,
         pollerSleep: RunningStatePoller.Sleeper? = nil,
         ownPID: pid_t = ProcessInfo.processInfo.processIdentifier,
         ownBundleID: String? = Bundle.main.bundleIdentifier
@@ -69,6 +80,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
         self.hal = hal
         self.resolver = resolver
         self.schedule = schedule
+        self.retrySchedule = retrySchedule
         self.pollerSleep = pollerSleep
         self.ownPID = ownPID
         self.ownBundleID = ownBundleID
@@ -115,6 +127,14 @@ public final class AudioProcessMonitor: AudioProcessSource {
         onChange = nil
         needsListRead = false
         dirtyRunning = []
+        // Forget the per-object state, so a later start() reads everything and listens again.
+        objectIDs = []
+        info = [:]
+        running = [:]
+        infoAttempts = [:]
+        listenerAttempts = [:]
+        poller.record([:])
+        apps = []
     }
 
     /// The objects the poller currently reads (for tests).
@@ -154,6 +174,7 @@ public final class AudioProcessMonitor: AudioProcessSource {
             needsListRead = false
             readList()
         }
+        resolvePending()
         for objectID in dirtyRunning where running[objectID] != nil {
             running[objectID] = hal.isRunningOutput(objectID)
         }
@@ -178,18 +199,56 @@ public final class AudioProcessMonitor: AudioProcessSource {
             info[objectID] = nil
             running[objectID] = nil
             if let listener = runningListeners.removeValue(forKey: objectID) { hal.removeListener(listener) }
+            infoAttempts[objectID] = nil
+            listenerAttempts[objectID] = nil
         }
-        for objectID in fresh where info[objectID] == nil {
-            // An unreadable PID is retried on the next list change.
-            guard let pid = hal.pid(of: objectID) else { continue }
-            info[objectID] = ObjectInfo(pid: pid, bundleID: hal.bundleID(of: objectID))
+        // A list change gives objects that ran out of retries a fresh round.
+        for objectID in fresh where info[objectID] == nil { infoAttempts[objectID] = 0 }
+        for objectID in fresh where info[objectID] != nil && runningListeners[objectID] == nil { listenerAttempts[objectID] = 0 }
+        objectIDs = fresh
+    }
+
+    /// Reads info for new objects and adds their running listener, retrying failures (bounded) on
+    /// a later turn rather than waiting for the next list change.
+    private func resolvePending() {
+        for objectID in objectIDs where info[objectID] == nil {
+            guard let attempts = infoAttempts[objectID], attempts < Self.maxRetries else { continue }
+            guard let pid = hal.pid(of: objectID), let bundleID = try? hal.bundleID(of: objectID) else {
+                infoAttempts[objectID] = attempts + 1
+                logger.debug("Couldn't read process object \(objectID) (attempt \(attempts + 1))")
+                continue
+            }
+            infoAttempts[objectID] = nil
+            info[objectID] = ObjectInfo(pid: pid, bundleID: bundleID)
             running[objectID] = hal.isRunningOutput(objectID)
+            listenerAttempts[objectID] = 0
+        }
+        for objectID in objectIDs where info[objectID] != nil && runningListeners[objectID] == nil {
+            guard let attempts = listenerAttempts[objectID], attempts < Self.maxRetries else { continue }
             // IsRunningOutput only: it's what decides `isPlaying`, and the poller reads the same flag.
-            runningListeners[objectID] = hal.addListener(objectID, kAudioProcessPropertyIsRunningOutput) { [weak self] in
+            if let listener = hal.addListener(objectID, kAudioProcessPropertyIsRunningOutput, { [weak self] in
                 self?.runningDidChange(objectID)
+            }) {
+                runningListeners[objectID] = listener
+                listenerAttempts[objectID] = nil
+            } else {
+                listenerAttempts[objectID] = attempts + 1
+                logger.debug("HAL refused a running listener on object \(objectID) (attempt \(attempts + 1))")
             }
         }
-        objectIDs = fresh
+        let pending = infoAttempts.values.contains { $0 < Self.maxRetries }
+            || listenerAttempts.values.contains { $0 < Self.maxRetries }
+        if pending { scheduleRetry() }
+    }
+
+    private func scheduleRetry() {
+        guard onChange != nil, !isRetryScheduled else { return }
+        isRetryScheduled = true
+        retrySchedule { [weak self] in
+            guard let self else { return }
+            self.isRetryScheduled = false
+            self.flush()
+        }
     }
 
     private func updatePollTargets() {
