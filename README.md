@@ -18,6 +18,27 @@ Turn Spotify down, boost a quiet call, mute a noisy tab: Hush gives every app th
 - macOS 26 or later
 - Audio Recording permission (Hush asks on first launch)
 
+## Install
+
+1. Download `Hush.dmg` from the [latest release](https://github.com/aydenjahola/Hush/releases/latest).
+2. Open it and drag **Hush** onto **Applications**.
+3. Open Hush from Applications. macOS blocks it the first time, because Hush isn't signed with a paid Apple Developer ID: it's free and open source, so releases are ad-hoc signed. To allow it, either:
+   - open **System Settings → Privacy & Security**, scroll down to the message about Hush, click **Open Anyway** and confirm; or
+   - run `xattr -dr com.apple.quarantine /Applications/Hush.app` in Terminal.
+
+   Since macOS 15, right-click → Open no longer bypasses this check.
+4. Grant Audio Recording permission when Hush asks.
+
+Each release also has a `.sha256` file, so you can check your download with `shasum -a 256 -c Hush-x.y.z.dmg.sha256`, run in the folder that holds the DMG.
+
+## Uninstall
+
+1. If you turned on "Launch at login", turn it off in Hush's Settings, or remove Hush from System Settings → General → Login Items.
+2. Quit Hush (right-click the gear in the popover → Quit Hush).
+3. Delete `/Applications/Hush.app`.
+4. Remove its saved levels: `rm -r ~/Library/Application\ Support/Hush`
+5. Reset its Audio Recording permission: `tccutil reset AudioCapture io.github.aydenjahola.Hush`
+
 ## Build from source
 
 You need the Xcode Command Line Tools (`xcode-select --install`). Xcode itself is optional.
@@ -26,6 +47,8 @@ You need the Xcode Command Line Tools (`xcode-select --install`). Xcode itself i
 make test   # run the unit tests
 make app    # build build/Hush.app (ad-hoc signed)
 make run    # build and launch
+make dmg    # build build/Hush-<version>.dmg (add ARCHS="arm64 x86_64" for a universal binary)
+make icon   # regenerate Resources/Hush.icns from scripts/make-icon.swift
 ```
 
 Run `Hush.app` (via `make run`), not the bare binary from Xcode's Run button. Without the app bundle there's no bundle ID or Audio Recording usage description, so the permission prompt and the Settings window misbehave.
@@ -44,6 +67,17 @@ For each app you adjust, Hush creates a private process tap that mutes the app a
 - Even a muted app can leak its very first sound after it launches, or when it starts a new audio helper process (common in browsers), because Hush can only tap a process once Core Audio reports it.
 - Audio from command-line tools is attributed to the terminal app that launched them.
 - When you switch output devices, lowered or boosted apps briefly play at their normal level while Hush rebuilds their engines. Muted apps stay muted.
+
+## Releasing
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please):
+
+1. Write [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, …) on `main`.
+2. release-please keeps a release PR open that bumps `version.txt` and updates `CHANGELOG.md`.
+3. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release.
+4. The same workflow (`.github/workflows/release.yml`) then runs the tests, builds a universal DMG and uploads `Hush-X.Y.Z.dmg`, `Hush.dmg` and a `.sha256` checksum to the release.
+
+The repository needs Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" turned on so release-please can open its PR. Releases are ad-hoc signed. If the `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and `NOTARY_PASSWORD` secrets are ever added, the workflow signs with the Developer ID and notarizes too. Before merging a release PR, run through [docs/manual-test.md](docs/manual-test.md).
 
 ## License
 
