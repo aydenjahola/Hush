@@ -13,6 +13,7 @@ The flow is **draft → DMG uploaded → published**. It works this way because 
 - **Settings → Pages → Build and deployment → Source** must be **GitHub Actions**, so the website can deploy.
 - **Settings → General → Pull Requests**: allow **squash merging** only, with the default commit message set to the pull request title.
 - **Settings → General → Releases → Enable release immutability** is on. The release workflow is built around it (see below).
+- **A `RELEASE_PLEASE_TOKEN` secret** (Settings → Secrets and variables → Actions). This is a fine-grained personal access token scoped to this repository only, with **Contents** and **Pull requests** set to read and write, and an expiry date. release-please uses it to open its pull request, so the pull request counts as yours and CI runs on it straight away. Without the secret, release-please falls back to `GITHUB_TOKEN`. Its pull requests then come from `github-actions[bot]`, so GitHub holds their CI runs until you click **Approve and run workflows**. When the token expires, create a new one and update the secret.
 
 ## 1. Write Conventional Commit titles
 
