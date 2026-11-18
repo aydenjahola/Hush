@@ -324,8 +324,15 @@ public final class MixerStore {
                 tearDownEngine(id)
                 continue
             }
-            // Make before break: the old engine keeps the app muted or processed until the new one
-            // exists, so a mode or process-list change doesn't let audio through in between.
+            // Change the running engine in place when possible: destroying a muted tap lets the
+            // app through at full level until a replacement's IO runs, and a new aggregate starts
+            // with a gap. A helper spawning (process list) or the user adjusting a metered app
+            // (mode) therefore keeps the same tap, aggregate and IOProc.
+            if let existing, applyInPlace(to: existing, id: id, processObjectIDs: app.processObjectIDs, mode: mode, setting: setting) {
+                continue
+            }
+            // Fallback, make before break: the old engine keeps the app muted or processed until
+            // the new one exists.
             do {
                 let replacement = try engineFactory.makeEngine(
                     appID: id,
@@ -340,6 +347,31 @@ public final class MixerStore {
                 tearDownEngine(id)  // never keep an engine in the wrong mode
                 recordFailure(error, for: id, mode: mode)
             }
+        }
+    }
+
+    /// Updates the process list first, then the mode. Returns false (after logging) if the engine
+    /// refused either change, so the caller replaces it.
+    private func applyInPlace(
+        to engine: any AudioEngineHandle,
+        id: String,
+        processObjectIDs: [AudioObjectID],
+        mode: EngineMode,
+        setting: AppVolumeSetting
+    ) -> Bool {
+        do {
+            if engine.processObjectIDs != processObjectIDs {
+                try engine.updateProcesses(processObjectIDs)
+            }
+            if engine.mode != mode {
+                try engine.switchMode(to: mode, gain: setting.effectiveGain)
+            } else if mode == .control {
+                engine.setGain(setting.effectiveGain)
+            }
+            return true
+        } catch {
+            logger.error("In-place change for \(id, privacy: .public) failed, rebuilding: \(String(describing: error), privacy: .public)")
+            return false
         }
     }
 
