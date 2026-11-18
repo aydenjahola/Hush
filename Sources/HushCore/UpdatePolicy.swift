@@ -81,7 +81,7 @@ public enum UpdatePolicy {
         let page = isTrusted(release.htmlURL) ? release.htmlURL : releasesPageURL
         let dmgName = "Hush-\(version).dmg"
         let asset = release.assets.first { $0.name == dmgName }?.browserDownloadURL
-        let download = asset.flatMap { isTrusted($0) ? $0 : nil } ?? page
+        let download = asset.flatMap { isTrustedDownload($0) ? $0 : nil } ?? page
         return AvailableUpdate(version: version, downloadURL: download, releasePageURL: page)
     }
 
@@ -92,9 +92,34 @@ public enum UpdatePolicy {
         return false
     }
 
-    /// Hush only ever opens release links on github.com over HTTPS.
+    private static let releasesPathPrefix = "/aydenjahola/hush/releases/"
+
+    /// Hush only opens its own release pages: `https://github.com/aydenjahola/Hush/releases/…`, with
+    /// no port, no user or password, and no ".." segments (checked on the standardized, decoded path).
     public static func isTrusted(_ url: URL) -> Bool {
-        url.scheme == "https" && url.host() == "github.com"
+        trustedPath(of: url) != nil
+    }
+
+    /// A release asset: a trusted URL under `/releases/download/`.
+    public static func isTrustedDownload(_ url: URL) -> Bool {
+        trustedPath(of: url)?.hasPrefix(releasesPathPrefix + "download/") == true
+    }
+
+    /// The lowercased, standardized, percent-decoded path of a trusted URL, or nil.
+    private static func trustedPath(of url: URL) -> String? {
+        guard url.scheme?.lowercased() == "https",
+              url.host(percentEncoded: false)?.lowercased() == "github.com",
+              url.port == nil,
+              url.user(percentEncoded: false) == nil,
+              url.password(percentEncoded: false) == nil
+        else { return nil }
+        let raw = url.path(percentEncoded: false)
+        let standardized = url.standardized.path(percentEncoded: false)
+        // Reject any dot segment, raw or percent-encoded, rather than trusting what it resolves to.
+        let segments = raw.split(separator: "/", omittingEmptySubsequences: false)
+        guard raw == standardized, !segments.contains(".."), !segments.contains(".") else { return nil }
+        let path = standardized.lowercased()
+        return path.hasPrefix(releasesPathPrefix) ? path : nil
     }
 }
 

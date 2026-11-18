@@ -191,7 +191,7 @@ public final class UpdateChecker {
     /// Opens the DMG (or the release page) in the browser. Hush never downloads or replaces itself.
     public func download() {
         guard let update = pendingUpdate ?? latestUpdate else { return }
-        openURL(update.downloadURL)
+        openURL(UpdatePolicy.isTrusted(update.downloadURL) ? update.downloadURL : UpdatePolicy.releasesPageURL)
     }
 
     /// Hides the banner, badge and notification for 24 hours.

@@ -111,6 +111,54 @@ import Testing
         #expect(update.releasePageURL == UpdatePolicy.releasesPageURL)
     }
 
+    // MARK: URL allow-list
+
+    @Test(arguments: [
+        "https://github.com/aydenjahola/Hush/releases/latest",
+        "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0",
+        "https://GitHub.com/AydenJahola/hush/releases/tag/v0.2.0",
+        "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg",
+    ])
+    func trustsHushReleaseLinks(_ text: String) {
+        #expect(UpdatePolicy.isTrusted(URL(string: text)!))
+    }
+
+    @Test(arguments: [
+        "https://github.com/attacker/Hush/releases/latest",           // another repo
+        "https://github.com/aydenjahola/HushEvil/releases/latest",    // look-alike repo
+        "https://github.com/aydenjahola/Hush/issues/1",                // not a release
+        "https://github.com:444/aydenjahola/Hush/releases/latest",    // port
+        "https://evil@github.com/aydenjahola/Hush/releases/latest",   // user
+        "https://a:b@github.com/aydenjahola/Hush/releases/latest",    // user and password
+        "http://github.com/aydenjahola/Hush/releases/latest",         // not https
+        "https://github.com.evil.example/aydenjahola/Hush/releases/latest",
+        "https://github.com/aydenjahola/Hush/../evil/releases/latest", // traversal
+        "https://github.com/aydenjahola/Hush/releases/../../../evil/x",
+        "https://github.com/aydenjahola/Hush/releases/%2e%2e/%2e%2e/%2e%2e/evil",
+        "file:///aydenjahola/Hush/releases/latest",
+    ])
+    func rejectsEverythingElse(_ text: String) {
+        #expect(!UpdatePolicy.isTrusted(URL(string: text)!))
+    }
+
+    @Test func downloadsMustBeReleaseAssets() {
+        let asset = URL(string: "https://github.com/aydenjahola/Hush/releases/download/v0.2.0/Hush-0.2.0.dmg")!
+        let page = URL(string: "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0")!
+        #expect(UpdatePolicy.isTrustedDownload(asset))
+        #expect(!UpdatePolicy.isTrustedDownload(page))
+        #expect(!UpdatePolicy.isTrustedDownload(URL(string: "https://github.com/attacker/x/releases/download/v1/Hush-0.2.0.dmg")!))
+    }
+
+    @Test func assetOutsideReleaseDownloadsFallsBackToTheReleasePage() throws {
+        let odd = GitHubRelease(
+            tagName: "v0.2.0",
+            htmlURL: URL(string: "https://github.com/aydenjahola/Hush/releases/tag/v0.2.0")!,
+            draft: false, prerelease: false,
+            assets: [.init(name: "Hush-0.2.0.dmg", browserDownloadURL: URL(string: "https://github.com/aydenjahola/Hush/releases/tag/Hush-0.2.0.dmg")!)])
+        let update = try #require(UpdatePolicy.availableUpdate(in: odd, current: current))
+        #expect(update.downloadURL == update.releasePageURL)
+    }
+
     // MARK: Suppression
 
     private func update(_ version: String) -> AvailableUpdate {
