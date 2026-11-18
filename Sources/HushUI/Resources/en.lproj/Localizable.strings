@@ -80,9 +80,15 @@
 /* %@ is a relative date such as "2 hours ago". */
 "Last checked %@" = "Last checked %@";
 
+/* Hint under the Launch at login switch while macOS waits for the user to approve the login item. */
+"Allow Hush in System Settings → General → Login Items." = "Allow Hush in System Settings → General → Login Items.";
+
 "Later" = "Later";
 
 "Launch at login" = "Launch at login";
+
+/* Tooltip on the disabled Launch at login switch when Hush isn't running from an app bundle. */
+"Launch at login needs Hush to run as an installed app." = "Launch at login needs Hush to run as an installed app.";
 
 "Layout" = "Layout";
 
@@ -105,6 +111,9 @@
 "No apps playing" = "No apps playing";
 
 "Nothing is playing" = "Nothing is playing";
+
+/* Button under Launch at login that opens System Settings → General → Login Items. */
+"Open Login Items" = "Open Login Items";
 
 "Open System Settings" = "Open System Settings";
 

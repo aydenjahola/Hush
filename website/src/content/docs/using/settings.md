@@ -11,6 +11,12 @@ To open Settings, click the gear button in the bottom-right corner of the mixer.
 
 Turn this on to start Hush automatically when you log in. Hush registers itself as a login item, and it appears in **System Settings → General → Login Items**.
 
+The switch reflects what macOS reports, and it updates when you come back to Hush after changing the setting in System Settings.
+
+If macOS wants your approval, the switch stays on and a hint appears under it: "Allow Hush in System Settings → General → Login Items." Click **Open Login Items** to jump to that pane and turn Hush on there.
+
+If Hush isn't running as an installed app (for example a bare binary), the switch is dimmed because macOS can't register it.
+
 If macOS refuses, the reason appears in small text under the switch and the switch turns back off. Moving Hush into your Applications folder first usually helps. You can also check whether Hush is turned off in **Login Items**.
 
 ### Maximum boost

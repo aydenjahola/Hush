@@ -1,14 +1,12 @@
+import AppKit
 import HushCore
-import ServiceManagement
 import SwiftUI
 
 package struct SettingsView: View {
     @Bindable var store: MixerStore
     @Bindable var updates: UpdateChecker
 
-    /// Read from SMAppService in onAppear, not as a `@State` initial value (evaluated on every init).
-    @State private var launchAtLogin = false
-    @State private var launchError: String?
+    @State private var launchAtLogin = LaunchAtLoginModel()
     @State private var confirmingReset = false
 
     package init(store: MixerStore, updates: UpdateChecker) {
@@ -19,10 +17,20 @@ package struct SettingsView: View {
     package var body: some View {
         Form {
             Section(L10n.general) {
-                Toggle(L10n.launchAtLogin, isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
-                if let launchError {
-                    Text(launchError)
+                Toggle(
+                    L10n.launchAtLogin,
+                    isOn: Binding(get: { launchAtLogin.state.isOn }, set: { launchAtLogin.setEnabled($0) })
+                )
+                .disabled(!launchAtLogin.state.isEnabled)
+                .help(launchAtLogin.state.isEnabled ? Text(verbatim: "") : Text(L10n.launchAtLoginUnavailableHelp))
+                if launchAtLogin.state.showsApprovalHint {
+                    Text(L10n.launchAtLoginApprovalHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button(L10n.openLoginItems) { launchAtLogin.openLoginItemsSettings() }
+                }
+                if let message = launchAtLogin.errorMessage {
+                    Text(message)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -70,7 +78,10 @@ package struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 420)
-        .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
+        .onAppear { launchAtLogin.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            launchAtLogin.refresh()
+        }
     }
 
     @ViewBuilder
@@ -98,22 +109,6 @@ package struct SettingsView: View {
         Text(text)
             .font(.callout)
             .foregroundStyle(.secondary)
-    }
-
-    private func setLaunchAtLogin(_ enabled: Bool) {
-        // Skip echoes from reverting the toggle after a failure; they would clobber the error.
-        guard enabled != (SMAppService.mainApp.status == .enabled) else { return }
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-            launchError = nil
-        } catch {
-            launchError = error.localizedDescription
-            launchAtLogin = SMAppService.mainApp.status == .enabled
-        }
     }
 
     private static var version: String {
