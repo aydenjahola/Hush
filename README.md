@@ -12,6 +12,11 @@ Turn Spotify down, boost a quiet call, mute a noisy tab: Hush gives every app th
 - Remembers each app's level across restarts
 - Apps you haven't touched aren't processed at all (except for level meters while the popover is open)
 - Follows your output device when you switch headphones or speakers
+- Tells you when a new version is available
+
+## Privacy
+
+Hush doesn't collect or send any data about you or your audio. The only network request it makes is the update check: once a day (and about 30 seconds after launch) it asks GitHub's public API for the latest Hush release, sending nothing but a `Hush/<version>` user agent. When a newer version exists, Hush shows a banner in the popover, a dot on the menu bar icon and a notification. **Download** opens the release in your browser; Hush never downloads or installs anything itself. Turn the check off in Settings → "Check for updates automatically".
 
 ## Requirements
 
