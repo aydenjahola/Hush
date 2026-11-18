@@ -81,6 +81,9 @@ final class FakeEngine: AudioEngineHandle {
         rebuiltDeviceIDs.append(outputDeviceID)
     }
 
+    /// Test hook: makes the engine's list differ from the app's without going through the store.
+    func forceProcessObjectIDs(_ ids: [AudioObjectID]) { processObjectIDs = ids }
+
     func updateProcesses(_ processObjectIDs: [AudioObjectID]) throws {
         log?("update \(appID) \(processObjectIDs)")
         if let updateError { throw updateError }

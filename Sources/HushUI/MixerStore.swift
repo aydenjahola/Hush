@@ -381,9 +381,11 @@ public final class MixerStore {
 
     /// Polls only what decisions depend on:
     /// - every process while the popover is open (live strips);
-    /// - otherwise the objects of present muted, lowered or boosted apps that aren't playing: their
-    ///   control engine starts only once Hush sees them play, so if the HAL misses the start, the
-    ///   next poll is what starts processing. A playing adjusted app's running engine covers it.
+    /// - otherwise the objects of every present muted, lowered or boosted app, playing or not. Its
+    ///   control engine starts only once Hush sees it play and stops once Hush sees it stop. The HAL
+    ///   often skips both notifications (a browser pausing and resuming), so the poll catches a
+    ///   missed start (audio unprocessed) and a missed stop (an IOProc running on silence keeps the
+    ///   output device and Bluetooth awake).
     /// - nothing otherwise; the HAL listeners still give best-effort updates.
     private func updatePolling() {
         let polling: ProcessPolling
@@ -392,7 +394,7 @@ public final class MixerStore {
         } else {
             var objects: Set<AudioObjectID> = []
             if controlsEnabled {
-                for app in apps where !app.isPlaying && (settings[app.id]?.needsEngine ?? false) {
+                for app in apps where settings[app.id]?.needsEngine ?? false {
                     objects.formUnion(app.processObjectIDs)
                 }
             }

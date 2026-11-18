@@ -722,15 +722,48 @@ import Testing
         #expect(h.processes.pollingCalls == [.objects([5, 6]), .off])
     }
 
-    @Test func playingAdjustedAppIsNotPolledWhileItsEngineRuns() {
+    @Test func playingAdjustedAppIsPolledSoAMissedStopIsCaught() {
+        // The HAL often skips IsRunningOutput on a browser pause; without polling, the control
+        // engine would keep running on silence (device and Bluetooth awake, isPlaying stale).
         let h = Harness()
         h.processes.emit([makeApp("a", objects: [5])])
         h.store.setPercent(60, for: "a")
         #expect(h.factory.live("a")?.mode == .control)
-        #expect(h.processes.pollingCalls.isEmpty, "the running control engine already covers it")
+        #expect(h.processes.pollingCalls == [.objects([5])])
 
         h.processes.emit([makeApp("a", playing: false, objects: [5])])
-        #expect(h.processes.pollingCalls == [.objects([5])], "stopped: watch for it starting again")
+        #expect(h.processes.pollingCalls == [.objects([5])], "still polled, so it's caught when it starts again")
+    }
+
+    @Test func aStopFoundByThePollTearsDownTheControlEngine() throws {
+        let h = Harness(document: SettingsDocument(apps: ["zen": mutedSetting()]))
+        h.processes.emit([makeApp("zen", objects: [7, 8])])
+        let engine = try #require(h.factory.live("zen"))
+        #expect(h.processes.pollingCalls == [.objects([7, 8])])
+
+        // What the monitor publishes when its poll reads IsRunningOutput = 0 for both objects.
+        h.processes.emit([makeApp("zen", playing: false, objects: [7, 8])])
+        #expect(engine.isStopped)
+        #expect(h.store.engineCount == 0)
+    }
+
+    @Test func staleProcessListAndModeChangeUpdateThenSwitchAndRebuildCleanlyIfTheSwitchFails() throws {
+        let h = Harness()
+        h.processes.emit([makeApp("a", objects: [42, 43])])
+        h.store.popoverDidAppear()
+        let meter = try #require(h.factory.live("a"))
+        meter.forceProcessObjectIDs([42])  // as if a helper joined since the engine was last updated
+        meter.switchError = FakeError()
+        let before = h.factory.events.count
+
+        h.store.setPercent(50, for: "a")
+        #expect(Array(h.factory.events.dropFirst(before)) == ["update a [42, 43]", "switch a control", "make a control", "stop a meterOnly"])
+        #expect(meter.isStopped)
+        let replacement = try #require(h.factory.live("a"))
+        #expect(replacement.mode == .control)
+        #expect(replacement.processObjectIDs == [42, 43])
+        #expect(replacement.initialGain == VolumeCurve.gain(percent: 50))
+        #expect(h.store.strips.first?.engineError == nil)
     }
 
     @Test func savedLoweredSettingPollsWhenTheAppAppearsAndStopsWhenItLeaves() {
