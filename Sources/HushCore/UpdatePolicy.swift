@@ -93,7 +93,7 @@ public enum UpdatePolicy {
     }
 
     /// Hush only ever opens release links on github.com over HTTPS.
-    static func isTrusted(_ url: URL) -> Bool {
+    public static func isTrusted(_ url: URL) -> Bool {
         url.scheme == "https" && url.host() == "github.com"
     }
 }
