@@ -25,7 +25,9 @@ DMG_ROOT := build/dmg-root
 # SwiftUI/Observation macros ship with Xcode. DEVELOPER_DIR, when set, wins over xcode-select.
 DEV_DIR := $(or $(DEVELOPER_DIR),$(shell xcode-select -p 2>/dev/null))
 
-.PHONY: require-xcode build test app dmg icon run clean
+INSTALL_DIR ?= /Applications
+
+.PHONY: require-xcode build test app dmg install icon run clean
 
 require-xcode:
 	@case "$(DEV_DIR)" in \
@@ -80,6 +82,17 @@ icon:
 
 run: app
 	open $(APP)
+
+# Builds first, so a failed build leaves the installed copy running. Then quits Hush, waits up to
+# 5 s for it to exit, replaces the installed app and relaunches it. Honors ARCHS like `app`.
+install: app
+	pkill -x Hush || true
+	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do \
+		pgrep -x Hush >/dev/null || break; sleep 0.2; \
+	done
+	rm -rf "$(INSTALL_DIR)/Hush.app"
+	ditto $(APP) "$(INSTALL_DIR)/Hush.app"
+	open "$(INSTALL_DIR)/Hush.app"
 
 clean:
 	rm -rf .build build

@@ -47,6 +47,7 @@ You need the Xcode Command Line Tools (`xcode-select --install`). Xcode itself i
 make test   # run the unit tests
 make app    # build build/Hush.app (ad-hoc signed)
 make run    # build and launch
+make install  # quit Hush, build, replace /Applications/Hush.app and relaunch it
 make dmg    # build build/Hush-<version>.dmg (add ARCHS="arm64 x86_64" for a universal binary)
 make icon   # regenerate Resources/Hush.icns from scripts/make-icon.swift
 ```
