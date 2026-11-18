@@ -55,6 +55,37 @@ package enum OutputDeviceList {
             }
     }
 
+    /// A per-device property the monitor listens to.
+    package enum WatchedProperty: Hashable, Sendable, CaseIterable {
+        /// Output-scope `kAudioDevicePropertyStreamConfiguration`, on every device: a hotplugged
+        /// Bluetooth or USB device can show up with no output streams and gain them a moment later.
+        case streamConfiguration
+        /// `kAudioObjectPropertyName`, on listed devices.
+        case name
+        /// Output-scope `kAudioDevicePropertyDataSource`, on listed built-in devices.
+        case dataSource
+    }
+
+    /// Which properties to watch on each device. Every device gets `streamConfiguration`, including
+    /// ones filtered out now, so one that gains output channels later is picked up. Hush's own
+    /// private aggregates are skipped: they can never be listed and come and go on every rebuild.
+    package static func watchedProperties(
+        for candidates: [OutputDeviceCandidate],
+        excludingUIDPrefix prefix: String = AppAudioEngine.privateAggregateUIDPrefix
+    ) -> [AudioObjectID: Set<WatchedProperty>] {
+        let listed = Set(outputs(from: candidates, excludingUIDPrefix: prefix).map(\.id))
+        var result: [AudioObjectID: Set<WatchedProperty>] = [:]
+        for candidate in candidates where !candidate.uid.hasPrefix(prefix) {
+            var properties: Set<WatchedProperty> = [.streamConfiguration]
+            if listed.contains(candidate.id) {
+                properties.insert(.name)
+                if candidate.transportType == kAudioDeviceTransportTypeBuiltIn { properties.insert(.dataSource) }
+            }
+            result[candidate.id, default: []].formUnion(properties)
+        }
+        return result
+    }
+
     package static func transport(for candidate: OutputDeviceCandidate) -> OutputTransport {
         transport(transportType: candidate.transportType, dataSource: candidate.dataSource)
     }

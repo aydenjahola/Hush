@@ -14,8 +14,9 @@ package final class DefaultOutputMonitor: OutputDeviceSource {
     private var onDevicesChange: (@MainActor ([OutputDevice]) -> Void)?
     private var devicesListener: AudioObjectPropertyListenerBlock?
     private var lastDevices: [OutputDevice]?
-    /// Per-device name (and built-in data source) listeners, so renames and headphone jacks show live.
-    private var deviceListeners: [AudioObjectID: [(AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)]] =
+    /// Per-device listeners (see `OutputDeviceList.watchedProperties`), so hotplugged devices that
+    /// gain streams late, renames and headphone jacks all show live.
+    private var deviceListeners: [AudioObjectID: [OutputDeviceList.WatchedProperty: AudioObjectPropertyListenerBlock]] =
         [:]
 
     package init() {}
@@ -78,10 +79,15 @@ package final class DefaultOutputMonitor: OutputDeviceSource {
 
     /// The pickable output devices right now.
     package func availableDevices() -> [OutputDevice] {
+        OutputDeviceList.outputs(from: currentCandidates())
+    }
+
+    /// Every device the HAL knows about, pickable or not.
+    private func currentCandidates() -> [OutputDeviceCandidate] {
         let ids =
             (try? CoreAudioProperty.array(
                 CoreAudioProperty.systemObject, kAudioHardwarePropertyDevices, filler: AudioObjectID(0))) ?? []
-        return OutputDeviceList.outputs(from: ids.map(Self.candidate))
+        return ids.map(Self.candidate)
     }
 
     package func setDefaultOutput(_ id: AudioObjectID) throws {
@@ -95,47 +101,54 @@ package final class DefaultOutputMonitor: OutputDeviceSource {
     }
 
     private func refreshDevices() {
-        let devices = availableDevices()
-        updateDeviceListeners(for: devices)
+        let candidates = currentCandidates()
+        updateDeviceListeners(OutputDeviceList.watchedProperties(for: candidates))
+        let devices = OutputDeviceList.outputs(from: candidates)
         guard devices != lastDevices else { return }
         lastDevices = devices
         onDevicesChange?(devices)
     }
 
-    /// A listed device's name or data source changed: refresh the list, and the header pill if
+    /// A device's streams, name or data source changed: refresh the list, and the header pill if
     /// it's the default (`publish` only reports a real change, and a same-ID change never rebuilds).
     private func deviceDidChange() {
         refreshDevices()
         publish()
     }
 
-    private func updateDeviceListeners(for devices: [OutputDevice]) {
-        let wanted = Dictionary(devices.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        for (id, listeners) in deviceListeners where wanted[id] == nil {
-            for (address, block) in listeners {
-                var address = address
-                // The device may already be gone, in which case there's nothing left to remove.
+    /// Adds and removes per-device listeners so exactly `wanted` is watched. Removal errors are
+    /// ignored: a vanished device has nothing left to remove.
+    private func updateDeviceListeners(_ wanted: [AudioObjectID: Set<OutputDeviceList.WatchedProperty>]) {
+        for (id, listeners) in deviceListeners {
+            let keep = wanted[id] ?? []
+            for (property, block) in listeners where !keep.contains(property) {
+                var address = Self.address(property)
                 _ = AudioObjectRemovePropertyListenerBlock(id, &address, DispatchQueue.main, block)
+                deviceListeners[id]?[property] = nil
             }
-            deviceListeners[id] = nil
+            if deviceListeners[id]?.isEmpty == true { deviceListeners[id] = nil }
         }
-        for (id, device) in wanted where deviceListeners[id] == nil {
-            var addresses = [CoreAudioProperty.address(kAudioObjectPropertyName)]
-            if [.builtIn, .builtInSpeakers, .builtInHeadphones].contains(device.transport) {
-                addresses.append(
-                    CoreAudioProperty.address(kAudioDevicePropertyDataSource, scope: kAudioObjectPropertyScopeOutput))
-            }
-            var added: [(AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
-            for address in addresses {
-                var address = address
+        for (id, properties) in wanted {
+            for property in properties where deviceListeners[id]?[property] == nil {
+                var address = Self.address(property)
                 let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
                     MainActor.assumeIsolated { self?.deviceDidChange() }
                 }
                 if AudioObjectAddPropertyListenerBlock(id, &address, DispatchQueue.main, block) == noErr {
-                    added.append((address, block))
+                    deviceListeners[id, default: [:]][property] = block
                 }
             }
-            deviceListeners[id] = added
+        }
+    }
+
+    private static func address(_ property: OutputDeviceList.WatchedProperty) -> AudioObjectPropertyAddress {
+        switch property {
+        case .streamConfiguration:
+            CoreAudioProperty.address(kAudioDevicePropertyStreamConfiguration, scope: kAudioObjectPropertyScopeOutput)
+        case .name:
+            CoreAudioProperty.address(kAudioObjectPropertyName)
+        case .dataSource:
+            CoreAudioProperty.address(kAudioDevicePropertyDataSource, scope: kAudioObjectPropertyScopeOutput)
         }
     }
 

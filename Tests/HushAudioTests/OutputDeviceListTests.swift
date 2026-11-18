@@ -57,6 +57,27 @@ import Testing
         #expect(outputs == [OutputDevice(id: 7, uid: "BlackHole2ch_UID", name: "BlackHole 2ch", transport: .virtual)])
     }
 
+    @Test func everyDeviceIsWatchedForStreamChangesIncludingFilteredOnes() {
+        let watched = OutputDeviceList.watchedProperties(for: [
+            device(1, "MacBook Pro Speakers", transport: kAudioDeviceTransportTypeBuiltIn),
+            device(2, "AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth, channels: 0),  // still connecting
+            device(3, "Hidden", hidden: true),
+            device(4, "Hush – Music", uid: "\(AppAudioEngine.privateAggregateUIDPrefix)x", channels: 2),
+        ])
+        #expect(watched[1] == [.streamConfiguration, .name, .dataSource])
+        #expect(watched[2] == [.streamConfiguration])
+        #expect(watched[3] == [.streamConfiguration])
+        #expect(watched[4] == nil)
+    }
+
+    @Test func aDeviceThatGainsOutputChannelsIsListedOnTheNextRefresh() {
+        var airPods = device(2, "AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth, channels: 0)
+        #expect(OutputDeviceList.outputs(from: [airPods]).isEmpty)
+        airPods.outputChannels = 2
+        #expect(OutputDeviceList.outputs(from: [airPods]).map(\.id) == [2])
+        #expect(OutputDeviceList.watchedProperties(for: [airPods])[2] == [.streamConfiguration, .name])
+    }
+
     @Test func devicesAreSortedByName() {
         let outputs = OutputDeviceList.outputs(from: [
             device(1, "USB DAC"), device(2, "AirPods Pro"), device(3, "MacBook Pro Speakers"),
