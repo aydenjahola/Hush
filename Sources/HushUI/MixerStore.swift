@@ -39,6 +39,9 @@ package final class MixerStore {
     package private(set) var hiddenApps: [HiddenApp]
     /// Saved presets; see MixerStore+Presets. Saved in the same write as the levels.
     package internal(set) var presetLibrary: PresetLibrary
+    /// Each output device's saved levels; see MixerStore+DeviceLevels. Saved in the same write as
+    /// the levels, and kept while "Remember levels for each output device" is off.
+    package internal(set) var deviceLevelBook: DeviceLevelBook
 
     package var controlsEnabled: Bool { permission == .authorized }
     package var playingCount: Int { apps.filter(\.isPlaying).count }
@@ -89,6 +92,9 @@ package final class MixerStore {
     @ObservationIgnored let installedApp: @MainActor (String) -> InstalledAppInfo?
     @ObservationIgnored var installedAppCache: [String: InstalledAppInfo?] = [:]
     @ObservationIgnored var engines: [String: any AudioEngineHandle] = [:]
+    /// The output device the current levels belong to while levels are remembered per device;
+    /// nil while the feature is off or before the first output with a UID is reported.
+    @ObservationIgnored var levelsDevice: DeviceLevelBook.Device?
     @ObservationIgnored var order: [String] = []
     @ObservationIgnored let saver: DebouncedSaver
     @ObservationIgnored var meterTask: Task<Void, Never>?
@@ -133,6 +139,8 @@ package final class MixerStore {
         self.hiddenApps = hiddenApps
         self.settings = HiddenAppsPlan.visibleSettings(document.apps, hidden: hiddenApps.ids)
         self.presetLibrary = PresetLibrary(presets: document.presets ?? [])
+        self.deviceLevelBook = DeviceLevelBook(sets: document.deviceLevels ?? [:])
+            .normalized(maxPercent: document.preferences.maxBoostPercent.rawValue, excluding: hiddenApps.ids)
         saver.perform = { [weak self] in self?.persistNow() }
     }
 
@@ -224,6 +232,7 @@ package final class MixerStore {
     package func setMaxBoost(_ limit: BoostLimit) {
         preferences.maxBoostPercent = limit
         settings = SettingsDocument(preferences: preferences, apps: settings).normalized().apps
+        deviceLevelBook = deviceLevelBook.normalized(maxPercent: maxPercent, excluding: hiddenApps.ids)
         settingsDidChange()
     }
 
@@ -297,11 +306,15 @@ package final class MixerStore {
 
     private func hiddenAppsDidChange() {
         apps = HiddenAppsPlan.visibleApps(allApps, hidden: hiddenApps.ids)
+        // A hidden app plays at 100% on every device, so no device keeps a level for it.
+        deviceLevelBook = deviceLevelBook.normalized(maxPercent: maxPercent, excluding: hiddenApps.ids)
         settingsDidChange()
     }
 
+    /// Resets the current levels and clears every output device's saved levels.
     package func resetAllLevels() {
         settings = [:]
+        deviceLevelBook.reset()
         engineErrors = [:]
         meterOnlyErrorIDs = []
         settingsDidChange()
@@ -343,11 +356,13 @@ package final class MixerStore {
         let apps = settings
         let hiddenApps = hiddenApps
         let presets = presetLibrary.presets
+        let deviceLevels = deviceLevelBook
         persister.update { document in
             document.preferences = preferences
             document.apps = apps
             document.hiddenApps = hiddenApps.isEmpty ? nil : hiddenApps
             document.presets = presets.isEmpty ? nil : presets
+            document.deviceLevels = deviceLevels.isEmpty ? nil : deviceLevels.sets
         }
     }
 
@@ -380,6 +395,8 @@ package final class MixerStore {
     private func outputDidChange(_ device: OutputDevice?) {
         let previous = outputDevice
         outputDevice = device
+        // Before any engine is rebuilt, so the rebuilt engines start at the new device's levels.
+        let switchedLevels = switchDeviceLevels(to: device)
         if let device, let previous, previous.id != device.id {
             if OutputDevice.isSameDevice(previous, device) {
                 // The same device under a new object ID (it was re-enumerated, as can happen
@@ -387,9 +404,11 @@ package final class MixerStore {
                 // rebuild the ones whose IO stopped or that didn't reattach to the new ID.
                 scheduleHealthCheck()
             } else {
+                if switchedLevels { prepareEnginesForSwitchedLevels() }
                 rebuildEngines(onOutputDevice: device)
             }
         }
+        if switchedLevels { saver.schedule() }
         clearStallRetries()  // a device that wasn't ready may be now
         reconcile()
         rebuildStrips()
@@ -413,6 +432,7 @@ package final class MixerStore {
     }
 
     func settingsDidChange() {
+        storeCurrentDeviceLevels()
         saver.schedule()
         reconcile()
         rebuildStrips()

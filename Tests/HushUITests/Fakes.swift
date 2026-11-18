@@ -75,6 +75,8 @@ final class FakeEngine: AudioEngineHandle {
     private(set) var currentGain: Float
     private(set) var isStopped = false
     private(set) var rebuiltDeviceIDs: [AudioObjectID] = []
+    /// The control gain each rebuild started with (the gain the engine hands over at).
+    private(set) var gainsAtRebuild: [Float] = []
     var rebuildError: (any Error)?
     /// Thrown by `updateProcesses` / `switchMode`, to exercise the make-before-break fallback.
     var updateError: (any Error)?
@@ -119,6 +121,7 @@ final class FakeEngine: AudioEngineHandle {
         log?("beginRebuild \(appID)")
         if let rebuildError { throw rebuildError }
         rebuiltDeviceIDs.append(outputDeviceID)
+        gainsAtRebuild.append(currentGain)
         attached = true  // a rebuilt engine has a fresh aggregate on the new device
         if mode == .control {
             mode = .meterOnly

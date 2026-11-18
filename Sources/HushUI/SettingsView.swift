@@ -53,6 +53,7 @@ package struct SettingsView: View {
             PresetsSettingsSection(store: store, sheet: $presetSheet)
 
             Section(L10n.levels) {
+                DeviceLevelsSettings(store: store)
                 HiddenAppsList(store: store)
                 Button(L10n.resetAllLevelsButton, role: .destructive) {
                     confirmingReset = true
@@ -60,7 +61,8 @@ package struct SettingsView: View {
                 .confirmationDialog(L10n.resetAllLevelsTitle, isPresented: $confirmingReset) {
                     Button(L10n.resetAllLevels, role: .destructive) { store.resetAllLevels() }
                 } message: {
-                    Text(L10n.resetAllLevelsMessage)
+                    Text(
+                        store.deviceLevelBook.isEmpty ? L10n.resetAllLevelsMessage : L10n.resetAllLevelsDeviceMessage)
                 }
             }
 

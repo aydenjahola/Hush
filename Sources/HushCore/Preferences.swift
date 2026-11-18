@@ -12,19 +12,24 @@ package struct Preferences: Codable, Equatable, Sendable {
     package var showInactiveApps: Bool
     /// Settings → Appearance. Every field is optional on disk, so older files still decode.
     package var appearance: AppearancePreferences
+    /// Settings → Levels → "Remember levels for each output device". Off by default, and optional
+    /// on disk (added after version 1 shipped). The sets themselves are `SettingsDocument.deviceLevels`.
+    package var rememberLevelsPerDevice: Bool
 
     package init(
         maxBoostPercent: BoostLimit = .percent200,
         showInactiveApps: Bool = false,
-        appearance: AppearancePreferences = AppearancePreferences()
+        appearance: AppearancePreferences = AppearancePreferences(),
+        rememberLevelsPerDevice: Bool = false
     ) {
         self.maxBoostPercent = maxBoostPercent
         self.showInactiveApps = showInactiveApps
         self.appearance = appearance
+        self.rememberLevelsPerDevice = rememberLevelsPerDevice
     }
 
     private enum CodingKeys: String, CodingKey {
-        case maxBoostPercent, showInactiveApps, appearance
+        case maxBoostPercent, showInactiveApps, appearance, rememberLevelsPerDevice
     }
 
     package init(from decoder: any Decoder) throws {
@@ -35,5 +40,7 @@ package struct Preferences: Codable, Equatable, Sendable {
         appearance =
             (try? container.decodeIfPresent(AppearancePreferences.self, forKey: .appearance))
             ?? AppearancePreferences()
+        rememberLevelsPerDevice =
+            (try? container.decodeIfPresent(Bool.self, forKey: .rememberLevelsPerDevice)) ?? false
     }
 }

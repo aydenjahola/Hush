@@ -123,6 +123,19 @@ package enum L10n {
     package static let resetAllLevelsTitle = resource("Reset all app levels?")
     package static let resetAllLevels = resource("Reset All Levels")
     package static let resetAllLevelsMessage = resource("Every app goes back to 100% and unmuted.")
+    package static let resetAllLevelsDeviceMessage = resource(
+        "Every app goes back to 100% and unmuted, and every output device's saved levels are cleared.")
+    package static let rememberLevelsPerDevice = resource("Remember levels for each output device")
+    package static let rememberLevelsPerDeviceExplanation = resource(
+        "Each output device keeps its own app levels. Switching outputs brings back that device's levels.")
+    package static let devicesWithSavedLevels = resource("Devices with saved levels")
+    package static let noDevicesWithSavedLevels = resource("No devices have saved levels yet.")
+    package static let forget = resource("Forget")
+    package static func forgetDeviceLevels(_ device: String) -> LocalizedStringResource {
+        resource("Forget levels for \(device)")
+    }
+    package static let forgetDeviceLevelsHelp = resource(
+        "Drops this device's saved levels. The current levels don't change.")
     package static let hiddenApps = resource("Hidden apps")
     package static let noHiddenApps = resource("No hidden apps.")
     package static let show = resource("Show")
@@ -252,7 +265,10 @@ package enum L10n {
             shortcutInUse, shortcutNeedsModifier, shortcutIsStandard, shortcutReservedByMacOS, shortcutCleared,
             spaceKey, unknownKey(50), showInactiveApps,
             levels,
-            resetAllLevelsButton, resetAllLevelsTitle, resetAllLevels, resetAllLevelsMessage, updates,
+            resetAllLevelsButton, resetAllLevelsTitle, resetAllLevels, resetAllLevelsMessage,
+            resetAllLevelsDeviceMessage, rememberLevelsPerDevice, rememberLevelsPerDeviceExplanation,
+            devicesWithSavedLevels, noDevicesWithSavedLevels, forget, forgetDeviceLevels("x"),
+            forgetDeviceLevelsHelp, updates,
             checkAutomatically, checkNow, about, version, localVersion("x", commit: "y"),
             localVersion("x", commit: nil),
             devBadge, localBuild, localBuildHelp("x"), localBuildHelpNoCommit, sourceCode, licence, lastChecked("x"),
