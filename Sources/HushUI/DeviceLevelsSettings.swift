@@ -9,11 +9,14 @@ struct DeviceLevelsSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // VoiceOver reads the explanation as the toggle's hint, so the caption isn't read twice.
             Toggle(L10n.rememberLevelsPerDevice, isOn: $store.rememberLevelsPerDevice)
+                .accessibilityHint(Text(L10n.rememberLevelsPerDeviceExplanation))
             Text(L10n.rememberLevelsPerDeviceExplanation)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityHidden(true)
         }
         if store.rememberLevelsPerDevice {
             VStack(alignment: .leading, spacing: 6) {

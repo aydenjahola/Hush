@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import HushAudio
 import HushCore
+import Observation
 import Testing
 
 @testable import HushUI
@@ -304,13 +305,56 @@ import Testing
         #expect(percent(h, "a") == 100)
     }
 
-    @Test func loweringTheMaximumBoostClampsEveryDevice() {
+    @Test func aLoweredMaximumBoostClampsOnlyWhenASetIsLoaded() {
         let h = harness(speakers: ["a": setting(40)], headphones: ["a": setting(200)])
         h.processes.emit([makeApp("a")])
         h.store.maxBoost = .percent150
-        #expect(h.store.deviceLevelBook.levels(for: "airpods")?.apps["a"]?.percent == 150)
+        #expect(h.store.deviceLevelBook.levels(for: "airpods")?.apps["a"]?.percent == 200, "not clamped while saved")
         h.output.emit(headphones)
         #expect(percent(h, "a") == 150)
+    }
+
+    @Test func boostsOnOtherDevicesSurviveLoweringAndRaisingTheMaximum() {
+        let h = harness(speakers: ["a": setting(40)], headphones: ["a": setting(180), "b": setting(130)])
+        h.processes.emit([makeApp("a"), makeApp("b", objects: [43])])
+
+        h.store.maxBoost = .percent100
+        h.store.maxBoost = .percent200
+        h.store.flushPendingSave()
+        #expect(h.persister.saved.last?.deviceLevels?["airpods"]?.apps["a"]?.percent == 180)
+
+        h.output.emit(headphones)
+        #expect(percent(h, "a") == 180)
+        #expect(percent(h, "b") == 130)
+    }
+
+    @Test func aRenamedDeviceKeepsItsSetUnderTheNewName() throws {
+        let h = harness(speakers: ["a": setting(40)], headphones: nil)
+        h.processes.emit([makeApp("a")])
+        let engine = try #require(h.factory.live("a"))
+
+        h.output.emit(OutputDevice(id: 1, uid: "built-in", name: "Studio Speakers"))
+
+        #expect(h.store.savedLevelDevices.map(\.name) == ["Studio Speakers"])
+        #expect(h.store.deviceLevelBook.levels(for: "built-in")?.apps["a"]?.percent == 40)
+        #expect(engine.rebuiltDeviceIDs.isEmpty)
+        h.store.flushPendingSave()
+        #expect(h.persister.saved.last?.deviceLevels?["built-in"]?.name == "Studio Speakers")
+    }
+
+    @Test func unchangedLevelsDontReassignTheBook() {
+        let h = harness(speakers: ["a": setting(40)], headphones: nil)
+        h.processes.emit([makeApp("a")])
+        let changes = ChangeCounter()
+        withObservationTracking {
+            _ = h.store.deviceLevelBook
+        } onChange: {
+            changes.increment()
+        }
+        h.store.setShowInactiveApps(true)  // a settings change that leaves the levels alone
+        h.store.setPercent(60, for: "a")
+        h.store.setPercent(60, for: "a")
+        #expect(changes.count == 1, "only the change to 60% touched the book")
     }
 
     // MARK: Persistence
@@ -396,4 +440,10 @@ import Testing
         reloadedOutput.emit(headphones)
         #expect(reloaded.strips.first?.setting.percent == 120)
     }
+}
+
+/// Counts observation callbacks (which arrive on a `@Sendable` closure).
+nonisolated private final class ChangeCounter: @unchecked Sendable {
+    private(set) var count = 0
+    func increment() { count += 1 }
 }

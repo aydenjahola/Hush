@@ -37,22 +37,30 @@ package extension MixerStore {
 }
 
 extension MixerStore {
-    /// Copies the current levels into the current device's set while the feature is on.
+    /// Copies the current levels (and the device's name) into the current device's set while the
+    /// feature is on. The book is only assigned when the set changed, so observers such as the
+    /// Settings list aren't invalidated by changes that leave it as it was.
     func storeCurrentDeviceLevels() {
         guard preferences.rememberLevelsPerDevice, let levelsDevice else { return }
-        deviceLevelBook.store(settings, for: levelsDevice, maxPercent: maxPercent, excluding: hiddenApps.ids)
+        var book = deviceLevelBook
+        book.store(settings, for: levelsDevice, maxPercent: maxPercent, excluding: hiddenApps.ids)
+        if book != deviceLevelBook { deviceLevelBook = book }
     }
 
     /// Switches to `device`'s levels when the feature is on and its UID differs from the device
     /// the current levels belong to. Returns whether the sets switched. Same-UID reports (a
     /// re-enumeration across sleep, say) and devices without a UID never switch; a new name for
-    /// the same UID is just recorded.
+    /// the same UID is just recorded and saved.
     func switchDeviceLevels(to device: OutputDevice?) -> Bool {
         guard preferences.rememberLevelsPerDevice, let device, let new = Self.levelsDevice(for: device) else {
             return false
         }
         guard levelsDevice?.uid != new.uid else {
-            levelsDevice = new
+            if levelsDevice?.name != new.name {
+                levelsDevice = new
+                storeCurrentDeviceLevels()  // the saved name follows a rename
+                saver.schedule()
+            }
             return false
         }
         let result = deviceLevelBook.switching(

@@ -140,7 +140,7 @@ package final class MixerStore {
         self.settings = HiddenAppsPlan.visibleSettings(document.apps, hidden: hiddenApps.ids)
         self.presetLibrary = PresetLibrary(presets: document.presets ?? [])
         self.deviceLevelBook = DeviceLevelBook(sets: document.deviceLevels ?? [:])
-            .normalized(maxPercent: document.preferences.maxBoostPercent.rawValue, excluding: hiddenApps.ids)
+            .normalized(excluding: hiddenApps.ids)
         saver.perform = { [weak self] in self?.persistNow() }
     }
 
@@ -232,7 +232,6 @@ package final class MixerStore {
     package func setMaxBoost(_ limit: BoostLimit) {
         preferences.maxBoostPercent = limit
         settings = SettingsDocument(preferences: preferences, apps: settings).normalized().apps
-        deviceLevelBook = deviceLevelBook.normalized(maxPercent: maxPercent, excluding: hiddenApps.ids)
         settingsDidChange()
     }
 
@@ -307,7 +306,7 @@ package final class MixerStore {
     private func hiddenAppsDidChange() {
         apps = HiddenAppsPlan.visibleApps(allApps, hidden: hiddenApps.ids)
         // A hidden app plays at 100% on every device, so no device keeps a level for it.
-        deviceLevelBook = deviceLevelBook.normalized(maxPercent: maxPercent, excluding: hiddenApps.ids)
+        deviceLevelBook = deviceLevelBook.normalized(excluding: hiddenApps.ids)
         settingsDidChange()
     }
 

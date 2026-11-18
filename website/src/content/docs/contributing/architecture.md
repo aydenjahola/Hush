@@ -124,7 +124,7 @@ While the popover is open, the store polls every engine's peak about 30 times a 
 Settings live at `~/Library/Application Support/Hush/settings.json`, a versioned JSON document (`version: 1`). Each app is keyed by bundle ID, or by executable name when there isn't one. The same file holds the preferences and the update checker's state.
 
 - Saves are debounced: the store writes 500 ms after the last change, and flushes any pending save when Hush quits.
-- `normalized()` clamps every level to the current maximum boost and drops entries at the default (100%, unmuted) before encoding. It does the same for each device's set in `deviceLevels`, and drops hidden apps from both.
+- `normalized()` clamps every level to the current maximum boost and drops entries at the default (100%, unmuted) before encoding. For each device's set in `deviceLevels` it drops default entries but doesn't clamp, so boosts survive lowering the maximum; a set is clamped when it's loaded. Hidden apps are dropped from both.
 - A file that can't be decoded, or that has an unknown version, is moved aside to `settings.corrupt-<unix-time>.json`, and Hush starts with defaults.
 - Every field added after the first release is optional on disk, so older files still decode.
 

@@ -139,8 +139,9 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
     /// listed once each, sorted, and never keep a level (they always play at 100%); an empty
     /// hidden list is stored as absent. Presets follow `PresetLibrary`'s rules (and become nil
     /// when none are left); their levels keep their saved percent and are clamped only when applied.
-    /// Device sets are clamped and lose default entries and hidden apps like `apps`; a device whose
-    /// set is empty stays (it means every app at 100% there), and no sets at all become nil.
+    /// Device sets lose default entries and hidden apps like `apps`, but keep their saved percent
+    /// (clamped only when loaded, like presets); a device whose set is empty stays (it means every
+    /// app at 100% there), and no sets at all become nil.
     package func normalized() -> SettingsDocument {
         let maxPercent = preferences.maxBoostPercent.rawValue
         let hidden = hiddenApps?.normalized() ?? []
@@ -153,7 +154,7 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
             return kept.isEmpty ? nil : kept
         }
         copy.deviceLevels = deviceLevels.flatMap { sets in
-            let book = DeviceLevelBook(sets: sets).normalized(maxPercent: maxPercent, excluding: hiddenIDs)
+            let book = DeviceLevelBook(sets: sets).normalized(excluding: hiddenIDs)
             return book.isEmpty ? nil : book.sets
         }
         return copy

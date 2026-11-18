@@ -266,7 +266,9 @@ import Testing
         let normalized = document.normalized()
         #expect(normalized.deviceLevels?.keys.sorted() == ["built-in"])
         #expect(normalized.deviceLevels?["built-in"]?.apps.keys.sorted() == ["loud"])
-        #expect(normalized.deviceLevels?["built-in"]?.apps["loud"]?.percent == 150)
+        #expect(
+            normalized.deviceLevels?["built-in"]?.apps["loud"]?.percent == 200,
+            "kept above the maximum boost; clamped only when loaded")
         #expect(SettingsDocument(deviceLevels: [:]).normalized().deviceLevels == nil)
     }
 }

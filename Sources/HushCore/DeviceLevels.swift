@@ -115,11 +115,14 @@ package struct DeviceLevelBook: Equatable, Sendable {
         sets = [:]
     }
 
-    /// Every set clamped to `maxPercent`, without default entries or apps in `hidden`.
-    package func normalized(maxPercent: Int, excluding hidden: Set<String> = []) -> DeviceLevelBook {
+    /// Every set without default entries or apps in `hidden`. Levels aren't clamped to the
+    /// current maximum boost here: a set keeps its boosts while the maximum is lowered, and is
+    /// clamped only when it's loaded (see `switching`), so raising the maximum again restores them.
+    package func normalized(excluding hidden: Set<String> = []) -> DeviceLevelBook {
         var copy = self
         for (uid, set) in sets {
-            copy.sets[uid]?.apps = Self.cleaned(set.apps, maxPercent: maxPercent, excluding: hidden)
+            copy.sets[uid]?.apps = Self.cleaned(
+                set.apps, maxPercent: AppVolumeSetting.absoluteMaxPercent, excluding: hidden)
         }
         return copy
     }

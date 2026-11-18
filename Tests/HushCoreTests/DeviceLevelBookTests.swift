@@ -80,7 +80,8 @@ import Testing
         #expect(book.levels(for: "airpods")?.apps == ["loud": level(200)])
         let result = book.switching(from: speakers, to: headphones, current: [:], maxPercent: 150)
         #expect(result.settings["loud"]?.percent == 150)
-        #expect(book.normalized(maxPercent: 100).levels(for: "airpods")?.apps.isEmpty == true)
+        #expect(book.normalized().levels(for: "airpods")?.apps["loud"]?.percent == 200, "kept until loaded")
+        #expect(book.normalized(excluding: ["loud"]).levels(for: "airpods")?.apps.isEmpty == true)
     }
 
     @Test func seedingReplacesTheSetAndRefreshesTheName() {
