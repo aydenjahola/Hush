@@ -240,7 +240,7 @@ jobs:
           gh release download "$TAG" --dir "$CHECK" --clobber \
             --pattern "Hush-$VERSION.dmg" --pattern Hush.dmg \
             --pattern "Hush-$VERSION.dmg.sha256" --pattern Hush.dmg.sha256
-          cd "$CHECK"
+          cd "$CHECK" || exit 1
           shasum -a 256 -c "Hush-$VERSION.dmg.sha256" Hush.dmg.sha256
           cmp "Hush-$VERSION.dmg.sha256" "$GITHUB_WORKSPACE/build/Hush-$VERSION.dmg.sha256"
           cmp Hush.dmg.sha256 "$GITHUB_WORKSPACE/build/Hush.dmg.sha256"
