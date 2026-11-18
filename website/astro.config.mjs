@@ -56,6 +56,7 @@ export default defineConfig({
             { label: 'Releasing', slug: 'contributing/releasing' },
           ],
         },
+        { label: 'Roadmap', slug: 'roadmap' },
         { label: 'Changelog', slug: 'changelog' },
       ],
     }),
