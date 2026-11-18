@@ -342,7 +342,7 @@ final class RecordingProcessSource: AudioProcessSource {
         }
     }
 
-    func setFastPolling(_ fast: Bool) { monitor.setFastPolling(fast) }
+    func setPolling(_ polling: ProcessPolling) { monitor.setPolling(polling) }
 
     func stop() { monitor.stop() }
 }

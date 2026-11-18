@@ -181,7 +181,7 @@ extension CoreAudioIntegration {
             let latest = AppsBox()
             monitor.start { latest.apps = $0 }
             defer { monitor.stop() }
-            monitor.setFastPolling(true)
+            monitor.setPolling(.all)
 
             let tone = try ToneProcess(deviceUID: output.device.uid, level: output.quietLevel)
             defer { tone.terminate() }

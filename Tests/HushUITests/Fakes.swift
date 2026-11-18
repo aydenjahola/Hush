@@ -23,8 +23,8 @@ final class FakeProcessSource: AudioProcessSource {
         onChange?(apps)
     }
 
-    private(set) var fastPollingCalls: [Bool] = []
-    func setFastPolling(_ fast: Bool) { fastPollingCalls.append(fast) }
+    private(set) var pollingCalls: [ProcessPolling] = []
+    func setPolling(_ polling: ProcessPolling) { pollingCalls.append(polling) }
 }
 
 @MainActor

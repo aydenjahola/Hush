@@ -60,8 +60,8 @@ public final class MixerStore {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var hasPendingSave = false
     @ObservationIgnored private var meterTask: Task<Void, Never>?
-    /// Last value pushed to `processSource.setFastPolling`.
-    @ObservationIgnored private var isFastPolling = false
+    /// Last value pushed to `processSource.setPolling`.
+    @ObservationIgnored private var currentPolling: ProcessPolling = .off
     /// The first-launch permission request, if one was made (exposed for tests).
     @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
@@ -375,17 +375,28 @@ public final class MixerStore {
         }
     }
 
-    /// Fast process polling while the popover is open (live strips) or while any present app
-    /// is muted, lowered or boosted: its control engine starts only once Hush sees it playing,
-    /// so if the HAL misses the start, the next poll is what starts processing it.
+    /// Polls only what decisions depend on:
+    /// - every process while the popover is open (live strips);
+    /// - otherwise the objects of present muted, lowered or boosted apps that aren't playing: their
+    ///   control engine starts only once Hush sees them play, so if the HAL misses the start, the
+    ///   next poll is what starts processing. A playing adjusted app's running engine covers it.
+    /// - nothing otherwise; the HAL listeners still give best-effort updates.
     private func updatePolling() {
-        let needsPlayingTimeEngine = controlsEnabled && apps.contains { app in
-            settings[app.id]?.needsEngine ?? false
+        let polling: ProcessPolling
+        if isPopoverVisible {
+            polling = .all
+        } else {
+            var objects: Set<AudioObjectID> = []
+            if controlsEnabled {
+                for app in apps where !app.isPlaying && (settings[app.id]?.needsEngine ?? false) {
+                    objects.formUnion(app.processObjectIDs)
+                }
+            }
+            polling = objects.isEmpty ? .off : .objects(objects)
         }
-        let fast = isPopoverVisible || needsPlayingTimeEngine
-        guard fast != isFastPolling else { return }
-        isFastPolling = fast
-        processSource.setFastPolling(fast)
+        guard polling != currentPolling else { return }
+        currentPolling = polling
+        processSource.setPolling(polling)
     }
 
     private func tearDownEngine(_ id: String) {

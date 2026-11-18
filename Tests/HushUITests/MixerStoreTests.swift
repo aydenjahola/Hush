@@ -691,57 +691,77 @@ import Testing
         #expect(h.store.playingCount == 2)
     }
 
-    @Test func popoverVisibilityTogglesFastProcessPolling() {
+    @Test func popoverVisibilityPollsEveryProcess() {
         let h = Harness()
-        #expect(h.processes.fastPollingCalls.isEmpty)
+        h.processes.emit([makeApp("a", objects: [1]), makeApp("b", playing: false, objects: [2])])
+        #expect(h.processes.pollingCalls.isEmpty, "nothing depends on running state: no polling")
 
         h.store.popoverDidAppear()
-        #expect(h.processes.fastPollingCalls == [true])
+        #expect(h.processes.pollingCalls == [.all], "live strips")
 
         h.store.popoverDidDisappear()
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.all, .off])
     }
 
-    @Test func presentLoweredAppTurnsFastPollingOnAndResetTurnsItOff() {
+    @Test func idleLoweredAppPollsOnlyItsOwnObjects() {
         let h = Harness()
-        h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.fastPollingCalls.isEmpty)
+        h.processes.emit([makeApp("a", playing: false, objects: [5, 6]), makeApp("b", playing: false, objects: [7])])
 
         h.store.setPercent(60, for: "a")
-        #expect(h.processes.fastPollingCalls == [true], "a missed start would otherwise play unprocessed for up to the slow interval")
+        #expect(h.processes.pollingCalls == [.objects([5, 6])], "a missed start would otherwise play unprocessed")
 
         h.store.setPercent(70, for: "a")
-        #expect(h.processes.fastPollingCalls == [true], "pushed only when it changes")
+        #expect(h.processes.pollingCalls == [.objects([5, 6])], "pushed only when it changes")
 
         h.store.resetVolume(for: "a")
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.objects([5, 6]), .off])
     }
 
-    @Test func savedLoweredSettingTurnsFastPollingOnWhenAppAppearsAndOffWhenItLeaves() {
+    @Test func playingAdjustedAppIsNotPolledWhileItsEngineRuns() {
+        let h = Harness()
+        h.processes.emit([makeApp("a", objects: [5])])
+        h.store.setPercent(60, for: "a")
+        #expect(h.factory.live("a")?.mode == .control)
+        #expect(h.processes.pollingCalls.isEmpty, "the running control engine already covers it")
+
+        h.processes.emit([makeApp("a", playing: false, objects: [5])])
+        #expect(h.processes.pollingCalls == [.objects([5])], "stopped: watch for it starting again")
+    }
+
+    @Test func savedLoweredSettingPollsWhenTheAppAppearsAndStopsWhenItLeaves() {
         let h = Harness(document: SettingsDocument(apps: ["a": AppVolumeSetting(percent: 150, lastAdjusted: Harness.fixedNow)]))
-        h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.fastPollingCalls == [true])
+        h.processes.emit([makeApp("a", playing: false, objects: [9])])
+        #expect(h.processes.pollingCalls == [.objects([9])])
+
+        h.processes.emit([makeApp("a", playing: false, objects: [9, 10])])
+        #expect(h.processes.pollingCalls == [.objects([9]), .objects([9, 10])], "a new helper is polled too")
 
         h.processes.emit([])
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.objects([9]), .objects([9, 10]), .off])
     }
 
-    @Test func presentMutedAppTurnsFastPollingOn() {
+    @Test func idleMutedAppIsPolled() {
         let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]))
         h.processes.emit([makeApp("a", playing: false)])
-        #expect(h.processes.fastPollingCalls == [true], "a muted app's missed start plays unmuted until the next poll")
+        #expect(h.processes.pollingCalls == [.objects([42])], "a muted app's missed start plays unmuted until the next poll")
 
         h.store.toggleMute(for: "a")
-        #expect(h.processes.fastPollingCalls == [true, false])
+        #expect(h.processes.pollingCalls == [.objects([42]), .off])
     }
 
-    @Test func loweredAppKeepsFastPollingAfterPopoverCloses() {
+    @Test func idleLoweredAppKeepsBeingPolledAfterThePopoverCloses() {
         let h = Harness()
-        h.processes.emit([makeApp("a")])
+        h.processes.emit([makeApp("a", playing: false)])
         h.store.setPercent(60, for: "a")
         h.store.popoverDidAppear()
         h.store.popoverDidDisappear()
-        #expect(h.processes.fastPollingCalls == [true])
+        #expect(h.processes.pollingCalls == [.objects([42]), .all, .objects([42])])
+    }
+
+    @Test func withoutPermissionAdjustedAppsAreNotPolled() {
+        let h = Harness(document: SettingsDocument(apps: ["a": mutedSetting()]), permission: .denied)
+        h.processes.emit([makeApp("a", playing: false)])
+        #expect(h.processes.pollingCalls.isEmpty, "no engine can start, so nothing depends on it")
     }
 
     @Test func mutingPlayingLoweredAppChangesGainWithoutReplacingEngine() throws {

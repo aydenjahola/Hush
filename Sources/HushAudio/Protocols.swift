@@ -1,15 +1,25 @@
 import CoreAudio
 
+/// Which process objects to poll for running-state changes the HAL may not notify.
+public enum ProcessPolling: Equatable, Sendable {
+    /// No polling; listeners still give best-effort updates.
+    case off
+    /// Only these objects (ones that don't exist are ignored).
+    case objects(Set<AudioObjectID>)
+    /// Every process object, including ones that appear later.
+    case all
+}
+
 @MainActor
 public protocol AudioProcessSource: AnyObject {
     /// Begins monitoring. Calls `onChange` immediately with the current list, then on every change.
     func start(onChange: @escaping @MainActor ([AudioApp]) -> Void)
-    /// Polls running state more often or less often. The caller decides when fast polling is worth it.
-    func setFastPolling(_ fast: Bool)
+    /// Chooses what to poll. The caller knows which running states decisions depend on.
+    func setPolling(_ polling: ProcessPolling)
 }
 
 public extension AudioProcessSource {
-    func setFastPolling(_ fast: Bool) {}
+    func setPolling(_ polling: ProcessPolling) {}
 }
 
 @MainActor

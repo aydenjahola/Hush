@@ -4,78 +4,212 @@ import HushCore
 import os
 
 /// Publishes the apps that own Core Audio process objects, with helpers grouped under their app.
+///
+/// Work is incremental and coalesced. Listener callbacks only mark what changed (the list, or one
+/// object's running flag) and schedule a single flush, so one playback start (list change plus
+/// running change) costs one flush. A flush reads the list only if it changed, reads PID and bundle
+/// ID once per object (they never change for an object ID), and re-reads running state only for
+/// objects that notified or are new. Polling reads only the objects `setPolling` asks for.
 @MainActor
 public final class AudioProcessMonitor: AudioProcessSource {
+    public typealias Scheduler = @MainActor (@escaping @MainActor () -> Void) -> Void
+
     public private(set) var apps: [AudioApp] = []
 
-    private var onChange: (@MainActor ([AudioApp]) -> Void)?
-    private var listListener: AudioObjectPropertyListenerBlock?
-    /// Per process object: one listener block per selector in `runningSelectors`.
-    private var runningListeners: [AudioObjectID: [AudioObjectPropertySelector: AudioObjectPropertyListenerBlock]] = [:]
-    /// Fast paths only: the HAL often skips these notifications, so `poller` backs them up.
-    private static let runningSelectors = [kAudioProcessPropertyIsRunning, kAudioProcessPropertyIsRunningOutput]
-    private lazy var poller = RunningStatePoller(
-        fastInterval: .seconds(1),
-        slowInterval: .seconds(3),
-        read: { Self.readIsRunningOutput($0) },
-        onChange: { [weak self] in self?.refresh() })
-    private let resolver = AppIdentityResolver()
-    private let ownPID = ProcessInfo.processInfo.processIdentifier
-    private let ownBundleID = Bundle.main.bundleIdentifier
-    private let logger = Logger(subsystem: HushIdentity.bundleID, category: "processes")
+    private struct ObjectInfo {
+        let pid: pid_t
+        let bundleID: String?
+    }
 
-    public init() {}
+    private let hal: any ProcessHAL
+    private let resolver: AppIdentityResolver
+    private let schedule: Scheduler
+    private let ownPID: pid_t
+    private let ownBundleID: String?
+    private let logger = Logger(subsystem: HushIdentity.bundleID, category: "processes")
+    private let pollerSleep: RunningStatePoller.Sleeper?
+
+    private var onChange: (@MainActor ([AudioApp]) -> Void)?
+    private var listListener: HALListener?
+    private var runningListeners: [AudioObjectID: HALListener] = [:]
+    private var objectIDs: [AudioObjectID] = []
+    private var info: [AudioObjectID: ObjectInfo] = [:]
+    private var running: [AudioObjectID: Bool] = [:]
+    private var polling: ProcessPolling = .off
+
+    private var needsListRead = false
+    private var dirtyRunning: Set<AudioObjectID> = []
+    private var isFlushScheduled = false
+
+    private lazy var poller: RunningStatePoller = {
+        let hal = self.hal
+        let read: RunningStatePoller.Reader = { hal.isRunningOutput($0) }
+        let onChange: @MainActor ([AudioObjectID: Bool]) -> Void = { [weak self] in self?.pollerDidChange($0) }
+        if let pollerSleep {
+            return RunningStatePoller(interval: .seconds(1), read: read, onChange: onChange, sleep: pollerSleep)
+        }
+        return RunningStatePoller(interval: .seconds(1), read: read, onChange: onChange)
+    }()
+
+    public convenience init() {
+        self.init(
+            hal: CoreAudioProcessHAL(),
+            resolver: AppIdentityResolver(),
+            schedule: Self.coalescing(within: .milliseconds(10)))
+    }
+
+    init(
+        hal: any ProcessHAL,
+        resolver: AppIdentityResolver,
+        schedule: @escaping Scheduler,
+        pollerSleep: RunningStatePoller.Sleeper? = nil,
+        ownPID: pid_t = ProcessInfo.processInfo.processIdentifier,
+        ownBundleID: String? = Bundle.main.bundleIdentifier
+    ) {
+        self.hal = hal
+        self.resolver = resolver
+        self.schedule = schedule
+        self.pollerSleep = pollerSleep
+        self.ownPID = ownPID
+        self.ownBundleID = ownBundleID
+    }
+
+    /// Runs the work once, `delay` after the first request. The HAL posts a playback start's
+    /// notifications (list, running) separately but within a few milliseconds, so one short window
+    /// catches them all while adding at most `delay` before a muted app's engine starts.
+    public static func coalescing(within delay: Duration) -> Scheduler {
+        let nanoseconds = Int(delay.components.seconds) * 1_000_000_000 + Int(delay.components.attoseconds / 1_000_000_000)
+        return { work in
+            DispatchQueue.main.asyncAfter(deadline: .now() + .nanoseconds(nanoseconds)) {
+                MainActor.assumeIsolated { work() }
+            }
+        }
+    }
 
     public func start(onChange: @escaping @MainActor ([AudioApp]) -> Void) {
         self.onChange = onChange
-        listListener = addListener(to: CoreAudioProperty.systemObject, selector: kAudioHardwarePropertyProcessObjectList)
-        resolver.onInvalidate = { [weak self] in self?.refresh() }
+        listListener = hal.addListener(CoreAudioProperty.systemObject, kAudioHardwarePropertyProcessObjectList) { [weak self] in
+            self?.listDidChange()
+        }
+        if listListener == nil { logger.error("Could not listen to the process list") }
+        resolver.onInvalidate = { [weak self] in self?.scheduleFlush() }
         resolver.startObserving()
-        refresh()
-        onChange(apps)
-        poller.start()
+        needsListRead = true
+        flush(publish: false)
+        onChange(apps)  // exactly once, even when the list is empty
     }
 
-    public func setFastPolling(_ fast: Bool) {
-        poller.setFast(fast)
+    public func setPolling(_ polling: ProcessPolling) {
+        self.polling = polling
+        updatePollTargets()
     }
 
     public func stop() {
         poller.stop()
         resolver.stopObserving()
-        if let listListener {
-            removeListener(listListener, from: CoreAudioProperty.systemObject, selector: kAudioHardwarePropertyProcessObjectList)
-        }
+        resolver.onInvalidate = nil
+        if let listListener { hal.removeListener(listListener) }
         listListener = nil
-        for (objectID, blocks) in runningListeners {
-            for (selector, block) in blocks { removeListener(block, from: objectID, selector: selector) }
-        }
+        for listener in runningListeners.values { hal.removeListener(listener) }
         runningListeners = [:]
         onChange = nil
+        needsListRead = false
+        dirtyRunning = []
     }
 
-    private func refresh() {
-        guard onChange != nil else { return }  // stopped: a queued listener block must not re-register listeners
-        let objectIDs = (try? CoreAudioProperty.array(
-            CoreAudioProperty.systemObject,
-            kAudioHardwarePropertyProcessObjectList,
-            filler: AudioObjectID(kAudioObjectUnknown))) ?? []
-        syncRunningListeners(with: objectIDs)
-        var running: [AudioObjectID: Bool] = [:]
-        for objectID in objectIDs { running[objectID] = Self.readIsRunningOutput(objectID) }
-        poller.record(running)
+    /// The objects the poller currently reads (for tests).
+    var pollTargets: Set<AudioObjectID> { poller.targets }
 
+    // MARK: Events
+
+    private func listDidChange() {
+        needsListRead = true
+        scheduleFlush()
+    }
+
+    private func runningDidChange(_ objectID: AudioObjectID) {
+        dirtyRunning.insert(objectID)
+        scheduleFlush()
+    }
+
+    private func pollerDidChange(_ changed: [AudioObjectID: Bool]) {
+        for (objectID, value) in changed where running[objectID] != nil {
+            running[objectID] = value
+        }
+        scheduleFlush()
+    }
+
+    private func scheduleFlush() {
+        guard onChange != nil, !isFlushScheduled else { return }
+        isFlushScheduled = true
+        schedule { [weak self] in self?.flush() }
+    }
+
+    // MARK: Flush
+
+    private func flush(publish: Bool = true) {
+        isFlushScheduled = false
+        guard onChange != nil else { return }  // stopped: a queued flush must not re-register listeners
+        if needsListRead {
+            needsListRead = false
+            readList()
+        }
+        for objectID in dirtyRunning where running[objectID] != nil {
+            running[objectID] = hal.isRunningOutput(objectID)
+        }
+        dirtyRunning = []
+        poller.record(running)
+        updatePollTargets()
+        regroup(publish: publish)
+    }
+
+    /// Applies a new process list. A failed read keeps the last state: publishing "no processes"
+    /// would tear down every engine and unmute every muted app until the next good read.
+    private func readList() {
+        let fresh: [AudioObjectID]
+        do {
+            fresh = try hal.processObjects()
+        } catch {
+            logger.error("Process list unreadable, keeping the last state: \(String(describing: error), privacy: .public)")
+            return
+        }
+        let current = Set(fresh)
+        for objectID in objectIDs where !current.contains(objectID) {
+            info[objectID] = nil
+            running[objectID] = nil
+            if let listener = runningListeners.removeValue(forKey: objectID) { hal.removeListener(listener) }
+        }
+        for objectID in fresh where info[objectID] == nil {
+            // An unreadable PID is retried on the next list change.
+            guard let pid = hal.pid(of: objectID) else { continue }
+            info[objectID] = ObjectInfo(pid: pid, bundleID: hal.bundleID(of: objectID))
+            running[objectID] = hal.isRunningOutput(objectID)
+            // IsRunningOutput only: it's what decides `isPlaying`, and the poller reads the same flag.
+            runningListeners[objectID] = hal.addListener(objectID, kAudioProcessPropertyIsRunningOutput) { [weak self] in
+                self?.runningDidChange(objectID)
+            }
+        }
+        objectIDs = fresh
+    }
+
+    private func updatePollTargets() {
+        let known = Set(objectIDs.filter { info[$0] != nil })
+        let targets: Set<AudioObjectID> = switch polling {
+        case .off: []
+        case .objects(let ids): ids.intersection(known)
+        case .all: known
+        }
+        poller.setTargets(targets)
+    }
+
+    private func regroup(publish: Bool) {
         var groups: [String: (identity: AppIdentity, objects: [AudioObjectID], playing: Bool)] = [:]
         var livePIDs: Set<pid_t> = []
         for objectID in objectIDs {
-            guard let pid = try? CoreAudioProperty.scalar(objectID, kAudioProcessPropertyPID, initial: pid_t(0)),
-                  pid > 0, pid != ownPID
-            else { continue }
-            livePIDs.insert(pid)
-            let rawBundleID = try? CoreAudioProperty.string(objectID, kAudioProcessPropertyBundleID)
-            let bundleID = (rawBundleID?.isEmpty ?? true) ? nil : rawBundleID
+            guard let object = info[objectID], object.pid > 0, object.pid != ownPID else { continue }
+            livePIDs.insert(object.pid)
             let isRunning = running[objectID] ?? false
-            let identity = resolver.identity(pid: pid, bundleID: bundleID)
+            let identity = resolver.identity(pid: object.pid, bundleID: object.bundleID)
             if let ownBundleID, identity.id == ownBundleID { continue }
 
             if var group = groups[identity.id] {
@@ -102,44 +236,6 @@ public final class AudioProcessMonitor: AudioProcessSource {
 
         guard updated != apps else { return }
         apps = updated
-        onChange?(updated)
-    }
-
-    private func syncRunningListeners(with objectIDs: [AudioObjectID]) {
-        let current = Set(objectIDs)
-        for (objectID, blocks) in runningListeners where !current.contains(objectID) {
-            for (selector, block) in blocks { removeListener(block, from: objectID, selector: selector) }
-            runningListeners[objectID] = nil
-        }
-        for objectID in objectIDs where runningListeners[objectID] == nil {
-            var blocks: [AudioObjectPropertySelector: AudioObjectPropertyListenerBlock] = [:]
-            for selector in Self.runningSelectors {
-                blocks[selector] = addListener(to: objectID, selector: selector)
-            }
-            runningListeners[objectID] = blocks
-        }
-    }
-
-    private static func readIsRunningOutput(_ objectID: AudioObjectID) -> Bool {
-        let value = (try? CoreAudioProperty.scalar(objectID, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0
-        return value != 0
-    }
-
-    private func addListener(to objectID: AudioObjectID, selector: AudioObjectPropertySelector) -> AudioObjectPropertyListenerBlock? {
-        var propertyAddress = CoreAudioProperty.address(selector)
-        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.refresh() }
-        }
-        let status = AudioObjectAddPropertyListenerBlock(objectID, &propertyAddress, DispatchQueue.main, block)
-        guard status == noErr else {
-            logger.error("Could not listen to object \(objectID) selector \(selector) (OSStatus \(status))")
-            return nil
-        }
-        return block
-    }
-
-    private func removeListener(_ block: @escaping AudioObjectPropertyListenerBlock, from objectID: AudioObjectID, selector: AudioObjectPropertySelector) {
-        var propertyAddress = CoreAudioProperty.address(selector)
-        AudioObjectRemovePropertyListenerBlock(objectID, &propertyAddress, DispatchQueue.main, block)
+        if publish { onChange?(updated) }
     }
 }

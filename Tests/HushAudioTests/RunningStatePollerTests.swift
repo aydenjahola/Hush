@@ -15,43 +15,44 @@ final class FakeRunningReader {
 
 @MainActor
 @Suite struct RunningStatePollerTests {
-    func makePoller(_ reader: FakeRunningReader, sleeper: FakeSleeper = FakeSleeper()) -> (RunningStatePoller, () -> Int) {
-        var changes = 0
+    func makePoller(_ reader: FakeRunningReader, sleeper: FakeSleeper = FakeSleeper()) -> (RunningStatePoller, () -> [[AudioObjectID: Bool]]) {
+        var changes: [[AudioObjectID: Bool]] = []
         let poller = RunningStatePoller(
-            fastInterval: .seconds(1), slowInterval: .seconds(3),
+            interval: .seconds(1),
             read: { reader.read($0) },
-            onChange: { changes += 1 },
+            onChange: { changes.append($0) },
             sleep: { try await sleeper.sleep($0) })
         return (poller, { changes })
     }
 
-    @Test func unchangedReadingsDoNotFire() {
+    @Test func readsOnlyTheTargets() {
         let reader = FakeRunningReader()
-        reader.values = [1: true, 2: false]
+        reader.values = [1: true, 2: false, 3: true]
         let (poller, changes) = makePoller(reader)
-        poller.record([1: true, 2: false])
+        poller.record([1: true, 2: false, 3: true])
+        poller.setTargets([2])
 
         #expect(poller.poll() == false)
-        #expect(poller.poll() == false)
-        #expect(changes() == 0)
-        #expect(Set(reader.reads) == [1, 2], "only the known objects are read")
+        #expect(reader.reads == [2], "objects nothing depends on aren't read")
+        #expect(changes().isEmpty)
     }
 
-    @Test func pausedThenResumedPlaybackFiresEachTime() {
+    @Test func reportsOnlyTheValuesThatChanged() {
         // The live Zen/YouTube case: an existing process object flips 1 -> 0 -> 1 with no HAL notification.
         let reader = FakeRunningReader()
-        reader.values = [7: true]
+        reader.values = [7: true, 8: true]
         let (poller, changes) = makePoller(reader)
-        poller.record([7: true])
+        poller.record([7: true, 8: true])
+        poller.setTargets([7, 8])
 
         reader.values[7] = false
         #expect(poller.poll() == true)
-        #expect(changes() == 1)
+        #expect(changes() == [[7: false]])
         #expect(poller.poll() == false, "the new reading becomes the snapshot")
 
         reader.values[7] = true
         #expect(poller.poll() == true)
-        #expect(changes() == 2)
+        #expect(changes() == [[7: false], [7: true]])
     }
 
     @Test func recordReplacesTheSnapshot() {
@@ -59,78 +60,80 @@ final class FakeRunningReader {
         reader.values = [1: false, 3: true]
         let (poller, changes) = makePoller(reader)
         poller.record([1: true])
+        poller.setTargets([1, 3])
 
-        poller.record([1: false, 3: true])   // a full refresh already saw the new state
+        poller.record([1: false, 3: true])   // a refresh already saw the new state
         #expect(poller.poll() == false)
-        #expect(changes() == 0)
+        #expect(changes().isEmpty)
     }
 
-    @Test func emptySnapshotReadsNothing() {
+    @Test func noTargetsReadsNothing() {
         let reader = FakeRunningReader()
         let (poller, changes) = makePoller(reader)
+        poller.record([1: true])
         #expect(poller.poll() == false)
         #expect(reader.reads.isEmpty)
-        #expect(changes() == 0)
+        #expect(changes().isEmpty)
     }
 
-    @Test func intervalFollowsFastPolling() {
-        let (poller, _) = makePoller(FakeRunningReader())
-        #expect(poller.interval == .seconds(3))
-        poller.setFast(true)
-        #expect(poller.interval == .seconds(1))
-        poller.setFast(false)
-        #expect(poller.interval == .seconds(3))
+    @Test func toleranceIsATenthOfTheInterval() {
+        #expect(RunningStatePoller.tolerance(for: .seconds(1)) == .milliseconds(100))
     }
 
-    @Test func timerPollsUntilStopped() async throws {
+    @Test func targetsStartTheLoopAndNoTargetsStopIt() async throws {
         let reader = FakeRunningReader()
         reader.values = [1: false]
         let sleeper = FakeSleeper()
         let (poller, changes) = makePoller(reader, sleeper: sleeper)
         poller.record([1: true])
-        poller.start()
+        await settle()
+        #expect(sleeper.requested.isEmpty, "nothing to poll, no timer")
 
-        try await waitUntil { sleeper.waiting == [.seconds(3)] }
+        poller.setTargets([1])
+        try await waitUntil { sleeper.waiting == [.seconds(1)] }
         sleeper.wakeAll()
-        try await waitUntil { changes() == 1 && sleeper.waiting.count == 1 }
+        try await waitUntil { changes().count == 1 && sleeper.waiting.count == 1 }
 
-        poller.stop()
+        poller.setTargets([])
         try await waitUntil { sleeper.waiting.isEmpty }
         let readsAtStop = reader.reads.count
         reader.values[1] = true
         sleeper.wakeAll()
         await settle()
-        #expect(reader.reads.count == readsAtStop, "no polling after stop")
-        #expect(changes() == 1)
+        #expect(reader.reads.count == readsAtStop, "no polling without targets")
+        #expect(changes().count == 1)
     }
 
-    @Test func setFastWhileRunningLeavesOneLoopAtTheNewCadence() async throws {
+    @Test func changingTargetsWhileRunningKeepsOneLoop() async throws {
         let reader = FakeRunningReader()
-        reader.values = [1: true]
+        reader.values = [1: true, 2: true]
         let sleeper = FakeSleeper()
         let (poller, _) = makePoller(reader, sleeper: sleeper)
-        poller.record([1: true])
-        poller.start()
-        try await waitUntil { sleeper.waiting == [.seconds(3)] }
-
-        poller.setFast(true)
+        poller.record([1: true, 2: true])
+        poller.setTargets([1])
         try await waitUntil { sleeper.waiting == [.seconds(1)] }
-        await settle()
-        #expect(sleeper.waiting == [.seconds(1)], "the slow loop was cancelled, not left running")
 
+        poller.setTargets([1, 2])
+        await settle()
+        #expect(sleeper.waiting == [.seconds(1)], "still one loop")
         sleeper.wakeAll()
-        try await waitUntil { sleeper.requested.count == 3 }
+        try await waitUntil { sleeper.requested.count == 2 }
         await settle()
-        #expect(sleeper.requested == [.seconds(3), .seconds(1), .seconds(1)])
-        #expect(sleeper.waiting == [.seconds(1)])
-        #expect(reader.reads.count == 1, "one loop, one poll per wake")
-
-        poller.setFast(true)   // unchanged: no restart
-        await settle()
-        #expect(sleeper.requested.count == 3)
+        #expect(Set(reader.reads) == [1, 2], "the next poll reads the new targets")
+        #expect(reader.reads.count == 2, "one loop, one poll per wake")
         poller.stop()
     }
 
+    @Test func stopEndsTheLoop() async throws {
+        let reader = FakeRunningReader()
+        let sleeper = FakeSleeper()
+        let (poller, _) = makePoller(reader, sleeper: sleeper)
+        poller.setTargets([1])
+        try await waitUntil { sleeper.waiting.count == 1 }
+        poller.stop()
+        try await waitUntil { sleeper.waiting.isEmpty }
+        #expect(poller.targets.isEmpty)
+    }
 }
 
 /// A sleep that suspends until the test wakes it, so poll timing is deterministic.
