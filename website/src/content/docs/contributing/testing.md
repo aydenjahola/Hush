@@ -42,7 +42,9 @@ A plain `swift test` (and CI's build job) reports these tests as skipped. To run
    ```
 
    If it doesn't show up in Audio MIDI Setup, run `sudo killall coreaudiod` or log out and back in. Don't select it as your output: the tests never change the system default output.
-2. **Grant Audio Recording** to the app you run the tests from (Terminal, iTerm or VS Code): System Settings → Privacy & Security → Screen & System Audio Recording, in the System Audio Recording Only list. Quit and reopen that app afterwards. The tests only read this permission and never ask for it. Without it, every test is skipped with that instruction.
+2. **Grant Audio Recording.** macOS attributes this permission to the app the tests run from (Terminal, iTerm, VS Code…), not to the test binary, so that's the app that needs it. The first local run asks for it: if the permission was never decided, the system prompt appears once, naming your terminal app, and the run waits up to 60 seconds for you to answer. Under CI (`CI` or `GITHUB_ACTIONS` set) it's never requested.
+
+   To grant it by hand, or if you denied the prompt: System Settings → Privacy & Security → Screen & System Audio Recording → System Audio Recording Only. Turn your terminal app on, or click **+** and add it if it isn't listed. **Quit and reopen the terminal app after granting**: a newly granted app often doesn't get the permission until it relaunches. Without the permission, every test is skipped with these instructions.
 3. **Run the tests:**
 
    ```sh
@@ -51,6 +53,8 @@ A plain `swift test` (and CI's build job) reports these tests as skipped. To run
 
    This builds `HushToneGenerator`, then runs `HUSH_INTEGRATION=1 swift test --no-parallel --filter HushIntegrationTests`. Every test must pass, none skipped. Without BlackHole, the engine-level tests still run, on your default output with a -60 dBFS tone, and the end-to-end tests skip.
 
+   Afterwards it prints how many tests actually ran and whether the BlackHole group ran. Swift Testing counts skipped tests as passed, so if none ran, `make integration-test` fails with "No integration tests ran". Set `ALLOW_SKIP=1` to allow that (CI does).
+
 Leave the Mac alone while the tests run (about a minute). Other audio from the terminal app can disturb the level checks.
 
 ## Continuous integration
@@ -58,7 +62,7 @@ Leave the Mac alone while the tests run (about a minute). Other audio from the t
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
 
 - **build-and-test** runs `swift build` and `swift test` on a macOS 26 runner. The integration tests show as skipped.
-- **integration** is experimental and can't fail the build. It installs BlackHole, tries to grant Audio Recording with `scripts/ci-grant-audio-capture.sh` (only possible when SIP is off), runs `make integration-test`, and reports how many tests passed and were skipped. It becomes required once it proves reliable.
+- **integration** is experimental and can't fail the build. It installs BlackHole, tries to grant Audio Recording with `scripts/ci-grant-audio-capture.sh` (only possible when SIP is off), runs `ALLOW_SKIP=1 make integration-test`, and reports how many tests passed and were skipped. It becomes required once it proves reliable.
 - **website** runs on pull requests that change `website/`. It runs `npm ci`, `npm test` and `npm run build`, and the build fails on any broken internal docs link.
 
 ## Manual checklist
