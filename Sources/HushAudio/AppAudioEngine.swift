@@ -7,10 +7,16 @@ import os
 /// Lock-free state shared between the main thread and the realtime IOProc.
 final class EngineSharedState: Sendable {
     let targetGainBits: Atomic<UInt32>
+    /// The replay's gain at the end of the last cycle. While IO runs, only the IOProc writes it, so
+    /// a mode switch on the main thread can never overwrite the gain the IOProc is ramping from.
     let appliedGainBits: Atomic<UInt32>
     let peakBits = Atomic<UInt32>(0)
     /// True: replay the tap with gain (`.control`). False: only measure it (`.meterOnly`).
     let replaying: Atomic<Bool>
+    /// Whether the last cycle replayed: the IOProc's record of the mode it last acted on. While IO
+    /// runs, only the IOProc writes it. A switch to `.control` that finds this true was never seen
+    /// as a switch away, so the replay continues from `appliedGainBits` instead of ramping up again.
+    let replayedLastCycle: Atomic<Bool>
     /// Set by the IOProc on every cycle (one relaxed store); lets the main thread see that IO is flowing.
     let hasRun = Atomic<Bool>(false)
     /// Incremented by the IOProc on every cycle (one relaxed wrapping add). Never reset, so the
@@ -49,6 +55,7 @@ final class EngineSharedState: Sendable {
         targetGainBits = Atomic(gain.bitPattern)
         appliedGainBits = Atomic((mode == .control ? gain : 0).bitPattern)
         replaying = Atomic(mode == .control)
+        replayedLastCycle = Atomic(mode == .control)
     }
 }
 
@@ -256,6 +263,7 @@ package final class AppAudioEngine: AudioEngineHandle {
             mode = newMode
             state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
             state.appliedGainBits.store((newMode == .control ? gain : 0).bitPattern, ordering: .relaxed)
+            state.replayedLastCycle.store(newMode == .control, ordering: .relaxed)
             state.replaying.store(newMode == .control, ordering: .releasing)
             return
         }
@@ -285,8 +293,13 @@ package final class AppAudioEngine: AudioEngineHandle {
         mode = newMode
     }
 
-    /// Turns the replay on with a ramp from g/1000 to g across the next buffer: never from an
-    /// exact 0, so the replay itself adds no digital silence next to the source's mute.
+    /// Turns the replay on. The IOProc ramps it up from g/1000 to g across its next buffer: never
+    /// from an exact 0, so the replay itself adds no digital silence next to the source's mute.
+    ///
+    /// This writes only the target and the mode, never `appliedGainBits`: the IOProc picks the
+    /// ramp's start (see `makeIOBlock`). Resetting the applied gain here caused #12: a switch to
+    /// `.meterOnly` and straight back, before the IOProc had seen the first, restarted a running
+    /// replay from g/1000, an 11 ms dip. It also raced a fade-out cycle's store of 0.
     ///
     /// Known limitation, measured on hardware: when a live tap starts muting a process that's
     /// already playing, Core Audio drops exactly one IO buffer of it (a 512-frame zero run at
@@ -296,7 +309,6 @@ package final class AppAudioEngine: AudioEngineHandle {
     /// buffers of zeros (#50); `TakeoverDiagnostics` records what the tap delivered each time.
     nonisolated static func beginReplay(state: EngineSharedState, gain: Float) {
         state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
-        state.appliedGainBits.store((gain / 1000).bitPattern, ordering: .relaxed)
         state.watchZeroRun.store(0, ordering: .relaxed)
         state.watchLongestZeroRun.store(0, ordering: .relaxed)
         state.watchSilentBuffers.store(0, ordering: .relaxed)
@@ -342,6 +354,7 @@ package final class AppAudioEngine: AudioEngineHandle {
         state.silentCyclesBeforeSound.store(0, ordering: .relaxed)
         let description = makeDescription(processes: processObjectIDs, mode: mode)
         if mode == .meterOnly { state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed) }
+        state.replayedLastCycle.store(mode == .control, ordering: .relaxed)
         state.replaying.store(mode == .control, ordering: .releasing)
 
         var newTap = AudioObjectID(kAudioObjectUnknown)
@@ -414,7 +427,14 @@ package final class AppAudioEngine: AudioEngineHandle {
             // Read once per cycle, so a mode switch lands on a buffer boundary.
             if state.replaying.load(ordering: .acquiring) {
                 let target = Float(bitPattern: state.targetGainBits.load(ordering: .relaxed))
-                let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
+                // The replay continues from its applied gain if the last cycle replayed too, even
+                // when the main thread switched away and back since (#12). Otherwise it's starting:
+                // the last cycle was meter-only, or a fade-out that ended at 0, so ramp up from
+                // g/1000, never from an exact 0.
+                let applied =
+                    state.replayedLastCycle.load(ordering: .relaxed)
+                    ? Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed)) : target / 1000
+                state.replayedLastCycle.store(true, ordering: .relaxed)
                 if target == 0 && applied == 0 {
                     // Muted and settled: the ramp down already ran (it ends by storing an exact 0),
                     // so the full render would only multiply every sample by 0. Write the zeros
@@ -434,6 +454,7 @@ package final class AppAudioEngine: AudioEngineHandle {
                     noteTapInput(state: state, heard: peak != 0)
                 }
             } else {
+                state.replayedLastCycle.store(false, ordering: .relaxed)
                 let applied = Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed))
                 if applied != 0 {
                     // The replay just stopped: fade it out over this buffer instead of cutting.
