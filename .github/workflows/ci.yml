@@ -54,7 +54,7 @@ jobs:
           # Per-test result lines; "Test run with ..." is the overall summary, not a test.
           tests=$(grep -E '^[^ ]+ Test ' integration.log | grep -v ' Test run with ' || true)
           passed=$(printf '%s\n' "$tests" | grep -c ' passed after' || true)
-          skipped=$(printf '%s\n' "$tests" | grep -c ' skipped' || true)
+          skipped=$(printf '%s\n' "$tests" | grep -E ' skipped([:.]|$)' | grep -cvE ' (passed|failed) after' || true)
           failed=$(printf '%s\n' "$tests" | grep -c ' failed after' || true)
           echo "Integration tests: ${passed} passed, ${skipped} skipped, ${failed} failed"
           {
