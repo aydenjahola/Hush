@@ -17,6 +17,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     /// follows must not reopen it.
     /// System uptime (seconds) at that close.
     private var closedByIconPress: TimeInterval?
+    /// Watches clicks in other apps while the popover is open; see `startWatchingOutsideClicks`.
+    private var outsideClickMonitor: Any?
 
     init(store: MixerStore, updates: UpdateChecker) {
         self.store = store
@@ -149,6 +151,28 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     func popoverDidShow(_ notification: Notification) {
         store.popoverDidAppear()
         updates.refresh()
+        startWatchingOutsideClicks()
+    }
+
+    /// A transient popover only closes for clicks Hush receives. A click in another app, on the
+    /// desktop or in another app's menu bar item goes to that app, so watch for those while the
+    /// popover is open and close it. Mouse-only global monitors need no Accessibility or Input
+    /// Monitoring permission, and they never see clicks in Hush's own windows or icon.
+    private func startWatchingOutsideClicks() {
+        guard outsideClickMonitor == nil else { return }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.popover.isShown else { return }
+                self.popover.performClose(nil)
+            }
+        }
+    }
+
+    private func stopWatchingOutsideClicks() {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        outsideClickMonitor = nil
     }
 
     func popoverWillClose(_ notification: Notification) {
@@ -160,6 +184,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        stopWatchingOutsideClicks()
         store.popoverDidDisappear()
     }
 }
