@@ -55,7 +55,10 @@ struct OutputPill: View {
                 }
                 .lineLimit(1)
                 .truncationMode(.tail)
+                // Hug the name up to the cap: a bare maxWidth frame would stretch to 160pt and
+                // leave a gap before the chevron for shorter names.
                 .frame(maxWidth: Self.maxNameWidth, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
                     .accessibilityHidden(true)
