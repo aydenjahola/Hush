@@ -6,9 +6,9 @@ import UserNotifications
 /// Skip This Version actions. Create it at launch, so the delegate is in place for a response
 /// that relaunches Hush; creating it doesn't ask for authorization.
 @MainActor
-public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying {
-    nonisolated static let categoryIdentifier = "\(HushIdentity.bundleID).update"
-    nonisolated private static let actionPrefix = "\(HushIdentity.bundleID).update."
+public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying, UNUserNotificationCenterDelegate {
+    static let categoryIdentifier = "\(HushIdentity.bundleID).update"
+    private static let actionPrefix = "\(HushIdentity.bundleID).update."
 
     static var category: UNNotificationCategory {
         let actions = [
@@ -24,15 +24,11 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying {
     public var onAction: (@MainActor (UpdateAction, String, URL?) -> Void)?
 
     private let center: UNUserNotificationCenter
-    private let delegate = Delegate()
 
     public init(center: UNUserNotificationCenter = .current()) {
         self.center = center
         super.init()
-        delegate.onResponse = { [weak self] action, version, url in
-            self?.onAction?(action, version, url)
-        }
-        center.delegate = delegate
+        center.delegate = self
         center.setNotificationCategories([Self.category])
     }
 
@@ -63,37 +59,32 @@ public final class UserNotificationUpdateNotifier: NSObject, UpdateNotifying {
     }
 
     /// Clicking the notification itself counts as Download.
-    nonisolated static func action(for identifier: String) -> UpdateAction? {
+    static func action(for identifier: String) -> UpdateAction? {
         if identifier == UNNotificationDefaultActionIdentifier { return .download }
         guard identifier.hasPrefix(actionPrefix) else { return nil }
         return UpdateAction(rawValue: String(identifier.dropFirst(actionPrefix.count)))
     }
 
-    /// The delegate callbacks arrive off the main actor; only Sendable values cross back.
-    private final class Delegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
-        // Set once in the notifier's init, before the delegate is installed; read-only afterwards.
-        nonisolated(unsafe) var onResponse: (@MainActor (UpdateAction, String, URL?) -> Void)?
+    // MARK: UNUserNotificationCenterDelegate
 
-        func userNotificationCenter(
-            _ center: UNUserNotificationCenter,
-            didReceive response: UNNotificationResponse
-        ) async {
-            let content = response.notification.request.content
-            guard content.categoryIdentifier == UserNotificationUpdateNotifier.categoryIdentifier,
-                  let action = UserNotificationUpdateNotifier.action(for: response.actionIdentifier),
-                  let version = content.userInfo["version"] as? String
-            else { return }
-            let url = (content.userInfo["url"] as? String).flatMap(URL.init(string:))
-            let onResponse = onResponse
-            await MainActor.run { onResponse?(action, version, url) }
-        }
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let content = response.notification.request.content
+        guard content.categoryIdentifier == Self.categoryIdentifier,
+              let action = Self.action(for: response.actionIdentifier),
+              let version = content.userInfo["version"] as? String
+        else { return }
+        let url = (content.userInfo["url"] as? String).flatMap(URL.init(string:))
+        onAction?(action, version, url)
+    }
 
-        /// Hush is a menu bar app and often "active" while its popover is open; show the banner anyway.
-        func userNotificationCenter(
-            _ center: UNUserNotificationCenter,
-            willPresent notification: UNNotification
-        ) async -> UNNotificationPresentationOptions {
-            [.banner, .list]
-        }
+    /// Hush is a menu bar app and often "active" while its popover is open; show the banner anyway.
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list]
     }
 }
