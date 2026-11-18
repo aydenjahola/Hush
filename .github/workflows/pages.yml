@@ -9,9 +9,10 @@ on:
       - '.github/workflows/pages.yml'
   # No `release: published` trigger: release events run on a tag ref, and the github-pages
   # environment only allows deployments from main. release.yml's `pages` job calls this
-  # workflow after the DMG is uploaded, because a release created with GITHUB_TOKEN doesn't
-  # start other workflows. Merging the release PR also triggers a push deploy (CHANGELOG.md
-  # changes); the `pages` job then supersedes it once the DMG exists.
+  # workflow after the draft release has its DMG and is published, because a release created
+  # with GITHUB_TOKEN doesn't start other workflows. Merging the release PR also triggers a
+  # push deploy (CHANGELOG.md changes); that one still shows the previous version, because
+  # drafts aren't "latest". The `pages` job supersedes it once the release is published.
   workflow_call:
   workflow_dispatch:
 
