@@ -15,10 +15,16 @@ jobs:
       - uses: actions/checkout@v7
       - name: Toolchain
         run: swift --version
-      - name: Build
-        run: swift build
+      - name: Lint
+        run: swift format lint --strict --recursive Sources Tests Package.swift
+      # Warnings fail CI only; Package.swift stays free of unsafeFlags so contributors aren't blocked
+      # by a new compiler's diagnostics while developing.
+      - name: Build (warnings are errors)
+        run: swift build --build-tests -Xswiftc -warnings-as-errors
       - name: Test
         run: swift test
+      - name: Build the app bundle
+        run: make app
 
   website-changes:
     if: github.event_name == 'pull_request'
