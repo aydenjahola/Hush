@@ -24,18 +24,22 @@ import Testing
         #expect(!DuckingPlan.isDuckable("com.apple.Safari", settings: settings))
     }
 
-    @Test func duckedAppsAreThePlayingDuckableOnes() {
+    @Test func duckedAppsAreThePlayingDuckableOnesWhileAFadeIsActive() {
         let playing = ["com.spotify.client", "us.zoom.xos", "com.example.podcast", "com.apple.Music"]
         #expect(
-            DuckingPlan.duckedApps(playing: playing, settings: settings)
+            DuckingPlan.duckedApps(playing: playing, settings: settings, isActive: true)
                 == ["com.spotify.client", "com.apple.Music"])
+        #expect(DuckingPlan.duckedApps(playing: playing, settings: settings, isActive: false).isEmpty)
     }
 
-    @Test func nothingIsDuckedWhileDuckingIsOff() {
+    @Test func theFadeNotTheSwitchDecidesTheMultiplier() {
+        // Turning ducking off mid-call fades back up instead of jumping, so the multiplier keeps
+        // applying to duckable apps until the fade has finished.
         var off = settings
         off.isEnabled = false
-        #expect(DuckingPlan.duckedApps(playing: ["com.spotify.client"], settings: off).isEmpty)
-        #expect(!DuckingPlan.isDuckable("com.spotify.client", settings: off))
+        #expect(DuckingPlan.multiplier(for: "com.spotify.client", fade: 0.5, settings: off) == 0.5)
+        #expect(DuckingPlan.multiplier(for: "us.zoom.xos", fade: 0.5, settings: off) == 1)
+        #expect(DuckingPlan.multiplier(for: "com.example.podcast", fade: 0.5, settings: settings) == 1)
     }
 
     // MARK: Call apps in a call
