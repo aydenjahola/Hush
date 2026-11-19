@@ -39,4 +39,51 @@ import Testing
                 setting: setting, isPlaying: c.playing, isPopoverVisible: c.popover, showLevelMeters: c.meters)
                 == c.expected)
     }
+
+    // MARK: Ducking
+
+    @Test func aDuckedPlayingAppIsControlledEvenAt100Percent() {
+        let plain = AppVolumeSetting()
+        #expect(
+            EnginePlan.desiredMode(
+                setting: plain, isPlaying: true, isPopoverVisible: false, showLevelMeters: true, isDucked: true)
+                == .control)
+        #expect(
+            EnginePlan.desiredMode(
+                setting: plain, isPlaying: false, isPopoverVisible: true, showLevelMeters: true, isDucked: true)
+                == nil, "an idle ducked app needs no engine")
+        #expect(
+            EnginePlan.desiredMode(
+                setting: plain, isPlaying: true, isPopoverVisible: true, showLevelMeters: true, isDucked: false)
+                == .meterOnly, "after the fade back up it falls back to the usual rule")
+    }
+
+    @Test func duckedAppsArePolledWithThePopoverClosed() {
+        let apps = [
+            AudioApp(id: "music", displayName: "Music", processObjectIDs: [1, 2], isPlaying: false),
+            AudioApp(id: "other", displayName: "Other", processObjectIDs: [3], isPlaying: true),
+        ]
+        #expect(
+            EnginePlan.polling(
+                isPopoverVisible: false, controlsEnabled: true, apps: apps, settings: [:], duckedApps: ["music"])
+                == .objects([1, 2]))
+        #expect(
+            EnginePlan.polling(
+                isPopoverVisible: false, controlsEnabled: false, apps: apps, settings: [:], duckedApps: ["music"])
+                == .off)
+        #expect(EnginePlan.polling(isPopoverVisible: false, controlsEnabled: true, apps: apps, settings: [:]) == .off)
+    }
+
+    @Test func inputIsTrackedOnlyWhileDuckingIsOnAndPermitted() {
+        let apps = [
+            AudioApp(id: "us.zoom.xos", displayName: "Zoom", processObjectIDs: [7], isPlaying: false),
+            AudioApp(id: "music", displayName: "Music", processObjectIDs: [1], isPlaying: true),
+            AudioApp(id: HushIdentity.bundleID, displayName: "Hush", processObjectIDs: [9], isPlaying: false),
+        ]
+        let on = DuckingSettings(isEnabled: true)
+        #expect(EnginePlan.inputPolling(controlsEnabled: true, ducking: on, allApps: apps) == .objects([7]))
+        #expect(EnginePlan.inputPolling(controlsEnabled: true, ducking: on, allApps: []) == .off)
+        #expect(EnginePlan.inputPolling(controlsEnabled: false, ducking: on, allApps: apps) == nil)
+        #expect(EnginePlan.inputPolling(controlsEnabled: true, ducking: DuckingSettings(), allApps: apps) == nil)
+    }
 }

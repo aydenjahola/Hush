@@ -164,7 +164,8 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
                 quit: { self.calls.append("quit") },
                 applyPreset: { self.calls.append("apply \($0)") },
                 savePreset: { self.calls.append("save preset") },
-                managePresets: { self.calls.append("manage presets") })
+                managePresets: { self.calls.append("manage presets") },
+                toggleDucking: { self.calls.append("toggle ducking") })
         }
     }
 
@@ -173,25 +174,58 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
         bulkMute: BulkMuteAction = BulkMuteAction(kind: .muteAllPlaying, isEnabled: true),
         canCheckForUpdates: Bool = true,
         presets: [QuickMenuModel.PresetItem] = [],
-        presetsEnabled: Bool = true
+        presetsEnabled: Bool = true,
+        duckingOn: Bool = false,
+        duckingEnabled: Bool = true
     ) -> QuickMenuModel {
         QuickMenuModel(
             outputs: outputs, bulkMute: bulkMute, canCheckForUpdates: canCheckForUpdates, presets: presets,
-            presetsEnabled: presetsEnabled)
+            presetsEnabled: presetsEnabled, duckingOn: duckingOn, duckingEnabled: duckingEnabled)
     }
 
     @Test func itemsComeInOrderWithStandardTitlesAndShortcuts() {
         let items = QuickMenu.items(for: model(), actions: Recorder().actions)
         #expect(
             items.map(\.title) == [
-                "Output", "Presets", "Mute All Playing Apps", "", "Settings…", "Check for Updates…", "", "Quit Hush",
+                "Output", "Presets", "Duck During Calls", "Mute All Playing Apps", "", "Settings…",
+                "Check for Updates…", "", "Quit Hush",
             ])
-        #expect(items[3].isSeparatorItem)
-        #expect(items[6].isSeparatorItem)
-        #expect(items[4].keyEquivalent == ",")
-        #expect(items[4].keyEquivalentModifierMask == .command)
-        #expect(items[7].keyEquivalent == "q")
-        #expect(items[7].keyEquivalentModifierMask == .command)
+        #expect(items[4].isSeparatorItem)
+        #expect(items[7].isSeparatorItem)
+        #expect(items[5].keyEquivalent == ",")
+        #expect(items[5].keyEquivalentModifierMask == .command)
+        #expect(items[8].keyEquivalent == "q")
+        #expect(items[8].keyEquivalentModifierMask == .command)
+    }
+
+    // MARK: Duck During Calls
+
+    @Test func duckingItemIsCheckedWhileOnAndTogglesDucking() throws {
+        let recorder = Recorder()
+        let off = try item("Duck During Calls", in: QuickMenu.items(for: model(), actions: recorder.actions))
+        #expect(off.state == .off)
+        #expect(off.isEnabled)
+        let on = try item(
+            "Duck During Calls", in: QuickMenu.items(for: model(duckingOn: true), actions: recorder.actions))
+        #expect(on.state == .on)
+        ActionMenuItem.perform(on)
+        #expect(recorder.calls == ["toggle ducking"])
+    }
+
+    @Test func duckingItemIsDisabledWithoutPermission() throws {
+        let items = QuickMenu.items(for: model(duckingEnabled: false), actions: Recorder().actions)
+        #expect(try !item("Duck During Calls", in: items).isEnabled)
+    }
+
+    @Test func modelReadsDuckingFromTheStore() {
+        let h = Harness()
+        #expect(!QuickMenuModel(store: h.store, updates: UpdateHarness().checker).duckingOn)
+        h.store.setDuckingEnabled(true)
+        let model = QuickMenuModel(store: h.store, updates: UpdateHarness().checker)
+        #expect(model.duckingOn)
+        #expect(model.duckingEnabled)
+        let denied = Harness(permission: .denied)
+        #expect(!QuickMenuModel(store: denied.store, updates: UpdateHarness().checker).duckingEnabled)
     }
 
     // MARK: Presets submenu
@@ -271,9 +305,9 @@ private let airPods = OutputDevice(id: 2, uid: "airpods", name: "AirPods Pro", t
         let recorder = Recorder()
         let items = QuickMenu.items(
             for: model(bulkMute: BulkMuteAction(kind: .unmuteAll, isEnabled: true)), actions: recorder.actions)
-        #expect(items[2].title == "Unmute All")
-        #expect(items[2].isEnabled)
-        ActionMenuItem.perform(items[2])
+        #expect(items[3].title == "Unmute All")
+        #expect(items[3].isEnabled)
+        ActionMenuItem.perform(items[3])
         #expect(recorder.calls == ["unmute all"])
     }
 

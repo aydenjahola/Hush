@@ -42,6 +42,11 @@ package final class MixerStore {
     /// Each output device's saved levels; see MixerStore+DeviceLevels. Saved in the same write as
     /// the levels, and kept while "Remember levels for each output device" is off.
     package internal(set) var deviceLevelBook: DeviceLevelBook
+    /// "Lower other apps during calls"; see MixerStore+Ducking. Saved in the same write as the
+    /// levels. Only the settings are saved, never whether a call is on.
+    package internal(set) var duckingSettings: DuckingSettings
+    /// The call apps in a call right now (debounced by `CallActivity`), for the popover's indicator.
+    package internal(set) var activeCallApps: Set<String> = []
 
     package var controlsEnabled: Bool { permission == .authorized }
     package var playingCount: Int { apps.filter(\.isPlaying).count }
@@ -104,6 +109,19 @@ package final class MixerStore {
     /// The first-launch permission request, if one was made (exposed for tests).
     @ObservationIgnored private(set) var permissionRequest: Task<Void, Never>?
     @ObservationIgnored let logger = Logger(subsystem: HushIdentity.bundleID, category: "engine")
+    /// Last value pushed to `processSource.setInputPolling` (nil, the source's default, is "off").
+    @ObservationIgnored var currentInputPolling: ProcessPolling?
+    /// Which call apps capture input, debounced over time.
+    @ObservationIgnored var callActivity = CallActivity()
+    /// The ducking multiplier over time.
+    @ObservationIgnored var duckingFade = DuckingFade()
+    /// The next ducking wake-up: a fade step or a call-detection deadline.
+    @ObservationIgnored var duckingTask: Task<Void, Never>?
+    /// How long until `duckingTask` wakes (exposed for tests); nil when none is pending.
+    @ObservationIgnored var pendingDuckingWake: Duration?
+    /// How often a fade steps the gain. The IOProc ramps each step across one buffer.
+    @ObservationIgnored let duckingStep: Duration
+    @ObservationIgnored let duckingSleep: @Sendable (Duration) async throws -> Void
 
     package init(
         processSource: any AudioProcessSource,
@@ -117,6 +135,8 @@ package final class MixerStore {
         healthCheckDelay: Duration = .milliseconds(300),
         stallConfirmDelay: Duration = .milliseconds(1700),
         stallRetryDelay: Duration = .seconds(3),
+        duckingStep: Duration = .milliseconds(20),
+        duckingSleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         now: @escaping () -> Date = Date.init,
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = InstalledAppInfo.lookUp(bundleID:)
     ) {
@@ -131,6 +151,8 @@ package final class MixerStore {
         self.healthCheckDelay = healthCheckDelay
         self.stallConfirmDelay = stallConfirmDelay
         self.stallRetryDelay = stallRetryDelay
+        self.duckingStep = duckingStep
+        self.duckingSleep = duckingSleep
         self.now = now
         self.installedApp = installedApp
         let document = persister.load()
@@ -141,6 +163,7 @@ package final class MixerStore {
         self.presetLibrary = PresetLibrary(presets: document.presets ?? [])
         self.deviceLevelBook = DeviceLevelBook(sets: document.deviceLevels ?? [:])
             .normalized(excluding: hiddenApps.ids)
+        self.duckingSettings = document.ducking ?? DuckingSettings()
         saver.perform = { [weak self] in self?.persistNow() }
     }
 
@@ -356,12 +379,14 @@ package final class MixerStore {
         let hiddenApps = hiddenApps
         let presets = presetLibrary.presets
         let deviceLevels = deviceLevelBook
+        let ducking = duckingSettings
         persister.update { document in
             document.preferences = preferences
             document.apps = apps
             document.hiddenApps = hiddenApps.isEmpty ? nil : hiddenApps
             document.presets = presets.isEmpty ? nil : presets
             document.deviceLevels = deviceLevels.isEmpty ? nil : deviceLevels.sets
+            document.ducking = ducking.isDefault ? nil : ducking
         }
     }
 
@@ -373,6 +398,7 @@ package final class MixerStore {
         cancelHealthCheck()
         stallRetryTask?.cancel()
         stallRetryTask = nil
+        cancelDuckingWake()
         tearDownAllEngines()
     }
 
@@ -387,6 +413,7 @@ package final class MixerStore {
     private func appsDidChange(_ newApps: [AudioApp]) {
         allApps = newApps
         apps = HiddenAppsPlan.visibleApps(newApps, hidden: hiddenApps.ids)
+        updateCallActivity()
         reconcile()
         rebuildStrips()
     }
@@ -416,6 +443,7 @@ package final class MixerStore {
     private func permissionDidChange(_ status: AudioCapturePermissionStatus) {
         guard status != permission else { return }
         permission = status
+        updateCallActivity()
         reconcile()
         rebuildStrips()
     }
