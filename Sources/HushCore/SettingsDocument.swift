@@ -29,6 +29,11 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
     /// optional on disk. The mixer owns it and writes it in the same save as `apps`; the sets stay
     /// when the feature is turned off, so turning it on again brings them back.
     package var deviceLevels: [String: DeviceLevels]?
+    /// "Lower other apps during calls". nil (the default) means the default settings (off), so
+    /// files of users who never touch it don't change. Added after version 1 shipped and optional
+    /// on disk. The mixer owns it and writes it in the same save as `apps`. Only these settings
+    /// are stored: whether a call is on, and how far apps are lowered right now, never are.
+    package var ducking: DuckingSettings?
 
     package init(
         preferences: Preferences = Preferences(),
@@ -37,7 +42,8 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         globalShortcut: GlobalShortcut? = nil,
         hiddenApps: [HiddenApp]? = nil,
         presets: [Preset]? = nil,
-        deviceLevels: [String: DeviceLevels]? = nil
+        deviceLevels: [String: DeviceLevels]? = nil,
+        ducking: DuckingSettings? = nil
     ) {
         self.version = Self.currentVersion
         self.preferences = preferences
@@ -47,10 +53,11 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         self.hiddenApps = hiddenApps
         self.presets = presets
         self.deviceLevels = deviceLevels
+        self.ducking = ducking
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, preferences, apps, updates, globalShortcut, hiddenApps, presets, deviceLevels
+        case version, preferences, apps, updates, globalShortcut, hiddenApps, presets, deviceLevels, ducking
     }
 
     package init(from decoder: any Decoder) throws {
@@ -70,6 +77,9 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
         // whole file, and a value that isn't an object is dropped too.
         deviceLevels =
             (try? container.decodeIfPresent(LossyDictionary<DeviceLevels>.self, forKey: .deviceLevels))?.elements
+        // A malformed value is dropped (default settings) rather than discarding the whole file;
+        // DuckingSettings itself falls back field by field.
+        ducking = (try? container.decodeIfPresent(DuckingSettings.self, forKey: .ducking)) ?? nil
     }
 
     /// Decodes a JSON object with string keys, skipping values that don't decode.
@@ -141,7 +151,7 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
     /// when none are left); their levels keep their saved percent and are clamped only when applied.
     /// Device sets lose default entries and hidden apps like `apps`, but keep their saved percent
     /// (clamped only when loaded, like presets); a device whose set is empty stays (it means every
-    /// app at 100% there), and no sets at all become nil.
+    /// app at 100% there), and no sets at all become nil. Default ducking settings become nil.
     package func normalized() -> SettingsDocument {
         let maxPercent = preferences.maxBoostPercent.rawValue
         let hidden = hiddenApps?.normalized() ?? []
@@ -157,6 +167,7 @@ package struct SettingsDocument: Codable, Equatable, Sendable {
             let book = DeviceLevelBook(sets: sets).normalized(excluding: hiddenIDs)
             return book.isEmpty ? nil : book.sets
         }
+        copy.ducking = ducking.flatMap { $0.isDefault ? nil : $0 }
         return copy
     }
 }

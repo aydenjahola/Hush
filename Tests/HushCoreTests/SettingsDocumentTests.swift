@@ -271,4 +271,36 @@ import Testing
             "kept above the maximum boost; clamped only when loaded")
         #expect(SettingsDocument(deviceLevels: [:]).normalized().deviceLevels == nil)
     }
+    // MARK: Ducking (additive, optional field in version 1)
+
+    @Test func fileWithoutDuckingLoadsWithNone() throws {
+        let json = #"{"version": 1, "preferences": {}, "apps": {}}"#
+        #expect(try SettingsDocument.decode(from: Data(json.utf8)).ducking == nil)
+    }
+
+    @Test func defaultDuckingLeavesTheFileWithoutIt() throws {
+        #expect(!String(decoding: try SettingsDocument().encoded(), as: UTF8.self).contains("ducking"))
+        let defaults = SettingsDocument(ducking: DuckingSettings())
+        #expect(!String(decoding: try defaults.encoded(), as: UTF8.self).contains("ducking"))
+        #expect(defaults.normalized().ducking == nil)
+    }
+
+    @Test func duckingRoundTrips() throws {
+        var ducking = DuckingSettings(isEnabled: true, percent: 20)
+        ducking.addException(DuckingApp(bundleID: "com.example.music", displayName: "Music"))
+        let document = SettingsDocument(
+            apps: ["x": AppVolumeSetting(percent: 50, lastAdjusted: date)], ducking: ducking)
+        #expect(try SettingsDocument.decode(from: document.encoded()) == document)
+    }
+
+    @Test func malformedDuckingValueIsDroppedButTheFileLoads() throws {
+        let json = """
+            {"version": 1, "preferences": {}, "apps": {
+              "x": { "percent": 50, "isMuted": false, "lastAdjusted": "2026-11-17T14:03:00Z" }
+            }, "ducking": [1, 2]}
+            """
+        let document = try SettingsDocument.decode(from: Data(json.utf8))
+        #expect(document.ducking == nil)
+        #expect(document.apps["x"]?.percent == 50)
+    }
 }
