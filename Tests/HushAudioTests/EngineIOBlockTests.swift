@@ -160,6 +160,86 @@ import Testing
         #expect(left(cycle(block)).allSatisfy { isApproximatelyEqual($0, 0.25) })
     }
 
+    // MARK: Fast mode toggles (#12)
+
+    @Test func switchingAwayAndBackBeforeTheIOProcRunsKeepsTheReplayAtItsGain() {
+        // control -> meter-only -> control within one buffer: the IOProc never saw the meter-only
+        // switch, so the replay continues at its gain. Restarting the ramp from g/1000 was an 11 ms dip.
+        let state = EngineSharedState(gain: 0.5, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        state.replaying.store(false, ordering: .releasing)  // switchMode(.meterOnly)
+        AppAudioEngine.beginReplay(state: state, gain: 0.5)  // switchMode(.control)
+
+        #expect(left(cycle(block)).allSatisfy { isApproximatelyEqual($0, 0.25) }, "no dip")
+        #expect(left(cycle(block)).allSatisfy { isApproximatelyEqual($0, 0.25) })
+    }
+
+    @Test func switchingAwayAndBackToANewGainRampsFromTheRealGain() {
+        let state = EngineSharedState(gain: 0.5, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        state.replaying.store(false, ordering: .releasing)
+        AppAudioEngine.beginReplay(state: state, gain: 1)
+
+        let ramp = left(cycle(block))
+        #expect(isApproximatelyEqual(ramp[0], 0.25, tolerance: 0.01), "starts where the replay was")
+        #expect(zip(ramp, ramp.dropFirst()).allSatisfy { $0 <= $1 }, "rises monotonically")
+        #expect(isApproximatelyEqual(ramp.last!, 0.5, tolerance: 0.01))
+    }
+
+    @Test func switchingToControlAndBackBeforeTheIOProcRunsStaysMeterOnly() {
+        // meter-only -> control -> meter-only within one buffer: the replay never started, so
+        // there is nothing to fade out and the output stays exact silence.
+        let state = EngineSharedState(gain: 0.5, mode: .meterOnly)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        AppAudioEngine.beginReplay(state: state, gain: 0.5)
+        state.replaying.store(false, ordering: .releasing)
+        _ = state.peakBits.exchange(0, ordering: .relaxed)
+
+        #expect(cycle(block).allSatisfy { $0 == 0 })
+        #expect(peak(state) == 0.5, "still metering the source")
+        #expect(Float(bitPattern: state.appliedGainBits.load(ordering: .relaxed)) == 0)
+    }
+
+    @Test func aSwitchBackAfterTheFadeOutRampsUpFromAlmostZero() {
+        // control -> meter-only, picked up by the IOProc (it fades out), then -> control: the
+        // source was unmuted in between, so the replay starts over, from g/1000 and not an exact 0.
+        let state = EngineSharedState(gain: 0.5, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        state.replaying.store(false, ordering: .releasing)
+        _ = cycle(block)  // the fade-out
+        AppAudioEngine.beginReplay(state: state, gain: 0.5)
+
+        let rise = left(cycle(block))
+        #expect(rise[0] > 0 && rise[0] < 0.01, "starts at g/1000")
+        #expect(zip(rise, rise.dropFirst()).allSatisfy { $0 <= $1 })
+        #expect(isApproximatelyEqual(rise.last!, 0.25, tolerance: 0.01))
+    }
+
+    @Test func beginReplayLeavesTheAppliedGainToTheIOProc() {
+        // A fade-out cycle that read `replaying == false` stores applied = 0 at its end. If
+        // beginReplay also wrote the applied gain, whichever store landed last would win. It
+        // doesn't, so the order no longer matters: the next replayed cycle ramps from g/1000.
+        let state = EngineSharedState(gain: 0.5, mode: .control)
+        let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
+        _ = cycle(block)
+        state.replaying.store(false, ordering: .releasing)
+        let appliedBefore = state.appliedGainBits.load(ordering: .relaxed)
+        AppAudioEngine.beginReplay(state: state, gain: 0.5)  // lands while the fade-out cycle runs
+        #expect(state.appliedGainBits.load(ordering: .relaxed) == appliedBefore, "untouched")
+        // The fade-out cycle's own stores, landing after beginReplay's:
+        state.appliedGainBits.store(Float(0).bitPattern, ordering: .relaxed)
+        state.replayedLastCycle.store(false, ordering: .relaxed)
+
+        let rise = left(cycle(block))
+        #expect(rise.allSatisfy { $0 > 0 }, "no exact zero")
+        #expect(rise[0] < 0.01)
+        #expect(isApproximatelyEqual(rise.last!, 0.25, tolerance: 0.01))
+    }
+
     // MARK: Muted fast path (#5)
 
     func fastPathCycles(_ state: EngineSharedState) -> UInt32 { state.mutedFastPathCycles.load(ordering: .relaxed) }
@@ -270,7 +350,7 @@ import Testing
     }
 
     @Test func takingOverAMutedAppGoesStraightToTheFastPath() {
-        // meter-only -> control at gain 0: beginReplay's g/1000 is 0, so there is nothing to ramp.
+        // meter-only -> control at gain 0: the IOProc's ramp starts at target/1000, which is 0, so there is nothing to ramp.
         let state = EngineSharedState(gain: 0, mode: .meterOnly)
         let block = AppAudioEngine.makeIOBlock(state: state, tapBufferOffset: 0)
         _ = cycle(block)
