@@ -233,6 +233,9 @@ final class Harness {
         answer: AudioCapturePermissionStatus? = nil,
         outputErrorDuration: Duration = .seconds(3600),
         healthCheckDelay: Duration = .seconds(3600),
+        duckingSleep: @escaping @Sendable (Duration) async throws -> Void = { _ in
+            try await Task.sleep(for: .seconds(3600))
+        },
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = { _ in nil }
     ) {
         let processes = FakeProcessSource()
@@ -260,7 +263,7 @@ final class Harness {
             healthCheckDelay: healthCheckDelay,
             stallConfirmDelay: healthCheckDelay,
             stallRetryDelay: .seconds(3600),
-            duckingSleep: { _ in try await Task.sleep(for: .seconds(3600)) },
+            duckingSleep: duckingSleep,
             now: { MainActor.assumeIsolated { clock.now } },
             installedApp: installedApp)
         store.start()

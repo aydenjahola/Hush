@@ -407,6 +407,20 @@ import Testing
         #expect(h.processes.pollingCalls.last == .off)
     }
 
+    @Test func aBurstOfAppChangesKeepsThePendingFadeStep() throws {
+        let h = duckingHarness()
+        h.processes.emit([zoom(capturing: true), app("music", objects: [42])])
+        h.tick(after: CallActivity.startDelay)
+        let step = try #require(h.store.duckingTask)
+
+        h.clock.advance(0.01)
+        h.processes.emit([
+            zoom(capturing: true), app("music", objects: [42]), app("other", playing: false, objects: [9]),
+        ])
+        h.processes.emit([zoom(capturing: true), app("music", objects: [42])])
+        #expect(h.store.duckingTask == step, "the step that was due sooner isn't pushed back")
+    }
+
     @Test func shutdownCancelsThePendingWake() {
         let h = duckingHarness()
         h.processes.emit([zoom(capturing: true)])

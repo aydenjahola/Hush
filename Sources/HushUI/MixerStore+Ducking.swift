@@ -154,6 +154,7 @@ extension MixerStore {
     func duckingTick() {
         duckingTask = nil
         pendingDuckingWake = nil
+        duckingWakeDeadline = nil
         let errors = engineErrors
         refreshDucking(at: now())
         reconcile()
@@ -164,20 +165,28 @@ extension MixerStore {
         duckingTask?.cancel()
         duckingTask = nil
         pendingDuckingWake = nil
+        duckingWakeDeadline = nil
     }
 
     /// Every `duckingStep` while the fade moves, else at the next debounce deadline, else never.
+    /// A pending wake-up that comes no later than the new one is kept, so a burst of app-list
+    /// changes can't keep pushing the fade's next step back.
     private func scheduleDuckingWake(at now: Date) {
-        cancelDuckingWake()
         let delay: Duration
         if !duckingFade.isSettled(at: now) {
             delay = duckingStep
         } else if let next = callActivity.nextChange(after: now) {
             delay = .seconds(max(next.timeIntervalSince(now), 0))
         } else {
+            cancelDuckingWake()
             return
         }
+        let deadline = now.addingTimeInterval(
+            Double(delay.components.seconds) + Double(delay.components.attoseconds) / 1e18)
+        if duckingTask != nil, let existing = duckingWakeDeadline, existing <= deadline { return }
+        cancelDuckingWake()
         pendingDuckingWake = delay
+        duckingWakeDeadline = deadline
         let sleep = duckingSleep
         duckingTask = Task { [weak self] in
             try? await sleep(delay)
