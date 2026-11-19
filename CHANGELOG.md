@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/aydenjahola/Hush/compare/v0.3.0...v0.4.0) (2026-11-19)
+
+
+### Features
+
+* hide apps from the mixer ([2fc3abc](https://github.com/aydenjahola/Hush/commit/2fc3abcc87d45bd505d123aa2e36b3a9908ca55a))
+* remember app levels per output device ([#48](https://github.com/aydenjahola/Hush/issues/48)) ([461acd2](https://github.com/aydenjahola/Hush/commit/461acd2ab03ab73ecd22bc17da1434622006825e))
+* save and switch volume presets ([2fc3abc](https://github.com/aydenjahola/Hush/commit/2fc3abcc87d45bd505d123aa2e36b3a9908ca55a))
+
+
+### Bug Fixes
+
+* **audio:** no dip when an engine toggles between meter-only and control within a buffer ([#54](https://github.com/aydenjahola/Hush/issues/54)) ([b45e45f](https://github.com/aydenjahola/Hush/commit/b45e45ff5b18e3ffe8862ede20818f00da1ae75f))
+
+
+### Performance Improvements
+
+* **audio:** skip sample processing for muted apps ([#51](https://github.com/aydenjahola/Hush/issues/51)) ([9a33624](https://github.com/aydenjahola/Hush/commit/9a33624eecca5508f7d8d6d1e69123ba8cb419d9))
+
 ## [0.3.0](https://github.com/aydenjahola/Hush/compare/v0.2.0...v0.3.0) (2026-11-18)
 
 
