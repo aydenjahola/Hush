@@ -121,6 +121,8 @@ package final class MixerStore {
     @ObservationIgnored var pendingDuckingWake: Duration?
     /// When `duckingTask` wakes, so a reschedule can keep a task that wakes soon enough.
     @ObservationIgnored var duckingWakeDeadline: Date?
+    /// Apps whose ducking-only engine failed during the current ducking episode (see reconcile).
+    @ObservationIgnored var duckingFailureIDs: Set<String> = []
     /// How often a fade steps the gain. The IOProc ramps each step across one buffer.
     @ObservationIgnored let duckingStep: Duration
     @ObservationIgnored let duckingSleep: @Sendable (Duration) async throws -> Void

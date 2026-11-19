@@ -439,6 +439,35 @@ import Testing
         #expect(engine.processObjectIDs == [42])
     }
 
+    @Test func aFailedDuckingOnlyEngineShowsNoWarningAndIsRetriedNextCall() throws {
+        let h = duckingHarness()
+        h.factory.error = FakeError()
+        startCall(h, others: [app("music", objects: [42])])
+        let attempts = { h.factory.events.filter { $0 == "make music control" }.count }
+        #expect(attempts() == 1)
+        #expect(h.store.strips.first { $0.id == "music" }?.engineError == nil, "the user's level didn't fail")
+
+        h.processes.emit([zoom(capturing: true), app("music", objects: [42, 43])])
+        #expect(attempts() == 1, "not retried during the same call")
+
+        // End the call and let the fade finish, then a new call tries again.
+        h.processes.emit([zoom(capturing: false), app("music", objects: [42, 43])])
+        h.tick(after: CallActivity.stopDelay)
+        h.tick(after: DuckingFade.upDuration)
+        h.factory.error = nil
+        startCall(h, others: [app("music", objects: [42, 43])])
+        #expect(attempts() == 2)
+        #expect(h.factory.live("music")?.mode == .control)
+    }
+
+    @Test func aFailedEngineForALoweredAppStillWarns() {
+        let h = duckingHarness(
+            document: SettingsDocument(apps: ["music": AppVolumeSetting(percent: 50, lastAdjusted: Harness.fixedNow)]))
+        h.factory.error = FakeError()
+        startCall(h, others: [app("music", objects: [42])])
+        #expect(h.store.strips.first { $0.id == "music" }?.engineError != nil)
+    }
+
     @Test func shutdownCancelsThePendingWake() {
         let h = duckingHarness()
         h.processes.emit([zoom(capturing: true)])

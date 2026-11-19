@@ -22,6 +22,10 @@ extension MixerStore {
         for id in engineErrors.keys where present[id] == nil { engineErrors[id] = nil }
 
         let ducking = duckingState()
+        // A ducking-only failure is retried once per ducking episode: on the next call, not on
+        // every reconcile during this one (each attempt is a takeover that can be heard).
+        if !ducking.isActive { duckingFailureIDs = [] }
+        duckingFailureIDs = duckingFailureIDs.filter { present[$0] != nil }
         for (id, app) in present {
             let setting = settings[id] ?? AppVolumeSetting()
             let desired = EnginePlan.desiredMode(
@@ -39,7 +43,11 @@ extension MixerStore {
                 continue
             }
 
-            guard let mode = desired, engineErrors[id] == nil else {
+            // Only ducking wants a control engine: the app is at its own default level.
+            let isDuckingOnly = desired == .control && !setting.needsEngine
+            guard let mode = desired, engineErrors[id] == nil,
+                !(isDuckingOnly && duckingFailureIDs.contains(id))
+            else {
                 tearDownEngine(id)
                 continue
             }
@@ -66,7 +74,16 @@ extension MixerStore {
                 if existing != nil { meterLevels[id] = nil }
             } catch {
                 tearDownEngine(id)  // never keep an engine in the wrong mode
-                recordFailure(error, for: id, mode: mode)
+                if isDuckingOnly {
+                    // Not the user's level that failed: the app just plays unducked, so no strip
+                    // warning. Logged, and retried with the next call.
+                    duckingFailureIDs.insert(id)
+                    logger.error(
+                        "Ducking engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)"
+                    )
+                } else {
+                    recordFailure(error, for: id, mode: mode)
+                }
             }
         }
     }
