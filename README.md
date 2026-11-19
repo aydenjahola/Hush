@@ -139,6 +139,10 @@ Version bumps follow Conventional Commits. Before 1.0, `feat:` bumps the minor v
 
 The repository needs Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" turned on so release-please can open its PR. Releases are ad-hoc signed. If the `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and `NOTARY_PASSWORD` secrets are ever added, the workflow signs with the Developer ID and notarizes too. Before merging a release PR, run through the [manual checklist](https://aydenjahola.github.io/Hush/contributing/testing/#manual-checklist). The full release guide is [on the website](https://aydenjahola.github.io/Hush/contributing/releasing/).
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md): smart ducking during calls next, then per-app EQ and sound shaping, then a signed 1.0.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Any change to audio behaviour (engines, taps, the process monitor, how the mixer starts or swaps engines) must pass `make integration-test` before it merges, not just `make test`: the unit tests use fake engines and can't see what reaches the speakers. CI runs the integration tests only experimentally, so run them on your Mac and say so in the pull request. Setup (BlackHole 2ch and the Audio Recording permission) is in the [testing guide](https://aydenjahola.github.io/Hush/contributing/testing/#integration-tests).
