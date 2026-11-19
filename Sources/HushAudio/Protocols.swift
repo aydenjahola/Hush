@@ -16,10 +16,15 @@ package protocol AudioProcessSource: AnyObject {
     func start(onChange: @escaping @MainActor ([AudioApp]) -> Void)
     /// Chooses what to poll. The caller knows which running states decisions depend on.
     func setPolling(_ polling: ProcessPolling)
+    /// Chooses whether to track microphone input (`AudioApp.isCapturingInput`) and what to poll
+    /// for it. nil (the default) tracks nothing: no input reads, listeners or polling. `.off`
+    /// tracks input through listeners only; `.objects` and `.all` also poll those objects.
+    func setInputPolling(_ polling: ProcessPolling?)
 }
 
 package extension AudioProcessSource {
     func setPolling(_ polling: ProcessPolling) {}
+    func setInputPolling(_ polling: ProcessPolling?) {}
 }
 
 @MainActor

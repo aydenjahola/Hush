@@ -10,6 +10,9 @@ import os
 /// running change) costs one flush. A flush reads the list only if it changed, reads PID and bundle
 /// ID once per object (they never change for an object ID), and re-reads running state only for
 /// objects that notified or are new. Polling reads only the objects `setPolling` asks for.
+///
+/// Microphone input (`IsRunningInput`) is tracked the same way, but only while
+/// `setInputPolling` asks for it (ducking is on): otherwise no input is read, listened to or polled.
 @MainActor
 package final class AudioProcessMonitor: AudioProcessSource {
     package typealias Scheduler = @MainActor (@escaping @MainActor () -> Void) -> Void
@@ -41,6 +44,12 @@ package final class AudioProcessMonitor: AudioProcessSource {
     private var info: [AudioObjectID: ObjectInfo] = [:]
     private var running: [AudioObjectID: Bool] = [:]
     private var polling: ProcessPolling = .off
+    /// nil while input isn't tracked (see `setInputPolling`).
+    private var inputPolling: ProcessPolling?
+    private var inputListeners: [AudioObjectID: HALListener] = [:]
+    private var inputRunning: [AudioObjectID: Bool] = [:]
+    private var dirtyInput: Set<AudioObjectID> = []
+    private var inputListenerAttempts: [AudioObjectID: Int] = [:]
 
     private var needsListRead = false
     private var dirtyRunning: Set<AudioObjectID> = []
@@ -54,6 +63,17 @@ package final class AudioProcessMonitor: AudioProcessSource {
         let hal = self.hal
         let read: RunningStatePoller.Reader = { hal.isRunningOutput($0) }
         let onChange: @MainActor ([AudioObjectID: Bool]) -> Void = { [weak self] in self?.pollerDidChange($0) }
+        if let pollerSleep {
+            return RunningStatePoller(interval: .seconds(1), read: read, onChange: onChange, sleep: pollerSleep)
+        }
+        return RunningStatePoller(interval: .seconds(1), read: read, onChange: onChange)
+    }()
+
+    /// Polls `IsRunningInput` for the objects `setInputPolling` asks for (call apps' processes).
+    private lazy var inputPoller: RunningStatePoller = {
+        let hal = self.hal
+        let read: RunningStatePoller.Reader = { hal.isRunningInput($0) }
+        let onChange: @MainActor ([AudioObjectID: Bool]) -> Void = { [weak self] in self?.inputPollerDidChange($0) }
         if let pollerSleep {
             return RunningStatePoller(interval: .seconds(1), read: read, onChange: onChange, sleep: pollerSleep)
         }
@@ -118,14 +138,36 @@ package final class AudioProcessMonitor: AudioProcessSource {
         updatePollTargets()
     }
 
+    /// Starting to track reads every known object's input and listens to it on the next flush;
+    /// stopping removes those listeners and forgets the state, so every app reports no input.
+    /// Either way the change is published from a scheduled flush, never from inside this call,
+    /// because the caller is usually handling a published change already.
+    package func setInputPolling(_ polling: ProcessPolling?) {
+        let wasTracking = inputPolling != nil
+        inputPolling = polling
+        if polling != nil, !wasTracking {
+            for objectID in objectIDs where info[objectID] != nil {
+                dirtyInput.insert(objectID)
+                inputListenerAttempts[objectID] = 0
+            }
+            scheduleFlush()
+        } else if polling == nil, wasTracking {
+            forgetInput()
+            scheduleFlush()
+        }
+        updatePollTargets()
+    }
+
     package func stop() {
         poller.stop()
+        inputPoller.stop()
         resolver.stopObserving()
         resolver.onInvalidate = nil
         if let listListener { hal.removeListener(listListener) }
         listListener = nil
         for listener in runningListeners.values { hal.removeListener(listener) }
         runningListeners = [:]
+        forgetInput()
         onChange = nil
         needsListRead = false
         dirtyRunning = []
@@ -141,6 +183,18 @@ package final class AudioProcessMonitor: AudioProcessSource {
 
     /// The objects the poller currently reads (for tests).
     var pollTargets: Set<AudioObjectID> { poller.targets }
+    /// The objects the input poller currently reads (for tests).
+    var inputPollTargets: Set<AudioObjectID> { inputPoller.targets }
+
+    /// Removes the input listeners and forgets every object's input state.
+    private func forgetInput() {
+        for listener in inputListeners.values { hal.removeListener(listener) }
+        inputListeners = [:]
+        inputRunning = [:]
+        dirtyInput = []
+        inputListenerAttempts = [:]
+        inputPoller.record([:])
+    }
 
     // MARK: Events
 
@@ -151,6 +205,18 @@ package final class AudioProcessMonitor: AudioProcessSource {
 
     private func runningDidChange(_ objectID: AudioObjectID) {
         dirtyRunning.insert(objectID)
+        scheduleFlush()
+    }
+
+    private func inputDidChange(_ objectID: AudioObjectID) {
+        dirtyInput.insert(objectID)
+        scheduleFlush()
+    }
+
+    private func inputPollerDidChange(_ changed: [AudioObjectID: Bool]) {
+        for (objectID, value) in changed where inputRunning[objectID] != nil {
+            inputRunning[objectID] = value
+        }
         scheduleFlush()
     }
 
@@ -181,7 +247,14 @@ package final class AudioProcessMonitor: AudioProcessSource {
             running[objectID] = hal.isRunningOutput(objectID)
         }
         dirtyRunning = []
+        if inputPolling != nil {
+            for objectID in dirtyInput where info[objectID] != nil {
+                inputRunning[objectID] = hal.isRunningInput(objectID)
+            }
+        }
+        dirtyInput = []
         poller.record(running)
+        inputPoller.record(inputRunning)
         updatePollTargets()
         regroup(publish: publish)
     }
@@ -204,11 +277,19 @@ package final class AudioProcessMonitor: AudioProcessSource {
             if let listener = runningListeners.removeValue(forKey: objectID) { hal.removeListener(listener) }
             infoAttempts[objectID] = nil
             listenerAttempts[objectID] = nil
+            inputRunning[objectID] = nil
+            if let listener = inputListeners.removeValue(forKey: objectID) { hal.removeListener(listener) }
+            inputListenerAttempts[objectID] = nil
         }
         // A list change gives objects that ran out of retries a fresh round.
         for objectID in fresh where info[objectID] == nil { infoAttempts[objectID] = 0 }
         for objectID in fresh where info[objectID] != nil && runningListeners[objectID] == nil {
             listenerAttempts[objectID] = 0
+        }
+        if inputPolling != nil {
+            for objectID in fresh where info[objectID] != nil && inputListeners[objectID] == nil {
+                inputListenerAttempts[objectID] = 0
+            }
         }
         objectIDs = fresh
     }
@@ -234,6 +315,10 @@ package final class AudioProcessMonitor: AudioProcessSource {
             infoAttempts[objectID] = nil
             running[objectID] = hal.isRunningOutput(objectID)
             listenerAttempts[objectID] = 0
+            if inputPolling != nil {
+                inputRunning[objectID] = hal.isRunningInput(objectID)
+                inputListenerAttempts[objectID] = 0
+            }
         }
         for objectID in objectIDs where info[objectID] != nil && runningListeners[objectID] == nil {
             guard let attempts = listenerAttempts[objectID], attempts < Self.maxRetries else { continue }
@@ -251,10 +336,31 @@ package final class AudioProcessMonitor: AudioProcessSource {
                 logger.debug("HAL refused a running listener on object \(objectID) (attempt \(attempts + 1))")
             }
         }
+        if inputPolling != nil { addInputListeners() }
         let pending =
             infoAttempts.values.contains { $0 < Self.maxRetries }
             || listenerAttempts.values.contains { $0 < Self.maxRetries }
+            || inputListenerAttempts.values.contains { $0 < Self.maxRetries }
         if pending { scheduleRetry() }
+    }
+
+    /// Adds the input listener to objects that lack one, retrying refusals like the running listener.
+    private func addInputListeners() {
+        for objectID in objectIDs where info[objectID] != nil && inputListeners[objectID] == nil {
+            guard let attempts = inputListenerAttempts[objectID], attempts < Self.maxRetries else { continue }
+            if let listener = hal.addListener(
+                objectID, kAudioProcessPropertyIsRunningInput,
+                { [weak self] in
+                    self?.inputDidChange(objectID)
+                })
+            {
+                inputListeners[objectID] = listener
+                inputListenerAttempts[objectID] = nil
+            } else {
+                inputListenerAttempts[objectID] = attempts + 1
+                logger.debug("HAL refused an input listener on object \(objectID) (attempt \(attempts + 1))")
+            }
+        }
     }
 
     private func scheduleRetry() {
@@ -276,24 +382,33 @@ package final class AudioProcessMonitor: AudioProcessSource {
             case .all: known
             }
         poller.setTargets(targets)
+        let inputTargets: Set<AudioObjectID> =
+            switch inputPolling {
+            case nil, .off: []
+            case .objects(let ids): ids.intersection(known)
+            case .all: known
+            }
+        inputPoller.setTargets(inputTargets)
     }
 
     private func regroup(publish: Bool) {
-        var groups: [String: (identity: AppIdentity, objects: [AudioObjectID], playing: Bool)] = [:]
+        var groups: [String: (identity: AppIdentity, objects: [AudioObjectID], playing: Bool, capturing: Bool)] = [:]
         var livePIDs: Set<pid_t> = []
         for objectID in objectIDs {
             guard let object = info[objectID], object.pid > 0, object.pid != ownPID else { continue }
             livePIDs.insert(object.pid)
             let isRunning = running[objectID] ?? false
+            let isCapturing = inputRunning[objectID] ?? false
             let identity = resolver.identity(pid: object.pid, bundleID: object.bundleID)
             if let ownBundleID, identity.id == ownBundleID { continue }
 
             if var group = groups[identity.id] {
                 group.objects.append(objectID)
                 group.playing = group.playing || isRunning
+                group.capturing = group.capturing || isCapturing
                 groups[identity.id] = group
             } else {
-                groups[identity.id] = (identity, [objectID], isRunning)
+                groups[identity.id] = (identity, [objectID], isRunning, isCapturing)
             }
         }
         resolver.retainOnly(pids: livePIDs)
@@ -306,7 +421,8 @@ package final class AudioProcessMonitor: AudioProcessSource {
                     icon: group.identity.icon,
                     processObjectIDs: group.objects.sorted(),
                     isPlaying: group.playing,
-                    isRegularApp: group.identity.isRegularApp)
+                    isRegularApp: group.identity.isRegularApp,
+                    isCapturingInput: group.capturing)
             }
             .sorted { $0.id < $1.id }
 
