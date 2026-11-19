@@ -31,7 +31,15 @@ package struct CallActivity: Equatable, Sendable {
             capturingSince[id] = nil
         }
         for id in capturing where capturingSince[id] == nil {
-            capturingSince[id] = now
+            if let until = heldUntil[id], until > now {
+                // Resuming during the hold: it already counts, so carry that over (as if it had
+                // captured for the start delay) and end the hold. Keeping the hold with a fresh
+                // start time would drop the app between the hold's end and the new start delay.
+                capturingSince[id] = now.addingTimeInterval(-Self.startDelay)
+                heldUntil[id] = nil
+            } else {
+                capturingSince[id] = now
+            }
         }
     }
 

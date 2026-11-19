@@ -45,6 +45,18 @@ import Testing
         #expect(activity.activeApps(at: at(30)) == ["zoom"])
     }
 
+    @Test func resumingJustBeforeTheHoldEndsKeepsCountingPastIt() {
+        // Stop at 0 (held until 2.0), resume at 1.9: the app must not drop out between 2.0 and 2.4.
+        var activity = CallActivity()
+        activity.update(capturing: ["zoom"], at: at(-10))
+        activity.update(capturing: [], at: at(0))
+        activity.update(capturing: ["zoom"], at: at(1.9))
+        #expect(activity.activeApps(at: at(2.0)) == ["zoom"])
+        #expect(activity.activeApps(at: at(2.1)) == ["zoom"])
+        #expect(activity.activeApps(at: at(2.5)) == ["zoom"])
+        #expect(activity.nextChange(after: at(1.9)) == nil, "already counting, nothing pending")
+    }
+
     @Test func stoppingDuringTheHoldOfAnEarlierStopExtendsTheHold() {
         var activity = CallActivity()
         activity.update(capturing: ["zoom"], at: at(0))
