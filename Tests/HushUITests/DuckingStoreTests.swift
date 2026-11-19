@@ -421,6 +421,24 @@ import Testing
         #expect(h.store.duckingTask == step, "the step that was due sooner isn't pushed back")
     }
 
+    @Test func aMidFadeStepOnlySetsGains() throws {
+        let h = duckingHarness()
+        h.processes.emit([zoom(capturing: true), app("music", objects: [42])])
+        h.tick(after: CallActivity.startDelay)
+        let engine = try #require(h.factory.live("music"))
+        // A process list that differs from the app's is only corrected by a full reconcile, so it
+        // shows which steps reconcile: not the mid-fade one, but the one that settles the fade.
+        engine.forceProcessObjectIDs([99])
+
+        h.tick(after: DuckingFade.downDuration / 2)
+        #expect(engine.currentGain < 1 && engine.currentGain > Self.ducked)
+        #expect(engine.processObjectIDs == [99])
+
+        h.tick(after: DuckingFade.downDuration / 2)
+        #expect(isApproximatelyEqual(engine.currentGain, Self.ducked))
+        #expect(engine.processObjectIDs == [42])
+    }
+
     @Test func shutdownCancelsThePendingWake() {
         let h = duckingHarness()
         h.processes.emit([zoom(capturing: true)])

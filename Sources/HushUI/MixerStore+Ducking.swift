@@ -151,14 +151,33 @@ extension MixerStore {
     /// A wake-up: a debounce deadline passed or the fade takes a step. Reconciling applies the new
     /// multiplier, starts engines for newly ducked apps and, once the fade back up has finished,
     /// drops the engines only ducking needed.
+    ///
+    /// A step in the middle of a fade only sets the ducked control engines' gains: the fade was
+    /// already active at the last reconcile and its target hasn't changed, so no engine needs
+    /// starting or stopping. A retarget, the step that settles the fade and a debounce deadline
+    /// with the fade settled all reconcile in full.
     func duckingTick() {
         duckingTask = nil
         pendingDuckingWake = nil
         duckingWakeDeadline = nil
+        let now = now()
+        let before = duckingFade
+        refreshDucking(at: now)
+        if duckingFade == before, !duckingFade.isSettled(at: now) {
+            applyDuckingGains()
+            return
+        }
         let errors = engineErrors
-        refreshDucking(at: now())
         reconcile()
         if engineErrors != errors { rebuildStrips() }
+    }
+
+    /// Sets every ducked control engine's gain to its own level times the current multiplier.
+    func applyDuckingGains() {
+        let ducking = duckingState()
+        for (id, engine) in engines where engine.mode == .control && ducking.isDucked(id) {
+            engine.setGain(ducking.gain(for: id, setting: settings[id] ?? AppVolumeSetting()))
+        }
     }
 
     func cancelDuckingWake() {
