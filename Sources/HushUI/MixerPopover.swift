@@ -31,6 +31,9 @@ package struct MixerPopover: View {
             if !store.controlsEnabled {
                 PermissionBanner()
             }
+            if let ducking = store.duckingIndicator {
+                DuckingIndicatorLine(indicator: ducking)
+            }
             if store.strips.isEmpty {
                 emptyState
             } else {
@@ -47,6 +50,7 @@ package struct MixerPopover: View {
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.strips.map(\.id))
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: updates.pendingUpdate?.version)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.outputSelectionError)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.duckingIndicator)
         .onChange(of: store.outputSelectionError) { _, message in
             // The error line is easy to miss without sight; VoiceOver speaks it as it appears.
             if let message { AccessibilityNotification.Announcement(message).post() }

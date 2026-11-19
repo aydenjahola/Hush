@@ -52,6 +52,8 @@ package struct SettingsView: View {
 
             PresetsSettingsSection(store: store, sheet: $presetSheet)
 
+            DuckingSettingsSection(store: store)
+
             Section(L10n.levels) {
                 DeviceLevelsSettings(store: store)
                 HiddenAppsList(store: store)

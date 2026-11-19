@@ -152,7 +152,7 @@ package enum QuickMenu {
 
         let ducking = ActionMenuItem.make(
             title: String(localized: L10n.duckDuringCalls), handler: actions.toggleDucking)
-        ducking.image = symbol("speaker.wave.1.fill")
+        ducking.image = symbol(DuckingIndicatorLine.symbolName)
         ducking.state = model.duckingOn ? .on : .off
         ducking.isEnabled = model.duckingEnabled
 

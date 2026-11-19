@@ -69,4 +69,15 @@ import Testing
             String(localized: L10n.presetLimitReached(20))
                 == "You can keep up to 20 presets. Delete one to save another.")
     }
+
+    @Test func duckingStringsResolve() {
+        #expect(String(localized: L10n.lowerOtherAppsTo(30)) == "Lower other apps to 30%")
+        #expect(String(localized: L10n.removeApp("Zoom")) == "Remove Zoom")
+        #expect(
+            String(localized: DuckingIndicatorLine.text(for: DuckingIndicator(appNames: ["Zoom"])))
+                == "Ducking for Zoom")
+        #expect(
+            String(localized: DuckingIndicatorLine.text(for: DuckingIndicator(appNames: ["Discord", "Zoom"])))
+                == "Ducking for 2 apps")
+    }
 }
