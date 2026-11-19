@@ -12,7 +12,7 @@ Ducking is off by default. Turn it on in **Settings → Ducking → Lower other 
 A call app is "in a call" while it's using a microphone. Hush sees this through the same audio information it already reads to find playing apps, so ducking needs no extra permission and never asks for microphone access.
 
 - An app has to use the microphone for about half a second before ducking starts, so a quick microphone check doesn't lower anything.
-- Ducking ends about 2 seconds after the last call app stops using the microphone. Muting and unmuting yourself in a call app can briefly stop its microphone, and this delay keeps your music from bouncing up and down when you do.
+- Ducking ends about 2 seconds after the last call app stops using the microphone. Muting and unmuting yourself in a call app can briefly stop its microphone, and this delay keeps your music from bouncing up and down when you do. Some call apps, such as Discord, may let go of the microphone for as long as you stay muted. If that lasts longer than 2 seconds, other apps come back up until you unmute.
 - Apps that use the microphone but aren't on the call apps list, such as a voice recorder, don't start ducking.
 - Hush itself never counts.
 
@@ -24,9 +24,11 @@ Every playing app is lowered except:
 
 - the **call apps**, whether or not they're the one in the call;
 - the apps in **Never lower**;
-- [hidden apps](/Hush/using/mixer/#hide-an-app), which Hush never adjusts.
+- [hidden apps](/Hush/using/mixer/#hide-an-app). Hush leaves hidden apps alone, so they're never lowered. A hidden call app still counts as being in a call, though.
 
 Call apps are never lowered, even when another call app is in the call. Browsers are on the list because calls in Google Meet (and the web versions of the other apps) run in a browser tab, so Hush can't tell a browser playing music from a browser in a call. For example, music playing in Safari keeps its level during a Zoom call. If you only use a browser for music, remove it from the call apps list so that it's lowered too, or play music in an app that isn't on the list.
+
+For the same reason, any web page that uses the microphone, such as an online voice recorder or dictation, lowers other apps while it listens. If that gets in the way, remove the browser from the call apps list.
 
 ## How much to lower
 
