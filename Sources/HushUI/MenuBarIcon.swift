@@ -65,13 +65,13 @@ package enum MenuBarIcon {
         let size = NSSize(width: ceil(glyph.width + badgeRadius + faderBadgeClearance), height: glyph.height)
         let levels = faderLevels(attenuated: attenuated)
         return templateImage(size: size, badged: badged) {
-            let trackWidth: CGFloat = 1.5, fillWidth: CGFloat = 2.25, knob = NSSize(width: 4.5, height: 3.5)
+            let trackWidth: CGFloat = 1.6, fillWidth: CGFloat = 2.35, knob = NSSize(width: 4.5, height: 3.5)
             let top: CGFloat = 1.5, bottom = glyph.height - 1.5
             for (index, level) in levels.enumerated() {
                 let centerX = 3 + CGFloat(index) * 5.75
                 let knobY = bottom - level * (bottom - top)
                 let track = NSRect(x: centerX - trackWidth / 2, y: top, width: trackWidth, height: bottom - top)
-                NSColor.black.withAlphaComponent(0.45).setFill()
+                NSColor.black.withAlphaComponent(0.55).setFill()
                 NSBezierPath(roundedRect: track, xRadius: trackWidth / 2, yRadius: trackWidth / 2).fill()
                 NSColor.black.setFill()
                 let fill = NSRect(x: centerX - fillWidth / 2, y: knobY, width: fillWidth, height: bottom - knobY)
