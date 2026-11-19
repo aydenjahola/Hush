@@ -447,15 +447,31 @@ import Testing
         #expect(attempts() == 1)
         #expect(h.store.strips.first { $0.id == "music" }?.engineError == nil, "the user's level didn't fail")
 
-        h.processes.emit([zoom(capturing: true), app("music", objects: [42, 43])])
+        h.processes.emit([
+            zoom(capturing: true), app("music", objects: [42]), app("other", playing: false, objects: [9]),
+        ])
         #expect(attempts() == 1, "not retried during the same call")
 
         // End the call and let the fade finish, then a new call tries again.
-        h.processes.emit([zoom(capturing: false), app("music", objects: [42, 43])])
+        h.processes.emit([zoom(capturing: false), app("music", objects: [42])])
         h.tick(after: CallActivity.stopDelay)
         h.tick(after: DuckingFade.upDuration)
         h.factory.error = nil
-        startCall(h, others: [app("music", objects: [42, 43])])
+        startCall(h, others: [app("music", objects: [42])])
+        #expect(attempts() == 2)
+        #expect(h.factory.live("music")?.mode == .control)
+    }
+
+    @Test func aRelaunchedAppGetsAFreshDuckingTryInTheSameCall() {
+        let h = duckingHarness()
+        h.factory.error = FakeError()
+        startCall(h, others: [app("music", objects: [42])])
+        let attempts = { h.factory.events.filter { $0 == "make music control" }.count }
+        #expect(attempts() == 1)
+
+        h.factory.error = nil
+        h.processes.emit([zoom(capturing: true)])  // music quits
+        h.processes.emit([zoom(capturing: true), app("music", objects: [50])])  // and comes back
         #expect(attempts() == 2)
         #expect(h.factory.live("music")?.mode == .control)
     }

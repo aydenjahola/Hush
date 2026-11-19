@@ -22,10 +22,12 @@ extension MixerStore {
         for id in engineErrors.keys where present[id] == nil { engineErrors[id] = nil }
 
         let ducking = duckingState()
-        // A ducking-only failure is retried once per ducking episode: on the next call, not on
-        // every reconcile during this one (each attempt is a takeover that can be heard).
-        if !ducking.isActive { duckingFailureIDs = [] }
-        duckingFailureIDs = duckingFailureIDs.filter { present[$0] != nil }
+        // After a ducking-only engine fails, Hush doesn't try that app again for the rest of the
+        // ducking episode (each attempt is a takeover that can be heard), unless its process
+        // objects change, as when the app is relaunched. Every failure is forgotten once the
+        // fade has fully ended, so the next call tries again.
+        if !ducking.isActive { duckingFailures = [:] }
+        duckingFailures = duckingFailures.filter { id, objects in present[id]?.processObjectIDs == objects }
         for (id, app) in present {
             let setting = settings[id] ?? AppVolumeSetting()
             let desired = EnginePlan.desiredMode(
@@ -46,7 +48,7 @@ extension MixerStore {
             // Only ducking wants a control engine: the app is at its own default level.
             let isDuckingOnly = desired == .control && !setting.needsEngine
             guard let mode = desired, engineErrors[id] == nil,
-                !(isDuckingOnly && duckingFailureIDs.contains(id))
+                !(isDuckingOnly && duckingFailures[id] != nil)
             else {
                 tearDownEngine(id)
                 continue
@@ -76,8 +78,8 @@ extension MixerStore {
                 tearDownEngine(id)  // never keep an engine in the wrong mode
                 if isDuckingOnly {
                     // Not the user's level that failed: the app just plays unducked, so no strip
-                    // warning. Logged, and retried with the next call.
-                    duckingFailureIDs.insert(id)
+                    // warning. Logged; see above for when it's tried again.
+                    duckingFailures[id] = app.processObjectIDs
                     logger.error(
                         "Ducking engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)"
                     )

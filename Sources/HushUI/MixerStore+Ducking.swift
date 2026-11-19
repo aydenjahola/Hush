@@ -200,8 +200,7 @@ extension MixerStore {
             cancelDuckingWake()
             return
         }
-        let deadline = now.addingTimeInterval(
-            Double(delay.components.seconds) + Double(delay.components.attoseconds) / 1e18)
+        let deadline = now.addingTimeInterval(Self.seconds(delay))
         if duckingTask != nil, let existing = duckingWakeDeadline, existing <= deadline { return }
         cancelDuckingWake()
         pendingDuckingWake = delay
@@ -212,6 +211,10 @@ extension MixerStore {
             guard !Task.isCancelled else { return }
             self?.duckingTick()
         }
+    }
+
+    private static func seconds(_ duration: Duration) -> TimeInterval {
+        Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
     }
 
     /// The call app list's name for `id` (so FaceTime's call agent reads as FaceTime), else the
