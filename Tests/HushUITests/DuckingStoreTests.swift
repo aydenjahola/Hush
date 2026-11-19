@@ -468,6 +468,60 @@ import Testing
         #expect(h.store.strips.first { $0.id == "music" }?.engineError != nil)
     }
 
+    // MARK: Wake-ups, input tracking and saving
+
+    @Test func aDebounceDeadlineFiresATickOnItsOwn() async throws {
+        // Only the 0.5 s debounce sleep returns; fade steps (20 ms) stay suspended.
+        let h = Harness(
+            document: SettingsDocument(ducking: DuckingSettings(isEnabled: true)),
+            duckingSleep: { duration in
+                if duration == .milliseconds(500) { return }
+                try await Task.sleep(for: .seconds(3600))
+            })
+        h.processes.emit([zoom(capturing: true), app("music", objects: [42])])
+        h.clock.advance(CallActivity.startDelay)  // the time when the sleep returns
+
+        var spins = 0
+        while h.store.activeCallApps.isEmpty {
+            spins += 1
+            try #require(spins < 10_000, "the deadline never fired")
+            await Task.yield()
+        }
+        #expect(h.store.activeCallApps == [Self.zoomID])
+        #expect(h.factory.live("music")?.mode == .control)
+        h.store.shutdown()
+    }
+
+    @Test func aFreshStoreWithDuckingOffSchedulesNothingAndTracksNoInput() {
+        let h = Harness()
+        h.processes.emit([zoom(capturing: false), app("music", objects: [42])])
+        #expect(h.store.duckingTask == nil)
+        #expect(h.store.currentInputPolling == nil)
+        #expect(h.processes.inputPollingCalls.allSatisfy { $0 == nil }, "never asks the source to track input")
+    }
+
+    @Test func losingPermissionStopsInputTracking() {
+        let h = duckingHarness()
+        h.processes.emit([zoom(capturing: false)])
+        #expect(h.processes.inputPollingCalls.last == .objects([7]))
+
+        h.permission.status = .denied
+        h.store.refreshPermission()
+        #expect(h.processes.inputPollingCalls.last == .some(nil))
+    }
+
+    @Test func aLevelSaveKeepsLoadedDuckingSettings() {
+        var ducking = DuckingSettings(isEnabled: true, percent: 15)
+        ducking.removeCallApp("com.apple.Safari")
+        let h = Harness(document: SettingsDocument(ducking: ducking))
+        h.processes.emit([app("music", objects: [42])])
+
+        h.store.setPercent(70, for: "music")
+        h.store.flushPendingSave()
+        #expect(h.persister.document.ducking == ducking)
+        #expect(h.persister.document.apps["music"]?.percent == 70)
+    }
+
     @Test func shutdownCancelsThePendingWake() {
         let h = duckingHarness()
         h.processes.emit([zoom(capturing: true)])
