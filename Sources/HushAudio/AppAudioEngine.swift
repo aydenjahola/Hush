@@ -301,12 +301,12 @@ package final class AppAudioEngine: AudioEngineHandle {
     /// `.meterOnly` and straight back, before the IOProc had seen the first, restarted a running
     /// replay from g/1000, an 11 ms dip. It also raced a fade-out cycle's store of 0.
     ///
-    /// Known limitation, measured on hardware: when a live tap starts muting a process that's
-    /// already playing, Core Audio drops exactly one IO buffer of it (a 512-frame zero run at
-    /// 512-frame buffers), whatever the order or timing of the replay and the mute. Waiting for
-    /// the IOProc to render a replay buffer before muting made no difference, so Hush doesn't.
-    /// The HAL applies the mute asynchronously (#38), and some takeovers have measured up to 1.7
-    /// buffers of zeros (#50); `TakeoverDiagnostics` records what the tap delivered each time.
+    /// Known limitation, measured on hardware (#50): when a live tap starts muting a process
+    /// that's already playing, the process goes quiet as soon as the mute takes effect, while the
+    /// replay's first buffer follows one IO cycle later. Depending on where in the cycle the mute
+    /// lands, that leaves one to two buffers of silence. The tap's own input stays continuous
+    /// (`TakeoverDiagnostics`), so nothing is dropped; closing the gap would need an overlap or a
+    /// hold, and #38 rejected the hold.
     nonisolated static func beginReplay(state: EngineSharedState, gain: Float) {
         state.targetGainBits.store(gain.bitPattern, ordering: .relaxed)
         state.watchZeroRun.store(0, ordering: .relaxed)

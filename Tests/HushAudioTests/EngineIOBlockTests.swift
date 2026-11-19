@@ -160,7 +160,6 @@ import Testing
         #expect(left(cycle(block)).allSatisfy { isApproximatelyEqual($0, 0.25) })
     }
 
-
     // MARK: Fast mode toggles (#12)
 
     @Test func switchingAwayAndBackBeforeTheIOProcRunsKeepsTheReplayAtItsGain() {
