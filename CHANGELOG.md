@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/aydenjahola/Hush/compare/v0.4.0...v0.4.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **ui:** balance the fader glyph's weight against the speaker symbol ([#62](https://github.com/aydenjahola/Hush/issues/62)) ([7e43005](https://github.com/aydenjahola/Hush/commit/7e43005974b8208b32720126115a141eb8b546d6))
+
 ## [0.4.0](https://github.com/aydenjahola/Hush/compare/v0.3.0...v0.4.0) (2026-11-19)
 
 
