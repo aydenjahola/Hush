@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/aydenjahola/Hush/compare/v0.4.1...v0.5.0) (2026-11-20)
+
+
+### Features
+
+* auto-duck other apps during calls ([#64](https://github.com/aydenjahola/Hush/issues/64)) ([d4c479e](https://github.com/aydenjahola/Hush/commit/d4c479eccf6624ec0b2f4b06b8359f379daa234b))
+
 ## [0.4.1](https://github.com/aydenjahola/Hush/compare/v0.4.0...v0.4.1) (2026-11-19)
 
 
