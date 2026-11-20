@@ -12,6 +12,9 @@ package struct AudioApp: Identifiable, Equatable {
     package var isPlaying: Bool
     /// True when the owning app is a regular (Dock) app rather than a daemon, agent or CLI tool.
     package var isRegularApp: Bool
+    /// True while any of the app's processes (helpers included) captures audio input, such as a
+    /// call app using the microphone. Always false unless the source was asked to track input.
+    package var isCapturingInput: Bool
 
     package init(
         id: String,
@@ -19,7 +22,8 @@ package struct AudioApp: Identifiable, Equatable {
         icon: NSImage? = nil,
         processObjectIDs: [AudioObjectID],
         isPlaying: Bool,
-        isRegularApp: Bool = true
+        isRegularApp: Bool = true,
+        isCapturingInput: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
@@ -27,6 +31,7 @@ package struct AudioApp: Identifiable, Equatable {
         self.processObjectIDs = processObjectIDs
         self.isPlaying = isPlaying
         self.isRegularApp = isRegularApp
+        self.isCapturingInput = isCapturingInput
     }
 
     /// Icons are ignored: they don't change identity or behavior.
@@ -36,6 +41,7 @@ package struct AudioApp: Identifiable, Equatable {
             && lhs.processObjectIDs == rhs.processObjectIDs
             && lhs.isPlaying == rhs.isPlaying
             && lhs.isRegularApp == rhs.isRegularApp
+            && lhs.isCapturingInput == rhs.isCapturingInput
     }
 }
 

@@ -21,21 +21,35 @@ extension MixerStore {
         for id in engines.keys where present[id] == nil { tearDownEngine(id) }
         for id in engineErrors.keys where present[id] == nil { engineErrors[id] = nil }
 
+        let ducking = duckingState()
+        // After a ducking-only engine fails, Hush doesn't try that app again for the rest of the
+        // ducking episode (each attempt is a takeover that can be heard), unless its process
+        // objects change, as when the app is relaunched. Every failure is forgotten once the
+        // fade has fully ended, so the next call tries again.
+        if !ducking.isActive { duckingFailures = [:] }
+        duckingFailures = duckingFailures.filter { id, objects in present[id]?.processObjectIDs == objects }
         for (id, app) in present {
             let setting = settings[id] ?? AppVolumeSetting()
             let desired = EnginePlan.desiredMode(
                 setting: setting,
                 isPlaying: app.isPlaying,
                 isPopoverVisible: isPopoverVisible,
-                showLevelMeters: preferences.appearance.showLevelMeters)
+                showLevelMeters: preferences.appearance.showLevelMeters,
+                isDucked: ducking.isDucked(id))
+            // The app's own level times the ducking multiplier; the saved setting never changes.
+            let gain = ducking.gain(for: id, setting: setting)
 
             let existing = engines[id]
             if let existing, existing.mode == desired, existing.processObjectIDs == app.processObjectIDs {
-                if desired == .control { existing.setGain(setting.effectiveGain) }
+                if desired == .control { existing.setGain(gain) }
                 continue
             }
 
-            guard let mode = desired, engineErrors[id] == nil else {
+            // Only ducking wants a control engine: the app is at its own default level.
+            let isDuckingOnly = desired == .control && !setting.needsEngine
+            guard let mode = desired, engineErrors[id] == nil,
+                !(isDuckingOnly && duckingFailures[id] != nil)
+            else {
                 tearDownEngine(id)
                 continue
             }
@@ -44,7 +58,7 @@ extension MixerStore {
             // with a gap. A helper spawning (process list) or the user adjusting a metered app
             // (mode) therefore keeps the same tap, aggregate and IOProc.
             if let existing,
-                applyInPlace(to: existing, id: id, processObjectIDs: app.processObjectIDs, mode: mode, setting: setting)
+                applyInPlace(to: existing, id: id, processObjectIDs: app.processObjectIDs, mode: mode, gain: gain)
             {
                 continue
             }
@@ -55,14 +69,23 @@ extension MixerStore {
                     appID: id,
                     processObjectIDs: app.processObjectIDs,
                     mode: mode,
-                    initialGain: mode == .control ? setting.effectiveGain : 1,
+                    initialGain: mode == .control ? gain : 1,
                     outputDeviceID: device.id)
                 engines[id] = replacement
                 existing?.stop()
                 if existing != nil { meterLevels[id] = nil }
             } catch {
                 tearDownEngine(id)  // never keep an engine in the wrong mode
-                recordFailure(error, for: id, mode: mode)
+                if isDuckingOnly {
+                    // Not the user's level that failed: the app just plays unducked, so no strip
+                    // warning. Logged; see above for when it's tried again.
+                    duckingFailures[id] = app.processObjectIDs
+                    logger.error(
+                        "Ducking engine for \(id, privacy: .public) failed: \(String(describing: error), privacy: .public)"
+                    )
+                } else {
+                    recordFailure(error, for: id, mode: mode)
+                }
             }
         }
     }
@@ -234,16 +257,16 @@ extension MixerStore {
         id: String,
         processObjectIDs: [AudioObjectID],
         mode: EngineMode,
-        setting: AppVolumeSetting
+        gain: Float
     ) -> Bool {
         do {
             if engine.processObjectIDs != processObjectIDs {
                 try engine.updateProcesses(processObjectIDs)
             }
             if engine.mode != mode {
-                try engine.switchMode(to: mode, gain: setting.effectiveGain)
+                try engine.switchMode(to: mode, gain: gain)
             } else if mode == .control {
-                engine.setGain(setting.effectiveGain)
+                engine.setGain(gain)
             }
             return true
         } catch {
@@ -254,13 +277,21 @@ extension MixerStore {
         }
     }
 
-    /// Pushes `EnginePlan.polling` to the process source when it changed.
+    /// Pushes `EnginePlan.polling` and `EnginePlan.inputPolling` to the process source when they changed.
     private func updatePolling() {
         let polling = EnginePlan.polling(
-            isPopoverVisible: isPopoverVisible, controlsEnabled: controlsEnabled, apps: apps, settings: settings)
-        guard polling != currentPolling else { return }
-        currentPolling = polling
-        processSource.setPolling(polling)
+            isPopoverVisible: isPopoverVisible, controlsEnabled: controlsEnabled, apps: apps, settings: settings,
+            duckedApps: duckingState().duckableApps(in: apps))
+        if polling != currentPolling {
+            currentPolling = polling
+            processSource.setPolling(polling)
+        }
+        let inputPolling = EnginePlan.inputPolling(
+            controlsEnabled: controlsEnabled, ducking: duckingSettings, allApps: allApps)
+        if inputPolling != currentInputPolling {
+            currentInputPolling = inputPolling
+            processSource.setInputPolling(inputPolling)
+        }
     }
 
     func tearDownEngine(_ id: String) {

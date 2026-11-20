@@ -378,3 +378,53 @@
 
 /* Message of the Reset All Levels confirmation when output devices have saved levels. */
 "Every app goes back to 100% and unmuted, and every output device's saved levels are cleared." = "Every app goes back to 100% and unmuted, and every output device's saved levels are cleared.";
+
+/* Ducking: lowering other apps while a call app is in a call. */
+
+/* Popover line while ducking is active. %@ is the name of the call app in a call (e.g. Zoom). */
+"Ducking for %@" = "Ducking for %@";
+
+/* Quick menu item (right-click on the menu bar icon): turns "Lower other apps during calls" on or off. Shows a checkmark while on. */
+"Duck During Calls" = "Duck During Calls";
+
+/* Title of the Ducking section in Settings: lowering other apps during calls. */
+"Ducking" = "Ducking";
+
+/* Settings → Ducking: toggle that lowers other apps while a call app uses the microphone. */
+"Lower other apps during calls" = "Lower other apps during calls";
+
+/* Settings → Ducking: label of the slider that sets how far other apps are lowered. %lld is a percentage of each app's own level (0–90). */
+"Lower other apps to %lld%%" = "Lower other apps to %lld%%";
+
+/* Settings → Ducking: explanation under the toggle. */
+"While a call app uses the microphone, other playing apps fade down, then come back up a couple of seconds after the call ends. Your levels, presets and saved settings don't change." = "While a call app uses the microphone, other playing apps fade down, then come back up a couple of seconds after the call ends. Your levels, presets and saved settings don't change.";
+
+/* Settings → Ducking: heading of the list of apps whose microphone use starts ducking (Zoom, FaceTime, browsers…). */
+"Call apps" = "Call apps";
+
+/* Settings → Ducking: explanation under the call apps list. */
+"Call apps are never lowered, even when another one is in the call. A browser playing music keeps its level during a Zoom call, because it could be the one in a Meet call." = "Call apps are never lowered, even when another one is in the call. A browser playing music keeps its level during a Zoom call, because it could be the one in a Meet call.";
+
+/* Settings → Ducking: heading of the list of apps that are never lowered during calls. */
+"Never lower" = "Never lower";
+
+/* Settings → Ducking: shown in the "Never lower" list when it's empty. */
+"No exceptions. Every other playing app is lowered." = "No exceptions. Every other playing app is lowered.";
+
+/* Settings → Ducking: menu button under a list that adds a running app (or one chosen in a file panel). */
+"Add App" = "Add App";
+
+/* Settings → Ducking: item in the Add App menu that opens a panel to choose an app from the Applications folder. */
+"Choose App…" = "Choose App…";
+
+/* Settings → Ducking: disabled item in the Add App menu when every running app is already listed. */
+"No other running apps" = "No other running apps";
+
+/* Settings → Ducking: button that puts the call apps list back to Hush's default list. */
+"Restore Defaults" = "Restore Defaults";
+
+/* Settings → Ducking: button on a list row that removes the app from the list. */
+"Remove" = "Remove";
+
+/* VoiceOver label of the Remove button on a ducking list row. %@ is the app's name. */
+"Remove %@" = "Remove %@";

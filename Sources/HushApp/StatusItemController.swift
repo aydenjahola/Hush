@@ -153,7 +153,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSMenuDelegate {
             managePresets: { [settingsNavigator, settingsOpener] in
                 settingsNavigator.request(.presets)
                 settingsOpener.open()
-            })
+            },
+            toggleDucking: { [store] in store.setDuckingEnabled(!store.duckingEnabled) })
     }
 
     // MARK: NSPopoverDelegate

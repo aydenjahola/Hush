@@ -237,6 +237,38 @@ package enum L10n {
     package static let replacePresetMessage = resource("It will hold the current levels instead of its saved ones.")
     package static let replacePreset = resource("Replace")
 
+    // MARK: Ducking (popover, quick menu and Settings)
+
+    package static func duckingFor(_ name: String) -> LocalizedStringResource {
+        resource("Ducking for \(name)")
+    }
+    package static func duckingForApps(_ count: Int) -> LocalizedStringResource {
+        resource("Ducking for \(count) apps")
+    }
+    package static let duckDuringCalls = resource("Duck During Calls")
+    package static let ducking = resource("Ducking")
+    package static let lowerOtherAppsDuringCalls = resource("Lower other apps during calls")
+    package static func lowerOtherAppsTo(_ percent: Int) -> LocalizedStringResource {
+        resource("Lower other apps to \(percent)%")
+    }
+    package static let duckingExplanation = resource(
+        "While a call app uses the microphone, other playing apps fade down, then come back up a couple of seconds after the call ends. Your levels, presets and saved settings don't change."
+    )
+    package static let callApps = resource("Call apps")
+    package static let callAppsExplanation = resource(
+        "Call apps are never lowered, even when another one is in the call. A browser playing music keeps its level during a Zoom call, because it could be the one in a Meet call."
+    )
+    package static let neverLower = resource("Never lower")
+    package static let noNeverLowerApps = resource("No exceptions. Every other playing app is lowered.")
+    package static let addApp = resource("Add App")
+    package static let chooseAppEllipsis = resource("Choose App…")
+    package static let noOtherRunningApps = resource("No other running apps")
+    package static let restoreDefaults = resource("Restore Defaults")
+    package static let remove = resource("Remove")
+    package static func removeApp(_ name: String) -> LocalizedStringResource {
+        resource("Remove \(name)")
+    }
+
     // MARK: Engine failures (strip warning tooltips)
 
     package static let controlFailed = resource("Hush couldn't control this app's audio, so it's playing normally.")
@@ -284,6 +316,9 @@ package enum L10n {
             savePresetTitle, renamePresetTitle, presetName, savePreset, renamePreset, cancel, presetNameTaken("x"),
             presetWillReplace("x"), presetLimitReached(20), replacePresetTitle("x"), replacePresetMessage,
             replacePreset,
+            duckingFor("x"), duckingForApps(2), duckDuringCalls, ducking, lowerOtherAppsDuringCalls,
+            lowerOtherAppsTo(30), duckingExplanation, callApps, callAppsExplanation, neverLower, noNeverLowerApps,
+            addApp, chooseAppEllipsis, noOtherRunningApps, restoreDefaults, remove, removeApp("x"),
         ]
     }
 }

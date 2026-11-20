@@ -80,6 +80,7 @@ extension MixerStore {
     func prepareEnginesForSwitchedLevels() {
         var present: [String: AudioApp] = [:]
         for app in apps { present[app.id] = app }
+        let ducking = duckingState()
         for (id, engine) in engines {
             let setting = settings[id] ?? AppVolumeSetting()
             let desired = present[id].flatMap { app in
@@ -87,13 +88,14 @@ extension MixerStore {
                     setting: setting,
                     isPlaying: app.isPlaying,
                     isPopoverVisible: isPopoverVisible,
-                    showLevelMeters: preferences.appearance.showLevelMeters)
+                    showLevelMeters: preferences.appearance.showLevelMeters,
+                    isDucked: ducking.isDucked(id))
             }
             switch (engine.mode, desired) {
             case (_, nil), (.control, .meterOnly):
                 tearDownEngine(id)
             case (.control, .control):
-                engine.setGain(setting.effectiveGain)
+                engine.setGain(ducking.gain(for: id, setting: setting))
             case (.meterOnly, _):
                 break
             }

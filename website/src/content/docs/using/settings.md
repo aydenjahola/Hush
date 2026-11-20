@@ -1,6 +1,6 @@
 ---
 title: Settings
-description: Launch at login, maximum boost, showing idle apps, the keyboard shortcut, the mixer's layout and appearance, hidden apps, presets, resetting levels, update checks, and where Hush keeps its settings.
+description: Launch at login, maximum boost, showing idle apps, the keyboard shortcut, the mixer's layout and appearance, hidden apps, presets, ducking during calls, resetting levels, update checks, and where Hush keeps its settings.
 ---
 
 To open Settings, click the gear button in the bottom-right corner of the mixer. The Settings window comes to the front even if another app is active.
@@ -107,6 +107,15 @@ The presets you've saved, each with its name and how many apps it holds. A check
 
 Apply and Save are greyed out until Hush has Audio Recording permission.
 
+## Ducking
+
+Lowers other apps while a call app uses the microphone. See [Ducking during calls](/Hush/using/ducking/) for how it works.
+
+- **Lower other apps during calls** turns ducking on or off. It's off by default.
+- **Lower other apps to** sets how far other apps go down, as a percentage of each app's own level: 0% to 90%, in steps of 5%. The default is 30%.
+- **Call apps** lists the apps whose microphone use starts ducking. Call apps are never lowered themselves. Click the row to open the list, where you can add a running app or choose one from Applications, remove apps, and **Restore Defaults**.
+- **Never lower** lists apps that keep their level during calls. It's empty to start with.
+
 ## Levels
 
 ### Remember levels for each output device
@@ -211,6 +220,7 @@ It looks like this:
 - The `updates` section remembers the update checker's state: whether automatic checks are on, the version you skipped, when "Later" ends and when Hush last checked. It may be missing or partly filled in.
 - `rememberLevelsPerDevice` in `preferences` is the [Remember levels for each output device](#remember-levels-for-each-output-device) setting. If it's missing, it's off.
 - `deviceLevels` holds each output device's saved levels, keyed by the device's unique ID: each has the device's `name` and an `apps` map like the top-level one (each level keeps its saved percent, even above a lowered maximum boost, and is clamped only when the device's levels are loaded), such as `{ "BuiltInSpeakerDevice" : { "name" : "MacBook Pro Speakers", "apps" : { … } } }`. A device with an empty `apps` map plays every app at 100%. It's missing when no device has saved levels, and it stays when you turn the setting off. A device that can't be read is skipped, and the rest of the file still loads.
+- `ducking`, present only once you've changed a [ducking](#ducking) setting, holds `isEnabled`, `percent`, `exceptions` (a list like `hiddenApps`) and, only if you've changed the call apps list, `callApps`. Without `callApps`, Hush uses its default list. A value that can't be read falls back to its default, and the rest of the file still loads. Whether a call is on, and how far apps are lowered at the moment, are never saved.
 - `hiddenApps`, present only once you've [hidden an app](#hidden-apps), lists each hidden app's `bundleID` (or executable name) and `displayName`, such as `{ "bundleID" : "com.apple.Safari", "displayName" : "Safari" }`. If it can't be read, Hush ignores it and keeps the rest of the file.
 - Hush rewrites the file after every change, so quit Hush before editing it by hand.
 - If the file can't be read, for example because it isn't valid JSON or comes from a newer version of Hush, Hush moves it aside as `settings.corrupt-<number>.json` in the same folder and starts with default settings. Your old file isn't deleted.

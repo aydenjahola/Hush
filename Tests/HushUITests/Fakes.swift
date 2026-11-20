@@ -26,6 +26,9 @@ final class FakeProcessSource: AudioProcessSource {
 
     private(set) var pollingCalls: [ProcessPolling] = []
     func setPolling(_ polling: ProcessPolling) { pollingCalls.append(polling) }
+
+    private(set) var inputPollingCalls: [ProcessPolling?] = []
+    func setInputPolling(_ polling: ProcessPolling?) { inputPollingCalls.append(polling) }
 }
 
 @MainActor
@@ -219,6 +222,9 @@ final class Harness {
     let persister: FakePersister
     /// Stands in for `NSWorkspace.shared.notificationCenter`; `simulateWake()` posts to it.
     let wakeNotifications = NotificationCenter()
+    /// The store's clock. Ducking's wake-ups never fire on their own (their
+    /// sleep never returns), so tests move this and call `tick(after:)`.
+    let clock = TestClock()  // starts at `fixedNow`
     let store: MixerStore
 
     init(
@@ -227,6 +233,9 @@ final class Harness {
         answer: AudioCapturePermissionStatus? = nil,
         outputErrorDuration: Duration = .seconds(3600),
         healthCheckDelay: Duration = .seconds(3600),
+        duckingSleep: @escaping @Sendable (Duration) async throws -> Void = { _ in
+            try await Task.sleep(for: .seconds(3600))
+        },
         installedApp: @escaping @MainActor (String) -> InstalledAppInfo? = { _ in nil }
     ) {
         let processes = FakeProcessSource()
@@ -241,6 +250,7 @@ final class Harness {
         self.factory = factory
         self.permission = permission
         self.persister = persister
+        let clock = self.clock
         self.store = MixerStore(
             processSource: processes,
             outputSource: output,
@@ -253,9 +263,16 @@ final class Harness {
             healthCheckDelay: healthCheckDelay,
             stallConfirmDelay: healthCheckDelay,
             stallRetryDelay: .seconds(3600),
-            now: { Harness.fixedNow },
+            duckingSleep: duckingSleep,
+            now: { MainActor.assumeIsolated { clock.now } },
             installedApp: installedApp)
         store.start()
+    }
+
+    /// Moves the clock on and runs the ducking wake-up the store would have run.
+    func tick(after seconds: TimeInterval) {
+        clock.advance(seconds)
+        store.duckingTick()
     }
 
     /// Posts a wake notification, as `NSWorkspace` does when the Mac wakes.

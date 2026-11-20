@@ -34,6 +34,7 @@ export default defineConfig({
           items: [
             { label: 'The mixer', slug: 'using/mixer' },
             { label: 'Presets', slug: 'using/presets' },
+            { label: 'Ducking during calls', slug: 'using/ducking' },
             { label: 'Settings', slug: 'using/settings' },
             { label: 'Keyboard and accessibility', slug: 'using/keyboard-accessibility' },
           ],

@@ -50,6 +50,21 @@ final class FakeProcessHAL: ProcessHAL {
         return running[object] ?? false
     }
 
+    var capturing: [AudioObjectID: Bool] = [:]
+    private(set) var inputReads: [AudioObjectID] = []
+
+    func isRunningInput(_ object: AudioObjectID) -> Bool {
+        inputReads.append(object)
+        return capturing[object] ?? false
+    }
+
+    func fireInput(_ object: AudioObjectID) { fire(object, kAudioProcessPropertyIsRunningInput) }
+
+    /// The selectors with a listener on `object`.
+    func selectors(on object: AudioObjectID) -> Set<AudioObjectPropertySelector> {
+        Set(listeners.keys.filter { $0.object == object }.map(\.selector))
+    }
+
     func addListener(
         _ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ handler: @escaping @MainActor () -> Void
     ) -> HALListener? {
@@ -85,6 +100,7 @@ final class FakeProcessHAL: ProcessHAL {
         pidReads = []
         bundleIDReads = []
         runningReads = []
+        inputReads = []
     }
 }
 

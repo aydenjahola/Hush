@@ -41,9 +41,10 @@ Switch output from the pill at the top of the mixer, or right-click the menu bar
 - **Remembers** each app's level across restarts
 - **Per-device levels (optional):** each output device can keep its own app levels, so switching between speakers and headphones brings back the levels you set for each
 - **Presets:** save every app's level under a name, such as "Call" or "Focus", and switch back to it from the quick menu or Settings
+- **Ducking during calls (optional):** while Zoom, FaceTime, Teams, Discord, Slack, Webex or a browser call uses the microphone, other apps fade down to a level you choose, then back up when the call ends. Your own levels never change
 - Apps you haven't touched aren't processed at all (except to measure them for the level meters while the mixer is open, if meters are on)
 - **Switch your Mac's output device from the menu bar**
-- **Quick menu:** right-click (or two-finger or Control-click) the menu bar icon to switch output, apply a preset, mute or unmute every playing app, open Settings or quit
+- **Quick menu:** right-click (or two-finger or Control-click) the menu bar icon to switch output, apply a preset, turn ducking on or off, mute or unmute every playing app, open Settings or quit
 - **Optional global keyboard shortcut** to open the mixer from any app, with no extra permissions
 - **Follows your output device** when you switch headphones or speakers
 - **Tells you when a new version is available**

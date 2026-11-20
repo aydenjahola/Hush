@@ -37,5 +37,22 @@
 			<string>%lld apps</string>
 		</dict>
 	</dict>
+	<!-- Popover line while ducking is active for two or more call apps at once; the count varies by plural. -->
+	<key>Ducking for %lld apps</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@apps@</string>
+		<key>apps</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Ducking for %lld app</string>
+			<key>other</key>
+			<string>Ducking for %lld apps</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

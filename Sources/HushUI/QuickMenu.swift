@@ -43,19 +43,27 @@ package struct QuickMenuModel: Equatable {
     package var presets: [PresetItem]
     /// False without Audio Recording permission: presets can't be applied or saved then.
     package var presetsEnabled: Bool
+    /// "Duck During Calls" is on (checked).
+    package var duckingOn: Bool
+    /// False without Audio Recording permission: nothing can be ducked then.
+    package var duckingEnabled: Bool
 
     package init(
         outputs: [Output],
         bulkMute: BulkMuteAction,
         canCheckForUpdates: Bool,
         presets: [PresetItem] = [],
-        presetsEnabled: Bool = true
+        presetsEnabled: Bool = true,
+        duckingOn: Bool = false,
+        duckingEnabled: Bool = true
     ) {
         self.outputs = outputs
         self.bulkMute = bulkMute
         self.canCheckForUpdates = canCheckForUpdates
         self.presets = presets
         self.presetsEnabled = presetsEnabled
+        self.duckingOn = duckingOn
+        self.duckingEnabled = duckingEnabled
     }
 
     /// The model for the current store and update state. Outputs use the same list (and the
@@ -70,6 +78,8 @@ package struct QuickMenuModel: Equatable {
         let active = store.activePresetID
         self.presets = store.presets.map { PresetItem(id: $0.id, name: $0.name, isActive: $0.id == active) }
         self.presetsEnabled = store.controlsEnabled
+        self.duckingOn = store.duckingEnabled
+        self.duckingEnabled = store.controlsEnabled
     }
 }
 
@@ -87,6 +97,8 @@ package struct QuickMenuActions {
     package var savePreset: () -> Void
     /// Opens Settings on the Presets section.
     package var managePresets: () -> Void
+    /// Turns "Lower other apps during calls" on or off.
+    package var toggleDucking: () -> Void
 
     package init(
         selectOutput: @escaping (OutputDevice) -> Void,
@@ -98,7 +110,8 @@ package struct QuickMenuActions {
         quit: @escaping () -> Void,
         applyPreset: @escaping (Preset.ID) -> Void = { _ in },
         savePreset: @escaping () -> Void = {},
-        managePresets: @escaping () -> Void = {}
+        managePresets: @escaping () -> Void = {},
+        toggleDucking: @escaping () -> Void = {}
     ) {
         self.selectOutput = selectOutput
         self.openSoundSettings = openSoundSettings
@@ -110,11 +123,13 @@ package struct QuickMenuActions {
         self.applyPreset = applyPreset
         self.savePreset = savePreset
         self.managePresets = managePresets
+        self.toggleDucking = toggleDucking
     }
 }
 
 /// Builds the menu that opens on a right-click (or two-finger or Control-click) of the menu bar
-/// icon: Output ▸, Presets ▸, Mute All Playing Apps / Unmute All, Settings…, Check for Updates…, Quit Hush.
+/// icon: Output ▸, Presets ▸, Duck During Calls, Mute All Playing Apps / Unmute All, Settings…,
+/// Check for Updates…, Quit Hush.
 package enum QuickMenu {
     /// System Settings → Sound, the same page as the output pill's "Sound Settings…".
     package static var soundSettingsURL: URL { OutputPicker.soundSettingsURL }
@@ -135,6 +150,12 @@ package enum QuickMenu {
         presets.image = symbol("slider.horizontal.3")
         presets.submenu = presetsSubmenu(model.presets, enabled: model.presetsEnabled, actions: actions)
 
+        let ducking = ActionMenuItem.make(
+            title: String(localized: L10n.duckDuringCalls), handler: actions.toggleDucking)
+        ducking.image = symbol(DuckingIndicatorLine.symbolName)
+        ducking.state = model.duckingOn ? .on : .off
+        ducking.isEnabled = model.duckingEnabled
+
         let bulk: NSMenuItem
         switch model.bulkMute.kind {
         case .muteAllPlaying:
@@ -153,7 +174,7 @@ package enum QuickMenu {
         checkForUpdates.isEnabled = model.canCheckForUpdates
         let quit = ActionMenuItem.make(title: String(localized: L10n.quit), keyEquivalent: "q", handler: actions.quit)
 
-        return [output, presets, bulk, .separator(), settings, checkForUpdates, .separator(), quit]
+        return [output, presets, ducking, bulk, .separator(), settings, checkForUpdates, .separator(), quit]
     }
 
     private static func outputSubmenu(_ outputs: [QuickMenuModel.Output], actions: QuickMenuActions) -> NSMenu {

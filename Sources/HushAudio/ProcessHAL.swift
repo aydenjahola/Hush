@@ -17,6 +17,8 @@ protocol ProcessHAL: AnyObject {
     /// Nil when the process has no bundle ID; throws when the read itself failed.
     func bundleID(of object: AudioObjectID) throws -> String?
     func isRunningOutput(_ object: AudioObjectID) -> Bool
+    /// Whether the process is capturing audio input (a microphone). No extra permission needed.
+    func isRunningInput(_ object: AudioObjectID) -> Bool
     /// Calls `handler` on the main queue whenever `selector` changes on `object`. Nil if the HAL refused.
     func addListener(
         _ object: AudioObjectID,
@@ -47,6 +49,12 @@ final class CoreAudioProcessHAL: ProcessHAL {
     func isRunningOutput(_ object: AudioObjectID) -> Bool {
         let value =
             (try? CoreAudioProperty.scalar(object, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0))) ?? 0
+        return value != 0
+    }
+
+    func isRunningInput(_ object: AudioObjectID) -> Bool {
+        let value =
+            (try? CoreAudioProperty.scalar(object, kAudioProcessPropertyIsRunningInput, initial: UInt32(0))) ?? 0
         return value != 0
     }
 
