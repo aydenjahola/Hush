@@ -23,6 +23,13 @@ enum IntegrationEnvironment {
         ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true"
     }
 
+    /// How long a wait for audio to settle may take: as given on hardware, five times that on
+    /// GitHub Actions, where the VM can stall Core Audio for over a second. Only for waits whose
+    /// failure means "never got there"; latency budgets (the 300 ms mute) use `expectTiming`.
+    static func settleTimeout(_ timeout: Duration) -> Duration {
+        isGitHubActions ? timeout * 5 : timeout
+    }
+
     static let disabledMessage: Comment =
         "Core Audio integration test: runs only with HUSH_INTEGRATION=1 (use `make integration-test`)"
 
@@ -86,6 +93,31 @@ enum IntegrationEnvironment {
         } else {
             FileManager.default.createFile(atPath: path, contents: line)
         }
+    }
+}
+
+/// A real-time check: a gap, a burst, an overlap or a latency budget. These measure scheduling as
+/// much as Hush, so they're strict on hardware (`make integration-test`, the release gate for audio
+/// changes) and soft on GitHub Actions, whose VM stalls coreaudiod and BlackHole's clock for
+/// anywhere from a few buffers to a quarter of a second (measured: zero runs of 740–11076 frames
+/// against 512 on hardware). On CI a miss is a known intermittent issue: it's printed with a
+/// `[ci-timing]` prefix, counted in the job summary, and doesn't fail the run. Checks of what
+/// Hush does (levels, mute holding, teardown) stay hard everywhere.
+func expectTiming(
+    _ condition: Bool, _ comment: @autoclosure () -> Comment, sourceLocation: SourceLocation = #_sourceLocation
+) {
+    guard !condition else { return }
+    guard IntegrationEnvironment.isGitHubActions else {
+        Issue.record(comment(), sourceLocation: sourceLocation)
+        return
+    }
+    let comment = comment()
+    print("[ci-timing] \(sourceLocation.fileName):\(sourceLocation.line): \(comment)")
+    withKnownIssue(
+        "Real-time check on the GitHub Actions VM: strict on hardware, soft here", isIntermittent: true,
+        sourceLocation: sourceLocation
+    ) {
+        Issue.record(comment, sourceLocation: sourceLocation)
     }
 }
 
