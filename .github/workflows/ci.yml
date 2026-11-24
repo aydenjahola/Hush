@@ -127,8 +127,19 @@ jobs:
           passed=$(printf '%s\n' "$tests" | grep -c ' passed after' || true)
           skipped=$(printf '%s\n' "$tests" | grep -E ' skipped([:.]|$)' | grep -cvE ' (passed|failed) after' || true)
           failed=$(printf '%s\n' "$tests" | grep -c ' failed after' || true)
-          echo "Integration tests: ${passed} passed, ${skipped} skipped, ${failed} failed"
+          # Real-time checks (gaps, bursts, latency) are soft on this VM: a miss is printed as a
+          # [ci-timing] line and recorded as a known issue instead of failing (see expectTiming).
+          timing=$(grep -E '^\[ci-timing\] ' integration.log || true)
+          soft=$(printf '%s' "$timing" | grep -c '' || true)
+          echo "Integration tests: ${passed} passed, ${skipped} skipped, ${failed} failed, ${soft} soft timing misses"
           {
             echo "### Core Audio integration tests (experimental)"
             echo "${passed} passed, ${skipped} skipped, ${failed} failed"
+            if [ "$soft" -gt 0 ]; then
+              echo
+              echo "${soft} real-time check(s) missed on the VM (soft here, strict on hardware):"
+              echo '```'
+              printf '%s\n' "$timing"
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

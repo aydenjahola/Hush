@@ -188,9 +188,14 @@ extension CoreAudioIntegration {
                 try engine.start()
 
                 // Prove the lists can see what we create, or the "after" check proves nothing.
+                // Polled: the HAL can publish a new aggregate after start() returns (seen on CI).
+                let aggregateVisible = await waitUntil(timeout: IntegrationEnvironment.settleTimeout(.seconds(1))) {
+                    Set(AudioDevices.hushAggregateUIDs()).subtracting(aggregatesBefore).count == 1
+                }
                 #expect(
-                    Set(AudioDevices.hushAggregateUIDs()).subtracting(aggregatesBefore).count == 1,
-                    "expected exactly one new Hush aggregate while a \(mode) engine runs")
+                    aggregateVisible,
+                    "expected exactly one new Hush aggregate while a \(mode) engine runs (found \(Set(AudioDevices.hushAggregateUIDs()).subtracting(aggregatesBefore).count))"
+                )
                 let tapsWhileRunning = AudioDevices.tapIDs().map(Set.init)
                 let tapsVisible = tapsBefore != nil && tapsWhileRunning.map { $0.count > tapsBefore!.count } == true
 
